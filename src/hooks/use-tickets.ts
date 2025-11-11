@@ -1,0 +1,254 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { TicketsService, Ticket, TicketInsert, TicketUpdate, TicketWithRelations } from '@/lib/services/tickets'
+
+const QUERY_KEYS = {
+  tickets: ['tickets'] as const,
+  ticket: (id: string) => ['tickets', id] as const,
+  stats: ['tickets', 'stats'] as const,
+}
+
+// Hook para obtener todos los tickets
+export function useTickets() {
+  return useQuery({
+    queryKey: QUERY_KEYS.tickets,
+    queryFn: () => TicketsService.getAll(),
+  })
+}
+
+// Hook para obtener un ticket específico
+export function useTicket(id: string) {
+  return useQuery({
+    queryKey: QUERY_KEYS.ticket(id),
+    queryFn: () => TicketsService.getById(id),
+    enabled: !!id,
+  })
+}
+
+// Hook para obtener estadísticas
+export function useTicketStats() {
+  return useQuery({
+    queryKey: QUERY_KEYS.stats,
+    queryFn: () => TicketsService.getStats(),
+  })
+}
+
+// Hook para crear ticket
+export function useCreateTicket() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (data: TicketInsert) => TicketsService.create(data),
+    onMutate: async (newTicket) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: QUERY_KEYS.tickets })
+
+      // Snapshot previous value
+      const previousTickets = queryClient.getQueryData<TicketWithRelations[]>(QUERY_KEYS.tickets)
+
+      // Optimistically update
+      const optimisticTicket: TicketWithRelations = {
+        id: `temp-${Date.now()}`,
+        ...newTicket,
+        status: newTicket.status || 'open',
+        priority: newTicket.priority || 'medium',
+        resolved_at: undefined,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+
+      queryClient.setQueryData<TicketWithRelations[]>(
+        QUERY_KEYS.tickets,
+        (old) => old ? [optimisticTicket, ...old] : [optimisticTicket]
+      )
+
+      return { previousTickets }
+    },
+    onError: (error, newTicket, context) => {
+      // Rollback
+      queryClient.setQueryData(QUERY_KEYS.tickets, context?.previousTickets)
+      toast.error('Error al crear ticket', {
+        description: error.message,
+      })
+    },
+    onSuccess: (data) => {
+      toast.success('Ticket creado exitosamente', {
+        description: `Ticket #${data.id.slice(-8)} ha sido creado`,
+      })
+    },
+    onSettled: () => {
+      // Refetch
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tickets })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.stats })
+    },
+  })
+}
+
+// Hook para actualizar ticket
+export function useUpdateTicket() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: TicketUpdate }) =>
+      TicketsService.update(id, data),
+    onMutate: async ({ id, data }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: QUERY_KEYS.tickets })
+      await queryClient.cancelQueries({ queryKey: QUERY_KEYS.ticket(id) })
+
+      // Snapshot previous values
+      const previousTickets = queryClient.getQueryData<TicketWithRelations[]>(QUERY_KEYS.tickets)
+      const previousTicket = queryClient.getQueryData<TicketWithRelations>(QUERY_KEYS.ticket(id))
+
+      // Optimistically update tickets list
+      queryClient.setQueryData<TicketWithRelations[]>(
+        QUERY_KEYS.tickets,
+        (old) =>
+          old?.map((ticket) =>
+            ticket.id === id 
+              ? { ...ticket, ...data, updated_at: new Date().toISOString() }
+              : ticket
+          ) || []
+      )
+
+      // Optimistically update single ticket
+      if (previousTicket) {
+        queryClient.setQueryData<TicketWithRelations>(
+          QUERY_KEYS.ticket(id),
+          { ...previousTicket, ...data, updated_at: new Date().toISOString() }
+        )
+      }
+
+      return { previousTickets, previousTicket }
+    },
+    onError: (error, { id }, context) => {
+      // Rollback
+      queryClient.setQueryData(QUERY_KEYS.tickets, context?.previousTickets)
+      queryClient.setQueryData(QUERY_KEYS.ticket(id), context?.previousTicket)
+      toast.error('Error al actualizar ticket', {
+        description: error.message,
+      })
+    },
+    onSuccess: (data) => {
+      toast.success('Ticket actualizado', {
+        description: `Ticket #${data.id.slice(-8)} ha sido actualizado`,
+      })
+    },
+    onSettled: () => {
+      // Refetch
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tickets })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.stats })
+    },
+  })
+}
+
+// Hook para eliminar ticket
+export function useDeleteTicket() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => TicketsService.delete(id),
+    onMutate: async (id) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: QUERY_KEYS.tickets })
+
+      // Snapshot previous value
+      const previousTickets = queryClient.getQueryData<TicketWithRelations[]>(QUERY_KEYS.tickets)
+
+      // Optimistically update
+      queryClient.setQueryData<TicketWithRelations[]>(
+        QUERY_KEYS.tickets,
+        (old) => old?.filter((ticket) => ticket.id !== id) || []
+      )
+
+      return { previousTickets }
+    },
+    onError: (error, id, context) => {
+      // Rollback
+      queryClient.setQueryData(QUERY_KEYS.tickets, context?.previousTickets)
+      toast.error('Error al eliminar ticket', {
+        description: error.message,
+      })
+    },
+    onSuccess: (_, id) => {
+      toast.success('Ticket eliminado', {
+        description: `Ticket #${id.slice(-8)} ha sido eliminado`,
+      })
+    },
+    onSettled: () => {
+      // Refetch
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tickets })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.stats })
+    },
+  })
+}
+
+// Hook para actualizar solo el status
+export function useUpdateTicketStatus() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: Ticket['status'] }) =>
+      TicketsService.updateStatus(id, status),
+    onMutate: async ({ id, status }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: QUERY_KEYS.tickets })
+      await queryClient.cancelQueries({ queryKey: QUERY_KEYS.ticket(id) })
+
+      // Snapshot previous values
+      const previousTickets = queryClient.getQueryData<TicketWithRelations[]>(QUERY_KEYS.tickets)
+      const previousTicket = queryClient.getQueryData<TicketWithRelations>(QUERY_KEYS.ticket(id))
+
+      const updates = {
+        status,
+        updated_at: new Date().toISOString(),
+        ...(status === 'resolved' && { resolved_at: new Date().toISOString() })
+      }
+
+      // Optimistically update tickets list
+      queryClient.setQueryData<TicketWithRelations[]>(
+        QUERY_KEYS.tickets,
+        (old) =>
+          old?.map((ticket) =>
+            ticket.id === id ? { ...ticket, ...updates } : ticket
+          ) || []
+      )
+
+      // Optimistically update single ticket
+      if (previousTicket) {
+        queryClient.setQueryData<TicketWithRelations>(
+          QUERY_KEYS.ticket(id),
+          { ...previousTicket, ...updates }
+        )
+      }
+
+      return { previousTickets, previousTicket }
+    },
+    onError: (error, { id }, context) => {
+      // Rollback
+      queryClient.setQueryData(QUERY_KEYS.tickets, context?.previousTickets)
+      queryClient.setQueryData(QUERY_KEYS.ticket(id), context?.previousTicket)
+      toast.error('Error al actualizar estado', {
+        description: error.message,
+      })
+    },
+    onSuccess: (data) => {
+      const statusLabels = {
+        open: 'abierto',
+        in_progress: 'en progreso',
+        pending: 'pendiente',
+        resolved: 'resuelto',
+        closed: 'cerrado'
+      }
+      
+      toast.success('Estado actualizado', {
+        description: `Ticket marcado como ${statusLabels[data.status]}`,
+      })
+    },
+    onSettled: () => {
+      // Refetch
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tickets })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.stats })
+    },
+  })
+}
