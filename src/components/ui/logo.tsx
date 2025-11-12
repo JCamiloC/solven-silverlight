@@ -43,7 +43,7 @@ export function Logo({
   if (variant === 'icon') {
     return (
       <div className={cn(
-        'flex items-center justify-center rounded-lg bg-gradient-to-br from-brand-primary-400 to-brand-primary-600',
+        'flex items-center justify-center rounded-lg bg-gradient-to-br from-[#4bc5d4] to-[#1d8fb5]',
         config.container,
         'aspect-square',
         className
@@ -64,7 +64,7 @@ export function Logo({
     return (
       <div className={cn('flex items-center space-x-2', className)}>
         <div className={cn(
-          'flex items-center justify-center rounded-lg bg-gradient-to-br from-brand-primary-400 to-brand-primary-600',
+          'flex items-center justify-center rounded-lg bg-gradient-to-br from-[#4bc5d4] to-[#1d8fb5]',
           config.container,
           'aspect-square'
         )}>
@@ -78,7 +78,7 @@ export function Logo({
           </span>
         </div>
         <span className={cn(
-          'font-bold bg-gradient-to-r from-brand-primary-600 to-brand-primary-500 bg-clip-text text-transparent',
+          'font-bold text-[#24add6] tracking-tight',
           config.text
         )}>
           Solven
@@ -91,7 +91,7 @@ export function Logo({
     <div className={cn('flex flex-col items-start', className)}>
       <div className="flex items-center space-x-3">
         <div className={cn(
-          'flex items-center justify-center rounded-xl bg-gradient-to-br from-brand-primary-400 to-brand-primary-600 shadow-lg',
+          'flex items-center justify-center rounded-xl bg-gradient-to-br from-[#4bc5d4] to-[#1d8fb5] shadow-lg',
           config.container,
           'aspect-square'
         )}>
@@ -106,7 +106,7 @@ export function Logo({
         </div>
         <div className="flex flex-col">
           <span className={cn(
-            'font-bold bg-gradient-to-r from-brand-primary-600 to-brand-primary-500 bg-clip-text text-transparent tracking-tight',
+            'font-bold text-[#24add6] tracking-tight',
             config.text
           )}>
             Solven
@@ -121,14 +121,6 @@ export function Logo({
           )}
         </div>
       </div>
-      {showTagline && variant === 'full' && (
-        <span className={cn(
-          'text-muted-foreground font-normal mt-1 ml-1',
-          config.tagline
-        )}>
-          Silverlight Colombia
-        </span>
-      )}
     </div>
   )
 }
@@ -137,14 +129,14 @@ export function Logo({
 export function SidebarLogo() {
   return (
     <div className="flex items-center space-x-3 px-4 py-2">
-      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-brand-primary-400 to-brand-primary-600 shadow-sm">
+      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-[#4bc5d4] to-[#1d8fb5] shadow-sm">
         <span className="text-sm font-bold text-white">S</span>
       </div>
       <div className="flex flex-col">
-        <span className="text-lg font-bold bg-gradient-to-r from-brand-primary-600 to-brand-primary-500 bg-clip-text text-transparent tracking-tight">
+        <span className="text-lg font-bold text-[#24add6] tracking-tight">
           Solven
         </span>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground -mt-1">
           Silverlight Colombia
         </span>
       </div>
@@ -156,10 +148,10 @@ export function SidebarLogo() {
 export function HeaderLogo() {
   return (
     <div className="flex items-center space-x-2">
-      <div className="flex items-center justify-center w-6 h-6 rounded bg-gradient-to-br from-brand-primary-400 to-brand-primary-600">
+      <div className="flex items-center justify-center w-6 h-6 rounded bg-gradient-to-br from-[#4bc5d4] to-[#1d8fb5]">
         <span className="text-xs font-bold text-white">S</span>
       </div>
-      <span className="text-base font-bold bg-gradient-to-r from-brand-primary-600 to-brand-primary-500 bg-clip-text text-transparent">
+      <span className="text-base font-bold text-[#24add6]">
         Solven
       </span>
     </div>

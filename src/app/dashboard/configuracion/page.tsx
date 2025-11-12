@@ -1,35 +1,35 @@
 'use client'
 
 import { SecuritySettings } from '@/components/security/security-settings'
-import { ThemeSelector } from '@/components/ui/theme-selector'
+import { UserProfile } from '@/components/security/user-profile'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { Palette, Shield } from 'lucide-react'
+import { User, Shield } from 'lucide-react'
 
 export default function ConfiguracionPage() {
   return (
     <div className="container max-w-4xl py-6 space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">Configuración del Sistema</h1>
+        <h1 className="text-3xl font-bold">Configuración</h1>
         <p className="text-muted-foreground mt-2">
-          Gestiona la seguridad, apariencia y configuraciones generales del sistema
+          Gestiona tu perfil personal y configuraciones de seguridad
         </p>
       </div>
 
-      {/* Configuración de Tema */}
+      {/* Perfil de Usuario */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Palette className="h-5 w-5" />
-            Configuración Visual
+            <User className="h-5 w-5" />
+            Mi Perfil
           </CardTitle>
           <CardDescription>
-            Personaliza la apariencia de la aplicación según tu organización
+            Actualiza tu información personal y datos de contacto
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ThemeSelector variant="inline" />
+          <UserProfile />
         </CardContent>
       </Card>
 

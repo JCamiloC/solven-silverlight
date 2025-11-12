@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,7 +15,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [sessionMessage, setSessionMessage] = useState('')
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const reason = searchParams.get('reason')
+    if (reason === 'timeout') {
+      setSessionMessage('Tu sesión ha expirado por inactividad. Por favor, inicia sesión nuevamente.')
+    } else if (reason === 'expired') {
+      setSessionMessage('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.')
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,11 +44,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
+    <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold">Mesa de Ayuda</h1>
-          <p className="text-muted-foreground">Inicia sesión en tu cuenta</p>
+          <h1 className="text-3xl font-bold text-slate-800">Solven</h1>
+          <p className="text-muted-foreground">Sistema de Gestión Integral</p>
         </div>
         
         <Card>
@@ -49,6 +60,12 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {sessionMessage && (
+                <Alert>
+                  <AlertDescription>{sessionMessage}</AlertDescription>
+                </Alert>
+              )}
+              
               {error && (
                 <Alert variant="destructive">
                   <AlertDescription>{error}</AlertDescription>
@@ -83,11 +100,18 @@ export default function LoginPage() {
               </Button>
             </form>
             
-            <div className="mt-4 text-center text-sm">
-              ¿No tienes cuenta?{' '}
-              <Link href="/auth/register" className="text-primary hover:underline">
-                Registrarse
-              </Link>
+            <div className="mt-4 text-center text-sm space-y-2">
+              <div>
+                <Link href="/auth/forgot-password" className="text-primary hover:underline">
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </div>
+              <div>
+                ¿No tienes cuenta?{' '}
+                <Link href="/auth/register" className="text-primary hover:underline">
+                  Registrarse
+                </Link>
+              </div>
             </div>
           </CardContent>
         </Card>

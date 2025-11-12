@@ -11,9 +11,9 @@ import { ProtectedRoute } from '@/components/auth/protected-route'
 export default function DashboardPage() {
   return (
     <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
-      <div className="container mx-auto py-6 space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
             Resumen general del sistema de mesa de ayuda
           </p>
@@ -21,7 +21,7 @@ export default function DashboardPage() {
 
         <DashboardStats />
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
           <RecentTickets />
           <HardwareOverview />
         </div>

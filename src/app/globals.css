@@ -46,7 +46,7 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
+  --background: oklch(92.98% 0.03741 198.749);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -119,5 +119,22 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Sidebar button hover styles */
+@layer components {
+  .sidebar-button {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+  
+  .sidebar-button:hover {
+    background-color: #24add6 !important;
+    color: white !important;
+  }
+  
+  .sidebar-button:hover svg {
+    color: white !important;
   }
 }

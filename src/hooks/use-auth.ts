@@ -47,6 +47,8 @@ export function useAuth() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth event:', event, session ? 'Session exists' : 'No session')
+        
         if (session?.user) {
           const profile = await getProfile(session.user.id)
           setAuthState({
@@ -60,8 +62,14 @@ export function useAuth() {
             profile: null,
             loading: false,
           })
+          
+          // Handle different logout scenarios
           if (event === 'SIGNED_OUT') {
             router.push('/auth/login')
+          } else if (event === 'TOKEN_REFRESHED' && !session) {
+            // Token refresh failed, likely expired
+            console.log('Token refresh failed, redirecting to login')
+            router.push('/auth/login?reason=expired')
           }
         }
       }

@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Bell, Search, User } from 'lucide-react'
+import { Bell, User, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { MobileSidebar } from './mobile-sidebar'
+import { useSidebar } from './sidebar-context'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -13,19 +14,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { ThemeSelector } from '@/components/ui/theme-selector'
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/hooks/use-auth'
+import { usePageTitle } from '@/hooks/use-page-title'
+import { useRouter } from 'next/navigation'
 
 interface HeaderProps {
-  title?: string
+  // Ya no necesitamos title como prop
 }
 
-export function Header({ title = 'Dashboard' }: HeaderProps) {
+export function Header({}: HeaderProps) {
   const [notifications] = useState(0) // Real notification count will be implemented later
   const [mounted, setMounted] = useState(false)
   const { profile, signOut } = useAuth()
+  const title = usePageTitle() // Obtener título dinámico basado en la ruta
+  const router = useRouter()
 
   // Prevent hydration mismatch
   useEffect(() => {
@@ -56,33 +59,29 @@ export function Header({ title = 'Dashboard' }: HeaderProps) {
     return roleMap[profile.role] || profile.role
   }
 
+  const { toggleSidebar } = useSidebar()
+
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center">
-        <div className="mr-4 flex">
-          <h1 className="text-lg font-semibold">{title}</h1>
+    <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="flex h-14 items-center px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center">
+          <MobileSidebar />
+          {/* Desktop sidebar toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleSidebar}
+            className="hidden md:flex mr-2"
+            aria-label="Toggle sidebar"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <h1 className="text-lg font-semibold ml-2 md:ml-0 truncate">{title}</h1>
         </div>
         
-        <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-          {/* Search */}
-          <div className="w-full flex-1 md:w-auto md:flex-none">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar..."
-                className="w-full pl-8 md:w-[300px] lg:w-[400px]"
-              />
-            </div>
-          </div>
-          
+        <div className="flex flex-1 items-center justify-end ml-4">
           {/* Right side items */}
           <div className="flex items-center space-x-2">
-            {/* Theme selector */}
-            <ThemeSelector />
-            
-            {/* Theme toggle */}
-            <ThemeToggle />
-            
             {/* Notifications */}
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="h-4 w-4" />
@@ -125,15 +124,10 @@ export function Header({ title = 'Dashboard' }: HeaderProps) {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push('/dashboard/configuracion')}>
                     <User className="mr-2 h-4 w-4" />
                     Perfil
                   </DropdownMenuItem>
-                  {(profile?.role === 'administrador' || profile?.role === 'lider_soporte') && (
-                    <DropdownMenuItem>
-                      Configuración
-                    </DropdownMenuItem>
-                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
                     Cerrar sesión

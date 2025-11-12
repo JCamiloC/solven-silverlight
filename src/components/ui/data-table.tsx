@@ -69,9 +69,9 @@ export function DataTable<T extends { id: string | number }>({
   return (
     <Card className={cn('w-full', className)}>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
           <CardTitle>{title}</CardTitle>
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-2">
             {searchable && (
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -79,12 +79,12 @@ export function DataTable<T extends { id: string | number }>({
                   placeholder={searchPlaceholder}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 w-[250px]"
+                  className="pl-8 w-full sm:w-[250px]"
                 />
               </div>
             )}
             {onAdd && (
-              <Button onClick={onAdd} size="sm">
+              <Button onClick={onAdd} size="sm" className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 {addButtonText}
               </Button>
@@ -93,53 +93,55 @@ export function DataTable<T extends { id: string | number }>({
         </div>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {columns.map((column) => (
-                <TableHead key={String(column.key)}>{column.label}</TableHead>
-              ))}
-              {(onEdit || onDelete) && <TableHead className="text-right">Acciones</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredData.map((item) => (
-              <TableRow key={String(item.id)}>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
                 {columns.map((column) => (
-                  <TableCell key={String(column.key)}>
-                    {column.render
-                      ? column.render(item[column.key], item)
-                      : String(item[column.key])}
-                  </TableCell>
+                  <TableHead key={String(column.key)} className="whitespace-nowrap">{column.label}</TableHead>
                 ))}
-                {(onEdit || onDelete) && (
-                  <TableCell className="text-right">
-                    <div className="flex justify-end space-x-2">
-                      {onEdit && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onEdit(item)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {onDelete && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onDelete(item)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                )}
+                {(onEdit || onDelete) && <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filteredData.map((item) => (
+                <TableRow key={String(item.id)}>
+                  {columns.map((column) => (
+                    <TableCell key={String(column.key)} className="whitespace-nowrap">
+                      {column.render
+                        ? column.render(item[column.key], item)
+                        : String(item[column.key])}
+                    </TableCell>
+                  ))}
+                  {(onEdit || onDelete) && (
+                    <TableCell className="text-right whitespace-nowrap">
+                      <div className="flex justify-end space-x-2">
+                        {onEdit && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onEdit(item)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {onDelete && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onDelete(item)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
         {filteredData.length === 0 && (
           <div className="text-center py-6 text-muted-foreground">
             No se encontraron resultados

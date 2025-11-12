@@ -5,7 +5,9 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuth } from '@/hooks/use-auth'
+import { useSidebar } from './sidebar-context'
 import { 
   LayoutDashboard, 
   HardDrive, 
@@ -21,6 +23,7 @@ import { SidebarLogo } from '@/components/ui/logo'
 
 interface SidebarProps {
   className?: string
+  onNavigate?: () => void
 }
 
 const allNavigationItems = [
@@ -68,9 +71,10 @@ const allNavigationItems = [
   },
 ]
 
-export function Sidebar({ className }: SidebarProps) {
+export function Sidebar({ className, onNavigate }: SidebarProps) {
   const pathname = usePathname()
   const { profile, signOut } = useAuth()
+  const { isCollapsed, isHovered, setIsHovered } = useSidebar()
 
   // Filter navigation items based on user role
   const navigation = allNavigationItems.filter(item => 
@@ -85,66 +89,120 @@ export function Sidebar({ className }: SidebarProps) {
     }
   }
 
+  const showText = !isCollapsed || isHovered
+  const sidebarWidth = isCollapsed && !isHovered ? 'w-20' : 'w-64'
+
+  const NavButton = ({ item, isActive }: { item: any, isActive: boolean }) => {
+    const button = (
+      <Button
+        variant={isActive ? 'secondary' : 'ghost'}
+        className={cn(
+          'w-full sidebar-button',
+          showText ? 'justify-start' : 'justify-center',
+          isActive && 'bg-secondary',
+          !showText && 'px-1'
+        )}
+        asChild
+      >
+        <Link href={item.href} onClick={onNavigate}>
+          <item.icon className={cn('h-4 w-4', showText && 'mr-2')} />
+          {showText && item.name}
+        </Link>
+      </Button>
+    )
+
+    if (isCollapsed && !isHovered) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {button}
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>{item.name}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )
+    }
+
+    return button
+  }
+
   return (
-    <div className={cn('pb-12 w-64', className)}>
-      <div className="space-y-4 py-4">
-        <div className="px-3 py-2">
+    <div 
+      className={cn('transition-all duration-300 overflow-x-hidden flex flex-col h-full', sidebarWidth, className)}
+      onMouseEnter={() => isCollapsed && setIsHovered(true)}
+      onMouseLeave={() => isCollapsed && setIsHovered(false)}
+    >
+      {/* Top Section - Logo */}
+      <div className={showText ? "px-3 py-4 flex-shrink-0" : "px-1 py-4 flex-shrink-0"}>
+        {showText ? (
           <SidebarLogo />
-          {profile && (
-            <div className="mb-4 px-4">
-              <p className="text-sm text-muted-foreground">
-                {profile.first_name} {profile.last_name}
-              </p>
-              <p className="text-xs text-muted-foreground capitalize">
-                {profile.role.replace('_', ' ')}
-              </p>
+        ) : (
+          <div className="flex justify-center mb-4">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center shadow-sm" style={{ backgroundColor: '#24add6' }}>
+              <span className="text-white font-bold text-lg">S</span>
             </div>
-          )}
-          <div className="space-y-1">
-            {navigation.map((item) => (
-              <Button
-                key={item.name}
-                variant={pathname === item.href ? 'secondary' : 'ghost'}
-                className={cn(
-                  'w-full justify-start',
-                  pathname === item.href && 'bg-secondary'
-                )}
-                asChild
-              >
-                <Link href={item.href}>
-                  <item.icon className="mr-2 h-4 w-4" />
-                  {item.name}
-                </Link>
-              </Button>
-            ))}
           </div>
+        )}
+      </div>
+
+      {/* Middle Section - Main Navigation (Centered Vertically) */}
+      <div className={`flex-1 flex flex-col justify-center ${showText ? 'px-3' : 'px-1'}`}>
+        <div className="space-y-1">
+          {navigation.map((item) => (
+            <NavButton
+              key={item.name}
+              item={item}
+              isActive={pathname === item.href}
+            />
+          ))}
         </div>
-        <div className="px-3 py-2">
-          <div className="space-y-1">
-            {(profile?.role === 'administrador' || profile?.role === 'lider_soporte') && (
-              <Button 
-                variant={pathname === '/dashboard/configuracion' ? 'secondary' : 'ghost'} 
-                className={cn(
-                  'w-full justify-start',
-                  pathname === '/dashboard/configuracion' && 'bg-secondary'
-                )}
-                asChild
-              >
-                <Link href="/dashboard/configuracion">
-                  <Settings className="mr-2 h-4 w-4" />
-                  Configuración
-                </Link>
-              </Button>
-            )}
+      </div>
+      
+      {/* Bottom Section - Settings & Logout */}
+      <div className={`py-4 flex-shrink-0 border-t border-border/50 ${showText ? 'px-3' : 'px-1'}`}>
+        <div className="space-y-1">
+          {(profile?.role === 'administrador' || profile?.role === 'lider_soporte') && (
+            <NavButton
+              item={{
+                name: 'Configuración',
+                href: '/dashboard/configuracion',
+                icon: Settings
+              }}
+              isActive={pathname === '/dashboard/configuracion'}
+            />
+          )}
+          
+          {/* Logout button with tooltip when collapsed */}
+          {isCollapsed && !isHovered ? (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-center px-1 sidebar-button"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>Cerrar Sesión</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : (
             <Button 
               variant="ghost" 
-              className="w-full justify-start"
+              className="w-full justify-start sidebar-button"
               onClick={handleLogout}
             >
               <LogOut className="mr-2 h-4 w-4" />
               Cerrar Sesión
             </Button>
-          </div>
+          )}
         </div>
       </div>
     </div>

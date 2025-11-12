@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ReactQueryProvider } from '@/components/providers/react-query-provider'
-import { ThemeProvider } from '@/components/providers/theme-provider'
 import { ThemeProvider as BrandThemeProvider } from '@/components/providers/theme-provider-brand'
+import { SessionTimeoutProvider } from '@/components/providers/session-timeout-provider'
 import { Toaster } from '@/components/ui/sonner'
 
 const geistSans = Geist({
@@ -27,23 +27,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html lang="es" className="light" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gradient-to-br from-blue-50/30 to-slate-50/50 min-h-screen`}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <BrandThemeProvider>
-            <ReactQueryProvider>
+        <BrandThemeProvider>
+          <ReactQueryProvider>
+            <SessionTimeoutProvider
+              timeoutMinutes={30}
+              warningMinutes={5}
+              enabled={true}
+            >
               {children}
               <Toaster />
-            </ReactQueryProvider>
-          </BrandThemeProvider>
-        </ThemeProvider>
+            </SessionTimeoutProvider>
+          </ReactQueryProvider>
+        </BrandThemeProvider>
       </body>
     </html>
   );

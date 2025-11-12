@@ -45,64 +45,12 @@ export class UsersService {
 
 
   /**
-   * Obtiene todos los usuarios del sistema con emails reales de auth.users
+   * Obtiene todos los usuarios del sistema directamente de profiles
    */
   static async getAll(): Promise<User[]> {
     try {
-      // Intentar usar la función RPC primero
-      console.log('🔍 Intentando usar función RPC get_users_with_emails...')
-      const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_users_with_emails')
-
-      console.log('📊 RPC Result:', { rpcData, rpcError })
-
-      if (!rpcError && rpcData) {
-        console.log('✅ Usando función RPC - emails reales disponibles')
-        return rpcData.map((user: any) => ({
-          id: user.id,
-          user_id: user.user_id,
-          email: user.email,
-          first_name: user.first_name,
-          last_name: user.last_name,
-          phone: user.phone,
-          department: user.department,
-          role: user.role,
-          avatar_url: user.avatar_url,
-          created_at: user.created_at,
-          updated_at: user.updated_at,
-          totp_enabled: user.totp_enabled,
-          totp_secret: user.totp_secret,
-          last_totp_verification: user.last_totp_verification
-        }))
-      }
-
-      // Intentar función alternativa de prueba
-      console.log('🔍 Intentando función alternativa test_get_users...')
-      const { data: testData, error: testError } = await supabase
-        .rpc('test_get_users')
-
-      if (!testError && testData) {
-        console.log('✅ Usando función alternativa - emails reales disponibles')
-        return testData.map((user: any) => ({
-          id: user.id,
-          user_id: user.user_id,
-          email: user.email,
-          first_name: user.first_name,
-          last_name: user.last_name,
-          phone: user.phone,
-          department: user.department,
-          role: user.role,
-          avatar_url: user.avatar_url,
-          created_at: user.created_at,
-          updated_at: user.updated_at,
-          totp_enabled: user.totp_enabled,
-          totp_secret: user.totp_secret,
-          last_totp_verification: user.last_totp_verification
-        }))
-      }
-
-      // Fallback: obtener solo perfiles si ninguna función RPC funciona
-      console.warn('⚠️ Ninguna función RPC disponible, usando profiles only. Errors:', { rpcError, testError })
+      console.log('� Obteniendo usuarios desde profiles...')
+      
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
@@ -113,11 +61,13 @@ export class UsersService {
         throw new Error(`Error connecting to database: ${profilesError.message}`)
       }
 
-      // Mapear perfiles con emails generados temporalmente
+      console.log('✅ Usuarios obtenidos correctamente desde profiles')
+      
+      // Mapear perfiles con todos los datos disponibles
       return (profiles || []).map((profile) => ({
         id: profile.id,
         user_id: profile.user_id,
-        email: `${profile.first_name?.toLowerCase()}.${profile.last_name?.toLowerCase()}@empresa.com`,
+        email: profile.email || `${profile.first_name?.toLowerCase()}.${profile.last_name?.toLowerCase()}@empresa.com`,
         first_name: profile.first_name,
         last_name: profile.last_name,
         phone: profile.phone,
@@ -126,7 +76,7 @@ export class UsersService {
         avatar_url: profile.avatar_url,
         created_at: profile.created_at,
         updated_at: profile.updated_at,
-        totp_enabled: profile.totp_enabled,
+        totp_enabled: profile.totp_enabled || false,
         totp_secret: profile.totp_secret,
         last_totp_verification: profile.last_totp_verification
       }))
