@@ -8,9 +8,15 @@ const nextConfig: NextConfig = {
   
   // Configuración de imágenes
   images: {
-    domains: [
-      'placeholder.supabase.co', // Temporal para desarrollo
-      // Agregar dominio real de Supabase cuando esté configurado
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'placeholder.supabase.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'qnwbaxlqdpdwfvrkqpvz.supabase.co',
+      },
     ],
   },
   
