@@ -16,7 +16,7 @@ import {
 import Link from 'next/link'
 
 export function QuickActions() {
-  const { profile, hasRole } = useAuth()
+  const { hasRole } = useAuth()
 
   const clientActions = [
     {

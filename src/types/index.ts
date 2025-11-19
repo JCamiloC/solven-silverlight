@@ -1,5 +1,14 @@
 export type UserRole = 'cliente' | 'agente_soporte' | 'lider_soporte' | 'administrador'
 
+export type UserType = 
+  | 'on_demand_software'
+  | 'on_demand_hardware'
+  | 'on_demand_ambos'
+  | 'contrato_software'
+  | 'contrato_hardware'
+  | 'contrato_ambos'
+  | 'no_aplica'
+
 export interface User {
   id: string
   email: string
@@ -12,12 +21,16 @@ export interface User {
 export interface Profile {
   id: string
   user_id: string
+  client_id?: string
   email: string
   first_name: string
   last_name: string
   phone?: string
   role: UserRole
+  user_type?: UserType
   avatar_url?: string
+  totp_secret?: string
+  totp_enabled?: boolean
   created_at: string
   updated_at: string
 }

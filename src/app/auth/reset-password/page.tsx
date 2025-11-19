@@ -71,10 +71,11 @@ function ResetPasswordForm() {
         router.push('/dashboard')
       }, 3000)
 
-    } catch (err: any) {
-      console.error('Error updating password:', err)
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Error desconocido')
+      console.error('Error updating password:', error)
       setError(
-        err.message.includes('session') 
+        error.message.includes('session') 
           ? 'El enlace ha expirado. Solicita un nuevo enlace de recuperación.'
           : 'Error al actualizar la contraseña. Inténtalo nuevamente.'
       )

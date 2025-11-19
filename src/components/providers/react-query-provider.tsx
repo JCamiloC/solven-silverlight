@@ -14,7 +14,7 @@ export function ReactQueryProvider({ children }: { children: React.ReactNode }) 
             retry: (failureCount, error) => {
               // Don't retry on 401/403 errors
               if (error && typeof error === 'object' && 'status' in error) {
-                const status = (error as any).status
+                const status = (error as { status?: number }).status
                 if (status === 401 || status === 403) {
                   return false
                 }

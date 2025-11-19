@@ -17,7 +17,9 @@ export function ThemeToggle() {
 
   // Prevent hydration mismatch by only rendering after client-side hydration
   useEffect(() => {
-    setMounted(true)
+    if (typeof window !== 'undefined') {
+      setMounted(true)
+    }
   }, [])
 
   if (!mounted) {

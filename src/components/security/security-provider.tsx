@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import Image from 'next/image'
 import { useAuth } from '@/hooks/use-auth'
 import { TwoFactorService } from '@/lib/two-factor'
 import { Button } from '@/components/ui/button'
@@ -42,14 +43,7 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Check 2FA status on mount
-  useEffect(() => {
-    if (user?.id) {
-      checkTwoFactorStatus()
-    }
-  }, [user])
-
-  const checkTwoFactorStatus = async () => {
+  const checkTwoFactorStatus = useCallback(async () => {
     if (!user?.id) return
     
     try {
@@ -63,7 +57,14 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
     } catch (error) {
       console.error('Error checking 2FA status:', error)
     }
-  }
+  }, [user?.id])
+
+  // Check 2FA status on mount
+  useEffect(() => {
+    if (user?.id) {
+      checkTwoFactorStatus()
+    }
+  }, [user?.id, checkTwoFactorStatus])
 
   const requireVerification = async (): Promise<boolean> => {
     if (!user?.id) return false
@@ -307,9 +308,11 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
             {setupData && (
               <>
                 <div className="flex justify-center">
-                  <img 
+                  <Image 
                     src={setupData.qrCodeUrl} 
                     alt="QR Code" 
+                    width={256}
+                    height={256}
                     className="border rounded-lg"
                   />
                 </div>
@@ -384,11 +387,7 @@ export function SecureRoute({ children, requireAdmin = false }: SecureRouteProps
   const [isChecking, setIsChecking] = useState(true)
   const [showSetupPrompt, setShowSetupPrompt] = useState(false)
 
-  useEffect(() => {
-    checkAuthorization()
-  }, [profile, is2FAEnabled])
-
-  const checkAuthorization = async () => {
+  const checkAuthorization = useCallback(async () => {
     setIsChecking(true)
 
     // Check role authorization
@@ -415,7 +414,11 @@ export function SecureRoute({ children, requireAdmin = false }: SecureRouteProps
     const verified = await requireVerification()
     setIsAuthorized(verified)
     setIsChecking(false)
-  }
+  }, [requireAdmin, hasRole, is2FAEnabled, requireVerification])
+
+  useEffect(() => {
+    checkAuthorization()
+  }, [profile, is2FAEnabled, checkAuthorization])
 
   if (isChecking) {
     return (

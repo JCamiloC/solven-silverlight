@@ -10,9 +10,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { useSidebar } from './sidebar-context'
 import { 
   LayoutDashboard, 
-  HardDrive, 
-  Monitor, 
-  Key, 
+  Building2,
   BarChart3, 
   Ticket,
   Users,
@@ -20,13 +18,67 @@ import {
   LogOut
 } from 'lucide-react'
 import { SidebarLogo } from '@/components/ui/logo'
+import { LucideIcon } from 'lucide-react'
 
 interface SidebarProps {
   className?: string
   onNavigate?: () => void
 }
 
-const allNavigationItems = [
+interface NavigationItem {
+  name: string
+  href: string
+  icon: LucideIcon
+  roles: string[]
+}
+
+interface NavButtonProps {
+  item: NavigationItem
+  isActive: boolean
+  showText: boolean
+  isCollapsed: boolean
+  isHovered: boolean
+  onNavigate?: () => void
+}
+
+const NavButton = ({ item, isActive, showText, isCollapsed, isHovered, onNavigate }: NavButtonProps) => {
+  const button = (
+    <Button
+      variant={isActive ? 'secondary' : 'ghost'}
+      className={cn(
+        'w-full sidebar-button',
+        showText ? 'justify-start' : 'justify-center',
+        isActive && 'bg-secondary',
+        !showText && 'px-1'
+      )}
+      asChild
+    >
+      <Link href={item.href} onClick={onNavigate}>
+        <item.icon className={cn('h-4 w-4', showText && 'mr-2')} />
+        {showText && item.name}
+      </Link>
+    </Button>
+  )
+
+  if (isCollapsed && !isHovered) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {button}
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            <p>{item.name}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
+  return button
+}
+
+const allNavigationItems: NavigationItem[] = [
   {
     name: 'Dashboard',
     href: '/dashboard',
@@ -34,22 +86,10 @@ const allNavigationItems = [
     roles: ['administrador', 'lider_soporte', 'agente_soporte'],
   },
   {
-    name: 'Hardware',
-    href: '/dashboard/hardware',
-    icon: HardDrive,
+    name: 'Clientes',
+    href: '/dashboard/clientes',
+    icon: Building2,
     roles: ['administrador', 'lider_soporte', 'agente_soporte'],
-  },
-  {
-    name: 'Software',
-    href: '/dashboard/software',
-    icon: Monitor,
-    roles: ['administrador', 'lider_soporte', 'agente_soporte'],
-  },
-  {
-    name: 'Accesos',
-    href: '/dashboard/accesos',
-    icon: Key,
-    roles: ['administrador'],
   },
   {
     name: 'Reportes',
@@ -92,43 +132,6 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
   const showText = !isCollapsed || isHovered
   const sidebarWidth = isCollapsed && !isHovered ? 'w-20' : 'w-64'
 
-  const NavButton = ({ item, isActive }: { item: any, isActive: boolean }) => {
-    const button = (
-      <Button
-        variant={isActive ? 'secondary' : 'ghost'}
-        className={cn(
-          'w-full sidebar-button',
-          showText ? 'justify-start' : 'justify-center',
-          isActive && 'bg-secondary',
-          !showText && 'px-1'
-        )}
-        asChild
-      >
-        <Link href={item.href} onClick={onNavigate}>
-          <item.icon className={cn('h-4 w-4', showText && 'mr-2')} />
-          {showText && item.name}
-        </Link>
-      </Button>
-    )
-
-    if (isCollapsed && !isHovered) {
-      return (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              {button}
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>{item.name}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )
-    }
-
-    return button
-  }
-
   return (
     <div 
       className={cn('transition-all duration-300 overflow-x-hidden flex flex-col h-full', sidebarWidth, className)}
@@ -156,6 +159,10 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
               key={item.name}
               item={item}
               isActive={pathname === item.href}
+              showText={showText}
+              isCollapsed={isCollapsed}
+              isHovered={isHovered}
+              onNavigate={onNavigate}
             />
           ))}
         </div>
@@ -169,9 +176,14 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
               item={{
                 name: 'Configuración',
                 href: '/dashboard/configuracion',
-                icon: Settings
+                icon: Settings,
+                roles: ['administrador', 'lider_soporte']
               }}
               isActive={pathname === '/dashboard/configuracion'}
+              showText={showText}
+              isCollapsed={isCollapsed}
+              isHovered={isHovered}
+              onNavigate={onNavigate}
             />
           )}
           

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -26,7 +26,22 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
   const [showWarning, setShowWarning] = useState(false)
   const [remainingTime, setRemainingTime] = useState(0)
 
-  const resetTimeout = () => {
+  const handleTimeout = useCallback(async () => {
+    try {
+      setShowWarning(false) // Cerrar modal antes del logout
+      toast.dismiss() // Cancelar todos los toasts activos
+      await supabase.auth.signOut()
+      toast.error(SESSION_MESSAGES.TIMEOUT_EXPIRED)
+      router.push(SESSION_CONFIG.REDIRECT_URLS.TIMEOUT)
+    } catch (error) {
+      console.error('Error during timeout logout:', error)
+      setShowWarning(false) // Cerrar modal incluso si hay error
+      toast.dismiss() // Cancelar toasts incluso si hay error
+      router.push(SESSION_CONFIG.REDIRECT_URLS.TIMEOUT)
+    }
+  }, [supabase.auth, router])
+
+  const resetTimeout = useCallback(() => {
     if (!enabled) return
 
     // Limpiar timeouts existentes
@@ -59,27 +74,13 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
     timeoutRef.current = setTimeout(async () => {
       await handleTimeout()
     }, timeoutMinutes * 60 * 1000)
-  }
+  }, [enabled, timeoutMinutes, warningMinutes, handleTimeout])
 
   const triggerWarningManually = () => {
     setShowWarning(true)
     setRemainingTime(warningMinutes * 60)
   }
 
-  const handleTimeout = async () => {
-    try {
-      setShowWarning(false) // Cerrar modal antes del logout
-      toast.dismiss() // Cancelar todos los toasts activos
-      await supabase.auth.signOut()
-      toast.error(SESSION_MESSAGES.TIMEOUT_EXPIRED)
-      router.push(SESSION_CONFIG.REDIRECT_URLS.TIMEOUT)
-    } catch (error) {
-      console.error('Error during timeout logout:', error)
-      setShowWarning(false) // Cerrar modal incluso si hay error
-      toast.dismiss() // Cancelar toasts incluso si hay error
-      router.push(SESSION_CONFIG.REDIRECT_URLS.TIMEOUT)
-    }
-  }
 
   const handleLogout = async () => {
     try {
@@ -125,7 +126,7 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
       if (warningRef.current) clearTimeout(warningRef.current)
     }
-  }, [enabled])
+  }, [enabled, resetTimeout])
 
   // Efecto separado para el countdown del warning
   useEffect(() => {
@@ -146,7 +147,7 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
     }, 1000)
 
     return () => clearInterval(countdownInterval)
-  }, [showWarning])
+  }, [showWarning, handleTimeout])
 
   return {
     showWarning,

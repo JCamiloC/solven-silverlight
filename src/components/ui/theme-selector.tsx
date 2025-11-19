@@ -15,6 +15,25 @@ interface ThemeSelectorProps {
   variant?: 'dialog' | 'inline'
 }
 
+interface ThemeGridProps {
+  availableThemes: BrandTheme[]
+  currentThemeId: string
+  onThemeChange: (themeId: string) => void
+}
+
+const ThemeGrid = ({ availableThemes, currentThemeId, onThemeChange }: ThemeGridProps) => (
+  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    {availableThemes.map((theme) => (
+      <ThemeCard
+        key={theme.id}
+        theme={theme}
+        isSelected={theme.id === currentThemeId}
+        onSelect={() => onThemeChange(theme.id)}
+      />
+    ))}
+  </div>
+)
+
 export function ThemeSelector({ showAsButton = true, variant = 'dialog' }: ThemeSelectorProps) {
   const { currentTheme, currentThemeId, availableThemes, changeTheme } = useTheme()
   const [isOpen, setIsOpen] = useState(false)
@@ -22,7 +41,9 @@ export function ThemeSelector({ showAsButton = true, variant = 'dialog' }: Theme
 
   // Prevenir hidratación mismatch
   useEffect(() => {
-    setMounted(true)
+    if (typeof window !== 'undefined') {
+      setMounted(true)
+    }
   }, [])
 
   const handleThemeChange = (themeId: string) => {
@@ -50,19 +71,6 @@ export function ThemeSelector({ showAsButton = true, variant = 'dialog' }: Theme
     
     toast.success('Configuración de tema exportada')
   }
-
-  const ThemeGrid = () => (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {availableThemes.map((theme) => (
-        <ThemeCard
-          key={theme.id}
-          theme={theme}
-          isSelected={theme.id === currentThemeId}
-          onSelect={() => handleThemeChange(theme.id)}
-        />
-      ))}
-    </div>
-  )
 
   // No renderizar hasta que esté montado en el cliente
   if (!mounted) {
@@ -92,7 +100,11 @@ export function ThemeSelector({ showAsButton = true, variant = 'dialog' }: Theme
           </div>
         </div>
         
-        <ThemeGrid />
+        <ThemeGrid 
+          availableThemes={availableThemes}
+          currentThemeId={currentThemeId}
+          onThemeChange={handleThemeChange}
+        />
         
         <div className="mt-6 p-4 bg-muted/50 rounded-lg">
           <h4 className="font-medium mb-2">Tema Actual</h4>
@@ -183,7 +195,11 @@ export function ThemeSelector({ showAsButton = true, variant = 'dialog' }: Theme
           {/* Grid de Temas */}
           <div>
             <h4 className="font-medium mb-4">Temas Disponibles</h4>
-            <ThemeGrid />
+            <ThemeGrid 
+              availableThemes={availableThemes}
+              currentThemeId={currentThemeId}
+              onThemeChange={handleThemeChange}
+            />
           </div>
 
           {/* Información adicional */}

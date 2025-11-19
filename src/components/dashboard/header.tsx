@@ -19,11 +19,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { useRouter } from 'next/navigation'
 
-interface HeaderProps {
-  // Ya no necesitamos title como prop
-}
-
-export function Header({}: HeaderProps) {
+export function Header() {
   const [notifications] = useState(0) // Real notification count will be implemented later
   const [mounted, setMounted] = useState(false)
   const { profile, signOut } = useAuth()
@@ -32,7 +28,9 @@ export function Header({}: HeaderProps) {
 
   // Prevent hydration mismatch
   useEffect(() => {
-    setMounted(true)
+    if (typeof window !== 'undefined') {
+      setMounted(true)
+    }
   }, [])
 
   const handleLogout = async () => {

@@ -324,10 +324,12 @@ export function useTheme() {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
-    // Solo cargar tema después de montar en el cliente
-    themeManager.loadSavedTheme()
-    setCurrentTheme(themeManager.getCurrentThemeId())
+    if (typeof window !== 'undefined') {
+      setMounted(true)
+      // Solo cargar tema después de montar en el cliente
+      themeManager.loadSavedTheme()
+      setCurrentTheme(themeManager.getCurrentThemeId())
+    }
   }, [themeManager])
 
   const changeTheme = (themeId: string) => {

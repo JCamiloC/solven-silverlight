@@ -28,7 +28,7 @@ import { Search, Plus, Edit, Trash2 } from 'lucide-react'
 interface Column<T> {
   key: keyof T
   label: string
-  render?: (value: any, item: T) => React.ReactNode
+  render?: (value: T[keyof T] | undefined, item: T) => React.ReactNode
 }
 
 interface DataTableProps<T> {

@@ -35,6 +35,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/use-users'
+import { useClients } from '@/hooks/use-clients'
+import { UserType } from '@/types'
 import { useInviteUser, usePendingUsers } from '@/hooks/use-user-invitations'
 import { User, UserInsert, UserUpdate } from '@/lib/services/users'
 
@@ -48,6 +50,7 @@ export default function UsersPage() {
 
   const { user: currentUser, hasRole } = useAuth()
   const { data: users = [], isLoading: usersLoading } = useUsers()
+  const { data: clients = [] } = useClients()
   
   const createUserMutation = useCreateUser()
   const updateUserMutation = useUpdateUser()
@@ -124,7 +127,7 @@ export default function UsersPage() {
     {
       key: 'first_name' as keyof User,
       label: 'Nombre Completo',
-      render: (value: string, user: User) => `${user.first_name} ${user.last_name}`,
+      render: (value: string | undefined, user: User) => `${user.first_name} ${user.last_name}`,
     },
     {
       key: 'email' as keyof User,
@@ -133,12 +136,12 @@ export default function UsersPage() {
     {
       key: 'role' as keyof User,
       label: 'Rol',
-      render: (value: string) => getRoleBadge(value),
+      render: (value: string | undefined) => value ? getRoleBadge(value) : null,
     },
     {
       key: 'created_at' as keyof User,
       label: 'Creado',
-      render: (value: string) => new Date(value).toLocaleDateString(),
+      render: (value: string | undefined) => value ? new Date(value).toLocaleDateString() : '',
     },
   ]
 
@@ -205,6 +208,8 @@ export default function UsersPage() {
       phone: formData.get('phone') as string,
       role: formData.get('role') as User['role'],
       password: formData.get('password') as string,
+      client_id: formData.get('client_id') as string,
+      user_type: formData.get('user_type') as UserType,
     }
 
     if (selectedUser) {
@@ -474,6 +479,54 @@ export default function UsersPage() {
                   defaultValue={selectedUser?.phone || ''}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="client_id">Cliente (Empresa) *</Label>
+              <Select 
+                name="client_id" 
+                defaultValue={selectedUser?.client_id || ''}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Selecciona la empresa cliente a la que pertenece este usuario
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="user_type">Tipo de Usuario *</Label>
+              <Select 
+                name="user_type" 
+                defaultValue={(selectedUser?.user_type as UserType) || 'no_aplica'}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="on_demand_software">On demand - Software</SelectItem>
+                  <SelectItem value="on_demand_hardware">On demand - Hardware</SelectItem>
+                  <SelectItem value="on_demand_ambos">On demand - Ambos</SelectItem>
+                  <SelectItem value="contrato_software">Contrato - Software</SelectItem>
+                  <SelectItem value="contrato_hardware">Contrato - Hardware</SelectItem>
+                  <SelectItem value="contrato_ambos">Contrato - Ambos</SelectItem>
+                  <SelectItem value="no_aplica">No Aplica</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Define el tipo de servicio para este usuario
+              </p>
             </div>
             
             <div className="flex justify-end space-x-2">

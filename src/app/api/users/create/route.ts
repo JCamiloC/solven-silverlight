@@ -42,11 +42,19 @@ export async function POST(request: NextRequest) {
 
     // Obtener datos del body
     const body = await request.json()
-    const { email, password, first_name, last_name, role, phone } = body
+    const { email, password, first_name, last_name, role, phone, client_id, user_type } = body
 
     if (!email || !password || !first_name || !last_name || !role) {
       return NextResponse.json(
         { error: 'Email, password, nombre, apellido y rol son requeridos' },
+        { status: 400 }
+      )
+    }
+
+    // Validar que si el rol es cliente, debe tener un client_id
+    if (role === 'cliente' && !client_id) {
+      return NextResponse.json(
+        { error: 'Los usuarios cliente deben estar asignados a una empresa cliente' },
         { status: 400 }
       )
     }
@@ -104,6 +112,8 @@ export async function POST(request: NextRequest) {
           last_name,
           phone: phone || null,
           role: role as UserRole,
+          client_id: client_id || null,
+          user_type: user_type || null,
         })
         .eq('user_id', authData.user.id)
         .select('*')
@@ -131,6 +141,8 @@ export async function POST(request: NextRequest) {
           last_name,
           phone: phone || null,
           role: role as UserRole,
+          client_id: client_id || null,
+          user_type: user_type || null,
         })
         .select('*')
         .single()
@@ -146,6 +158,7 @@ export async function POST(request: NextRequest) {
 
       profileData = newProfile
     }
+
 
     return NextResponse.json({
       success: true,

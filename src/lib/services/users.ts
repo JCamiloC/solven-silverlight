@@ -6,11 +6,13 @@ const supabase = createClient()
 export interface User {
   id: string
   user_id: string
+  client_id?: string
   email?: string
   first_name: string
   last_name: string
   phone?: string
   role: UserRole
+  user_type?: string
   avatar_url?: string
   created_at: string
   updated_at: string
@@ -32,6 +34,8 @@ export interface UserUpdate {
   last_name?: string
   phone?: string
   role?: UserRole
+  client_id?: string
+  user_type?: string
   avatar_url?: string
   updated_at?: string
 }
@@ -62,11 +66,13 @@ export class UsersService {
       return (profiles || []).map((profile) => ({
         id: profile.id,
         user_id: profile.user_id,
+        client_id: profile.client_id,
         email: profile.email || `${profile.first_name?.toLowerCase()}.${profile.last_name?.toLowerCase()}@empresa.com`,
         first_name: profile.first_name,
         last_name: profile.last_name,
         phone: profile.phone,
         role: profile.role,
+        user_type: profile.user_type,
         avatar_url: profile.avatar_url,
         created_at: profile.created_at,
         updated_at: profile.updated_at

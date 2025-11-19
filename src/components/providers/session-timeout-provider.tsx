@@ -4,8 +4,6 @@ import { createContext, useContext, ReactNode } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { useSessionTimeout } from '@/hooks/use-session-timeout'
 import { SessionWarningDialog } from '@/components/auth/session-warning-dialog'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 
 interface SessionTimeoutContextType {
   extendSession: () => void
@@ -29,8 +27,6 @@ export function SessionTimeoutProvider({
   enabled = true
 }: SessionTimeoutProviderProps) {
   const { user } = useAuth()
-  const router = useRouter()
-  const supabase = createClient()
   
   const { 
     showWarning, 

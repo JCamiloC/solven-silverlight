@@ -40,18 +40,20 @@ export default function ForgotPasswordPage() {
 
       console.log('✅ Email enviado exitosamente')
       setSuccess(true)
-    } catch (err: any) {
-      console.error('❌ Error sending reset email:', err)
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Error desconocido')
+      const errorWithStatus = err && typeof err === 'object' && 'status' in err ? err as { status?: number; statusCode?: number } : null
+      console.error('❌ Error sending reset email:', error)
       console.error('Error details:', {
-        message: err.message,
-        status: err.status,
-        statusCode: err.statusCode
+        message: error.message,
+        status: errorWithStatus?.status,
+        statusCode: errorWithStatus?.statusCode
       })
       
       setError(
-        err.message === 'User not found' 
+        error.message === 'User not found'
           ? 'No encontramos una cuenta con ese email. Verifica el email o contacta al administrador.'
-          : `Error al enviar el email de recuperación: ${err.message || 'Inténtalo nuevamente.'}`
+          : `Error al enviar el email de recuperación: ${error.message || 'Inténtalo nuevamente.'}`
       )
     } finally {
       setLoading(false)
