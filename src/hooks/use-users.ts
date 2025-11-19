@@ -60,11 +60,15 @@ export function useCreateUser() {
       // Optimistically update
       const optimisticUser: User = {
         id: `temp-${Date.now()}`,
-        ...newUser,
-        email: `${newUser.first_name.toLowerCase()}.${newUser.last_name.toLowerCase()}@empresa.com`,
+        user_id: newUser.user_id || `temp-${Date.now()}`,
+        email: newUser.email || `${newUser.first_name.toLowerCase()}.${newUser.last_name.toLowerCase()}@empresa.com`,
+        first_name: newUser.first_name,
+        last_name: newUser.last_name,
+        phone: newUser.phone,
+        role: newUser.role,
+        avatar_url: newUser.avatar_url,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        totp_enabled: false
+        updated_at: new Date().toISOString()
       }
 
       queryClient.setQueryData<User[]>(

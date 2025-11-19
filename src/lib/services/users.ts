@@ -6,27 +6,23 @@ const supabase = createClient()
 export interface User {
   id: string
   user_id: string
-  email?: string // Viene de auth.users
+  email?: string
   first_name: string
   last_name: string
   phone?: string
-  department?: string
   role: UserRole
   avatar_url?: string
   created_at: string
   updated_at: string
-  // Campos 2FA
-  totp_enabled?: boolean
-  totp_secret?: string
-  last_totp_verification?: string
 }
 
 export interface UserInsert {
-  user_id: string
+  user_id?: string
   first_name: string
   last_name: string
+  email?: string
+  password?: string
   phone?: string
-  department?: string
   role: UserRole
   avatar_url?: string
 }
@@ -35,7 +31,6 @@ export interface UserUpdate {
   first_name?: string
   last_name?: string
   phone?: string
-  department?: string
   role?: UserRole
   avatar_url?: string
   updated_at?: string
@@ -71,14 +66,10 @@ export class UsersService {
         first_name: profile.first_name,
         last_name: profile.last_name,
         phone: profile.phone,
-        department: profile.department,
         role: profile.role,
         avatar_url: profile.avatar_url,
         created_at: profile.created_at,
-        updated_at: profile.updated_at,
-        totp_enabled: profile.totp_enabled || false,
-        totp_secret: profile.totp_secret,
-        last_totp_verification: profile.last_totp_verification
+        updated_at: profile.updated_at
       }))
 
     } catch (error) {
@@ -126,32 +117,64 @@ export class UsersService {
   }
 
   /**
-   * Crear un nuevo usuario
+   * Crear un nuevo usuario con autenticación en Supabase
    */
   static async create(user: UserInsert): Promise<User> {
     try {
-      const userData = {
-        user_id: user.user_id,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        phone: user.phone,
-        department: user.department,
-        role: user.role,
-        avatar_url: user.avatar_url
+      console.log('🔹 Creando nuevo usuario...')
+      
+      // Si se proporciona email y password, usar la API para crear usuario con privilegios admin
+      if (user.email && user.password) {
+        console.log('🔐 Creando usuario vía API...')
+        
+        const response = await fetch('/api/users/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: user.email,
+            password: user.password,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            role: user.role,
+            phone: user.phone,
+          })
+        })
+
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Error al crear usuario')
+        }
+
+        console.log('✅ Usuario creado exitosamente')
+        return result.user
+
+      } else {
+        // Crear solo el perfil (modo antiguo - para compatibilidad)
+        const userData = {
+          user_id: user.user_id || `user-${Date.now()}`,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          phone: user.phone,
+          role: user.role,
+          avatar_url: user.avatar_url
+        }
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .insert(userData)
+          .select('*')
+          .single()
+
+        if (error) {
+          console.error('Error creating user:', error)
+          throw new Error(`Failed to create user: ${error.message}`)
+        }
+
+        return data
       }
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .insert(userData)
-        .select('*')
-        .single()
-
-      if (error) {
-        console.error('Error creating user:', error)
-        throw new Error(`Failed to create user: ${error.message}`)
-      }
-
-      return data
     } catch (err) {
       console.error('Error in create user:', err)
       throw new Error(`Failed to create user: ${err instanceof Error ? err.message : 'Unknown error'}`)

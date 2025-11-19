@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/form'
 import { HardwareAsset } from '@/types'
 import { useCreateHardware, useUpdateHardware } from '@/hooks/use-hardware'
-import { useClients } from '@/hooks/use-clients'
+import { useUsers } from '@/hooks/use-users'
 
 const hardwareSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -55,7 +55,7 @@ export function HardwareForm({ asset, onSuccess, onCancel }: HardwareFormProps) 
     asset?.specifications ? JSON.stringify(asset.specifications, null, 2) : ''
   )
   
-  const { data: clients } = useClients()
+  const { data: users } = useUsers()
   const createMutation = useCreateHardware()
   const updateMutation = useUpdateHardware()
 
@@ -236,9 +236,9 @@ export function HardwareForm({ asset, onSuccess, onCancel }: HardwareFormProps) 
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {clients?.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
+                  {users?.filter((u) => u.role === 'cliente').map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.first_name} {user.last_name}
                     </SelectItem>
                   ))}
                 </SelectContent>

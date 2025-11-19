@@ -17,7 +17,6 @@ export function UserProfile() {
     first_name: '',
     last_name: '',
     phone: '',
-    department: '',
     email: '',
   })
 
@@ -29,7 +28,6 @@ export function UserProfile() {
         first_name: profile.first_name || '',
         last_name: profile.last_name || '',
         phone: profile.phone || '',
-        department: profile.department || '',
         email: user.email || '',
       })
     }
@@ -48,7 +46,6 @@ export function UserProfile() {
           first_name: formData.first_name,
           last_name: formData.last_name,
           phone: formData.phone,
-          department: formData.department,
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', profile.user_id)
@@ -190,20 +187,6 @@ export function UserProfile() {
               onChange={(e) => handleInputChange('phone', e.target.value)}
               placeholder="Ingresa tu teléfono"
               type="tel"
-            />
-          </div>
-
-          {/* Department */}
-          <div className="space-y-2">
-            <Label htmlFor="department" className="flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
-              Departamento
-            </Label>
-            <Input
-              id="department"
-              value={formData.department}
-              onChange={(e) => handleInputChange('department', e.target.value)}
-              placeholder="Ingresa tu departamento"
             />
           </div>
 

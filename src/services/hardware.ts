@@ -9,7 +9,7 @@ export class HardwareService {
       .from('hardware_assets')
       .select(`
         *,
-        client:clients(name)
+        client:profiles(first_name, last_name, email)
       `)
       .order('created_at', { ascending: false })
 
@@ -22,7 +22,7 @@ export class HardwareService {
       .from('hardware_assets')
       .select(`
         *,
-        client:clients(name)
+        client:profiles(first_name, last_name, email)
       `)
       .eq('id', id)
       .single()
@@ -37,7 +37,7 @@ export class HardwareService {
       .insert(asset)
       .select(`
         *,
-        client:clients(name)
+        client:profiles(first_name, last_name, email)
       `)
       .single()
 
@@ -52,7 +52,7 @@ export class HardwareService {
       .eq('id', id)
       .select(`
         *,
-        client:clients(name)
+        client:profiles(first_name, last_name, email)
       `)
       .single()
 

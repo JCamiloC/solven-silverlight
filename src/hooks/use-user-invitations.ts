@@ -44,7 +44,11 @@ export function useResendInvitation() {
 export function usePendingUsers() {
   return useQuery({
     queryKey: ['pending-users'],
-    queryFn: () => UserInvitationService.getPendingUsers(),
+    queryFn: async () => {
+      const res = await fetch('/api/pending-users')
+      if (!res.ok) throw new Error('Error al obtener usuarios pendientes')
+      return res.json()
+    },
     refetchInterval: 30000 // Refrescar cada 30 segundos
   })
 }

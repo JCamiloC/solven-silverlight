@@ -12,10 +12,10 @@ export interface User {
 export interface Profile {
   id: string
   user_id: string
+  email: string
   first_name: string
   last_name: string
   phone?: string
-  department?: string
   role: UserRole
   avatar_url?: string
   created_at: string

@@ -44,7 +44,7 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
-  const [twoFAFilter, setTwoFAFilter] = useState<string>('all')
+  const [showPassword, setShowPassword] = useState(false)
 
   const { user: currentUser, hasRole } = useAuth()
   const { data: users = [], isLoading: usersLoading } = useUsers()
@@ -116,12 +116,8 @@ export default function UsersPage() {
     const matchesSearch = `${user.first_name} ${user.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesRole = !roleFilter || roleFilter === 'all' || user.role === roleFilter
-    // Filtrar por estado de 2FA en lugar de is_active
-    const matchesStatus = !twoFAFilter || twoFAFilter === 'all' || 
-                         (twoFAFilter === 'enabled' && user.totp_enabled) ||
-                         (twoFAFilter === 'disabled' && !user.totp_enabled)
     
-    return matchesSearch && matchesRole && matchesStatus
+    return matchesSearch && matchesRole
   })
 
   const columns = [
@@ -140,16 +136,6 @@ export default function UsersPage() {
       render: (value: string) => getRoleBadge(value),
     },
     {
-      key: 'department' as keyof User,
-      label: 'Departamento',
-      render: (value: string) => value || 'No asignado',
-    },
-    {
-      key: 'totp_enabled' as keyof User,
-      label: '2FA',
-      render: (value: boolean) => getTwoFABadge(value),
-    },
-    {
       key: 'created_at' as keyof User,
       label: 'Creado',
       render: (value: string) => new Date(value).toLocaleDateString(),
@@ -157,6 +143,12 @@ export default function UsersPage() {
   ]
 
   const handleAdd = () => {
+    if (!canCreateUsers) return
+    setSelectedUser(null)
+    setIsDialogOpen(true)
+  }
+
+  const handleInviteClick = () => {
     if (!canCreateUsers) return
     setIsInviteDialogOpen(true)
   }
@@ -170,7 +162,6 @@ export default function UsersPage() {
       first_name: formData.get('first_name') as string,
       last_name: formData.get('last_name') as string,
       phone: formData.get('phone') as string,
-      department: formData.get('department') as string,
       role: formData.get('role') as User['role'],
     }
 
@@ -210,15 +201,18 @@ export default function UsersPage() {
     const userData = {
       first_name: formData.get('first_name') as string,
       last_name: formData.get('last_name') as string,
+      email: formData.get('email') as string,
       phone: formData.get('phone') as string,
-      department: formData.get('department') as string,
       role: formData.get('role') as User['role'],
+      password: formData.get('password') as string,
     }
 
     if (selectedUser) {
+      // Actualizar usuario existente (sin password)
+      const { password, email, ...updateData } = userData
       updateUserMutation.mutate({
         id: selectedUser.id,
-        data: userData as UserUpdate
+        data: updateData as UserUpdate
       }, {
         onSuccess: () => {
           setIsDialogOpen(false)
@@ -226,10 +220,8 @@ export default function UsersPage() {
         }
       })
     } else {
-      createUserMutation.mutate({
-        ...userData,
-        user_id: `user-${Date.now()}` // Generar user_id temporal
-      } as UserInsert, {
+      // Crear nuevo usuario con email y password
+      createUserMutation.mutate(userData as any, {
         onSuccess: () => {
           setIsDialogOpen(false)
         }
@@ -245,16 +237,16 @@ export default function UsersPage() {
       description: 'Usuarios registrados'
     },
     {
-      title: 'Con 2FA Habilitado',
-      value: users.filter(u => u.totp_enabled).length,
-      icon: UserCheck,
-      description: 'Usuarios con autenticación 2FA'
-    },
-    {
       title: 'Administradores',
       value: users.filter(u => u.role === 'administrador').length,
       icon: Shield,
       description: 'Usuarios con permisos admin'
+    },
+    {
+      title: 'Agentes de Soporte',
+      value: users.filter(u => u.role === 'agente_soporte' || u.role === 'lider_soporte').length,
+      icon: UserCheck,
+      description: 'Personal de soporte'
     },
     {
       title: 'Invitaciones Pendientes',
@@ -282,10 +274,16 @@ export default function UsersPage() {
           </p>
         </div>
         {canCreateUsers && (
-          <Button onClick={handleAdd}>
-            <UserPlus className="mr-2 h-4 w-4" />
-            Invitar Usuario
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleInviteClick}>
+              <Mail className="mr-2 h-4 w-4" />
+              Invitar Usuario
+            </Button>
+            <Button onClick={handleAdd}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Crear Usuario
+            </Button>
+          </div>
         )}
       </div>
 
@@ -351,20 +349,6 @@ export default function UsersPage() {
                 </SelectContent>
               </Select>
             </div>
-            
-            <div className="space-y-2">
-              <Label>2FA</Label>
-              <Select value={twoFAFilter} onValueChange={setTwoFAFilter}>
-                <SelectTrigger className="w-32">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="enabled">Con 2FA</SelectItem>
-                  <SelectItem value="disabled">Sin 2FA</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -398,35 +382,26 @@ export default function UsersPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="first_name">Nombre</Label>
+                <Label htmlFor="first_name">Nombre *</Label>
                 <Input 
                   id="first_name" 
                   name="first_name"
                   placeholder="Nombre"
                   defaultValue={selectedUser?.first_name}
+                  required
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="last_name">Apellido</Label>
+                <Label htmlFor="last_name">Apellido *</Label>
                 <Input 
                   id="last_name" 
                   name="last_name"
                   placeholder="Apellido"
                   defaultValue={selectedUser?.last_name}
+                  required
                 />
               </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="full_name">Nombre Completo *</Label>
-              <Input 
-                id="full_name" 
-                name="full_name"
-                placeholder="Nombre completo del usuario"
-                defaultValue={selectedUser ? `${selectedUser.first_name} ${selectedUser.last_name}` : ''}
-                required
-              />
             </div>
             
             <div className="space-y-2">
@@ -435,11 +410,45 @@ export default function UsersPage() {
                 id="email" 
                 name="email"
                 type="email"
-                placeholder="email@ejemplo.com"
+                placeholder="usuario@ejemplo.com"
                 defaultValue={selectedUser?.email}
+                disabled={!!selectedUser}
                 required
               />
+              {selectedUser && (
+                <p className="text-xs text-muted-foreground">
+                  El email no puede ser modificado después de crear el usuario
+                </p>
+              )}
             </div>
+            
+            {!selectedUser && (
+              <div className="space-y-2">
+                <Label htmlFor="password">Contraseña *</Label>
+                <div className="relative">
+                  <Input 
+                    id="password" 
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Contraseña segura"
+                    required
+                    minLength={6}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? '👁️' : '👁️‍🗨️'}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Mínimo 6 caracteres. Se recomienda una contraseña segura.
+                </p>
+              </div>
+            )}
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -463,15 +472,6 @@ export default function UsersPage() {
                   name="phone"
                   placeholder="Número de teléfono"
                   defaultValue={selectedUser?.phone || ''}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="department">Departamento</Label>
-                <Input
-                  name="department"
-                  placeholder="Departamento"
-                  defaultValue={selectedUser?.department || ''}
                 />
               </div>
             </div>
@@ -555,21 +555,12 @@ export default function UsersPage() {
               </Select>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone">Teléfono</Label>
-                <Input
-                  name="phone"
-                  placeholder="Número de teléfono"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="department">Departamento</Label>
-                <Input
-                  name="department"
-                  placeholder="Departamento"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Teléfono</Label>
+              <Input
+                name="phone"
+                placeholder="Número de teléfono"
+              />
             </div>
             
             <div className="flex justify-end space-x-2">

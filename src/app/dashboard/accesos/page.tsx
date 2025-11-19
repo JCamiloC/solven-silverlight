@@ -15,6 +15,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { SecureRoute, SecurityProvider } from '@/components/security/security-provider'
+import { TwoFactorRequiredNotice } from '@/components/security/2fa-required-notice'
+import { useAuth } from '@/hooks/use-auth'
 import { 
   useAccessCredentials, 
   useAccessStats, 
@@ -35,13 +37,22 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from 'sonner'
 
 export default function AccessCredentialsPage() {
+  const { profile } = useAuth()
+  
+  // Verificar si el usuario tiene 2FA habilitado
+  const has2FA = profile?.totp_enabled === true
+
   return (
     <ProtectedRoute allowedRoles={['administrador']}>
-      <SecurityProvider>
-        <SecureRoute requireAdmin>
-          <AccessCredentialsContent />
-        </SecureRoute>
-      </SecurityProvider>
+      {!has2FA ? (
+        <TwoFactorRequiredNotice />
+      ) : (
+        <SecurityProvider>
+          <SecureRoute requireAdmin>
+            <AccessCredentialsContent />
+          </SecureRoute>
+        </SecurityProvider>
+      )}
     </ProtectedRoute>
   )
 }
