@@ -17,6 +17,19 @@ export default function ClientesPage() {
   const router = useRouter()
   const { data: clients, isLoading, error } = useClients()
   const [searchTerm, setSearchTerm] = useState('')
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    contact_person: '',
+    nit: '',
+    mantenimientos_al_anio: 0,
+  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
+  const { mutate: createClient } = require('@/hooks/use-clients').useCreateClient?.() || { mutate: () => {} }
 
   const filteredClients = clients?.filter((client) => {
     const search = searchTerm.toLowerCase()
@@ -49,6 +62,20 @@ export default function ClientesPage() {
       key: 'phone',
       label: 'Teléfono',
       render: (value: string | undefined) => value || '-',
+    },
+    {
+      key: 'nit',
+      label: 'NIT',
+      render: (value: string | undefined) => value || '-',
+    },
+    {
+      key: 'mantenimientos_al_anio',
+      label: 'Mantenimientos/año',
+      render: (value: string | number | undefined) => {
+        if (typeof value === 'number') return value;
+        if (typeof value === 'string' && value !== '') return value;
+        return '-';
+      },
     },
     {
       key: 'created_at',
@@ -87,7 +114,7 @@ export default function ClientesPage() {
               Gestión de clientes y sus recursos
             </p>
           </div>
-          <Button onClick={() => router.push('/dashboard/usuarios')}>
+          <Button onClick={() => setShowCreateDialog(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Nuevo Cliente
           </Button>
@@ -165,7 +192,7 @@ export default function ClientesPage() {
                           {columns.map((column) => {
                             const value = client[column.key]
                             const displayValue = column.render
-                              ? column.render(value as string | undefined)
+                              ? column.render(value as any)
                               : String(value || '-')
                             return (
                               <td
@@ -186,6 +213,109 @@ export default function ClientesPage() {
           </CardContent>
         </Card>
       </div>
+      {/* Modal para crear nuevo cliente */}
+      {showCreateDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-lg relative">
+            <button className="absolute top-2 right-2 text-xl" onClick={() => setShowCreateDialog(false)}>&times;</button>
+            <h2 className="text-2xl font-bold mb-4">Crear Nuevo Cliente</h2>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setIsSubmitting(true);
+                setFormError('');
+                try {
+                  await createClient(formData, {
+                    onSuccess: () => {
+                      setShowCreateDialog(false);
+                      setFormData({ name: '', email: '', phone: '', address: '', contact_person: '', nit: '', mantenimientos_al_anio: 0 });
+                    },
+                    onError: (err: any) => {
+                      setFormError(err?.message || 'Error al crear cliente');
+                    },
+                  });
+                } catch (err) {
+                  setFormError('Error inesperado');
+                }
+                setIsSubmitting(false);
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                              <div className="space-y-2">
+                                <label className="block text-sm font-medium">Mantenimientos al año</label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={formData.mantenimientos_al_anio}
+                                  onChange={e => setFormData({ ...formData, mantenimientos_al_anio: Number(e.target.value) })}
+                                  className="w-full border rounded px-3 py-2"
+                                  placeholder="Cantidad de mantenimientos"
+                                />
+                              </div>
+                <label className="block text-sm font-medium">Nombre *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={e => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="Nombre de la empresa"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Email *</label>
+                <input
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={e => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="Email de contacto"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Teléfono</label>
+                <input
+                  type="text"
+                  value={formData.phone}
+                  onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="Teléfono de contacto"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Dirección</label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={e => setFormData({ ...formData, address: e.target.value })}
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="Dirección de la empresa"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Persona de contacto *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.contact_person}
+                  onChange={e => setFormData({ ...formData, contact_person: e.target.value })}
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="Nombre de la persona de contacto"
+                />
+              </div>
+              {formError && <div className="text-red-600 text-sm">{formError}</div>}
+              <div className="flex justify-end gap-2">
+                <button type="button" className="px-4 py-2 rounded border" onClick={() => setShowCreateDialog(false)}>Cancelar</button>
+                <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white" disabled={isSubmitting}>
+                  {isSubmitting ? 'Creando...' : 'Crear Cliente'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </ProtectedRoute>
   )
 }

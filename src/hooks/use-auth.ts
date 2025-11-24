@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
@@ -20,26 +20,6 @@ export function useAuth() {
   })
   const router = useRouter()
   const supabase = createClient()
-
-  const getProfile = useCallback(async (userId: string): Promise<Profile | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .single()
-
-      if (error) {
-        console.error('Error fetching profile:', error)
-        return null
-      }
-      
-      return data
-    } catch (error) {
-      console.error('Error fetching profile:', error)
-      return null
-    }
-  }, [supabase])
 
   useEffect(() => {
     // Get initial session
@@ -96,7 +76,27 @@ export function useAuth() {
     )
 
     return () => subscription.unsubscribe()
-  }, [router, supabase.auth, getProfile])
+  }, [router, supabase.auth])
+
+  const getProfile = async (userId: string): Promise<Profile | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single()
+
+      if (error) {
+        console.error('Error fetching profile:', error)
+        return null
+      }
+      
+      return data
+    } catch (error) {
+      console.error('Error fetching profile:', error)
+      return null
+    }
+  }
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut()

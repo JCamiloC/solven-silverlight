@@ -42,6 +42,8 @@ export interface Client {
   phone?: string
   address?: string
   contact_person: string
+  nit?: string
+  mantenimientos_al_anio?: number
   created_at: string
   updated_at: string
 }

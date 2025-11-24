@@ -51,6 +51,16 @@ export default function UsersPage() {
   const { user: currentUser, hasRole } = useAuth()
   const { data: users = [], isLoading: usersLoading } = useUsers()
   const { data: clients = [] } = useClients()
+  // Log para depuración de clientes
+  console.log('[Usuarios Debug] Clientes recibidos:', clients)
+
+  // Consulta directa a Supabase para depuración
+  import('@/lib/supabase/client').then(({ createClient }) => {
+    const supabase = createClient();
+    supabase.from('clients').select('*').then((res) => {
+      console.log('[Usuarios Debug] Consulta directa a clients:', res);
+    });
+  });
   
   const createUserMutation = useCreateUser()
   const updateUserMutation = useUpdateUser()

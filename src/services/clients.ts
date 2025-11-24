@@ -26,7 +26,6 @@ export class ClientService {
       .select('*')
       .order('name')
 
-    if (error) throw error
     return data || []
   }
 
