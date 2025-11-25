@@ -1,4 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+export function useCreateClient() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: clientService.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: clientKeys.list() });
+    },
+  });
+}
 import { clientService } from '@/services/clients'
 
 export const clientKeys = {

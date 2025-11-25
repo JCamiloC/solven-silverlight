@@ -30,6 +30,9 @@ export default function ClientesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
   const { mutate: createClient } = require('@/hooks/use-clients').useCreateClient?.() || { mutate: () => {} }
+  // Reemplazar require por import directo
+  // import { useCreateClient } from '@/hooks/use-clients'
+  // const { mutate: createClient } = useCreateClient()
 
   const filteredClients = clients?.filter((client) => {
     const search = searchTerm.toLowerCase()
@@ -242,17 +245,6 @@ export default function ClientesPage() {
               className="space-y-4"
             >
               <div className="space-y-2">
-                              <div className="space-y-2">
-                                <label className="block text-sm font-medium">Mantenimientos al año</label>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={formData.mantenimientos_al_anio}
-                                  onChange={e => setFormData({ ...formData, mantenimientos_al_anio: Number(e.target.value) })}
-                                  className="w-full border rounded px-3 py-2"
-                                  placeholder="Cantidad de mantenimientos"
-                                />
-                              </div>
                 <label className="block text-sm font-medium">Nombre *</label>
                 <input
                   type="text"
@@ -261,6 +253,16 @@ export default function ClientesPage() {
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
                   className="w-full border rounded px-3 py-2"
                   placeholder="Nombre de la empresa"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">NIT</label>
+                <input
+                  type="text"
+                  value={formData.nit}
+                  onChange={e => setFormData({ ...formData, nit: e.target.value })}
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="NIT de la empresa"
                 />
               </div>
               <div className="space-y-2">
@@ -303,6 +305,17 @@ export default function ClientesPage() {
                   onChange={e => setFormData({ ...formData, contact_person: e.target.value })}
                   className="w-full border rounded px-3 py-2"
                   placeholder="Nombre de la persona de contacto"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Mantenimientos al año</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.mantenimientos_al_anio}
+                  onChange={e => setFormData({ ...formData, mantenimientos_al_anio: Number(e.target.value) })}
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="Cantidad de mantenimientos"
                 />
               </div>
               {formError && <div className="text-red-600 text-sm">{formError}</div>}

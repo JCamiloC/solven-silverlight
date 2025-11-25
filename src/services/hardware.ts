@@ -1,48 +1,46 @@
-import { createClient } from '@/lib/supabase/client'
-import { HardwareAsset } from '@/types'
+import { createClient } from '@/lib/supabase/client';
+import { HardwareAsset } from '@/types';
 
-const supabase = createClient()
+const supabase = createClient();
 
 export class HardwareService {
   async getAll(): Promise<HardwareAsset[]> {
     const { data, error } = await supabase
       .from('hardware_assets')
-      .select(`
-        *,
-        client:profiles(first_name, last_name, email)
-      `)
-      .order('created_at', { ascending: false })
+      .select(`*, client:profiles(first_name, last_name, email)`) // adjust as needed
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
 
-    if (error) throw error
-    return data || []
+  async getByClient(clientId: string): Promise<HardwareAsset[]> {
+    const { data, error } = await supabase
+      .from('hardware_assets')
+      .select(`*`)
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
   }
 
   async getById(id: string): Promise<HardwareAsset | null> {
     const { data, error } = await supabase
       .from('hardware_assets')
-      .select(`
-        *,
-        client:profiles(first_name, last_name, email)
-      `)
+      .select(`*, client:profiles(first_name, last_name, email)`)
       .eq('id', id)
-      .single()
-
-    if (error) throw error
-    return data
+      .single();
+    if (error) throw error;
+    return data;
   }
 
   async create(asset: Omit<HardwareAsset, 'id' | 'created_at' | 'updated_at'>): Promise<HardwareAsset> {
     const { data, error } = await supabase
       .from('hardware_assets')
       .insert(asset)
-      .select(`
-        *,
-        client:profiles(first_name, last_name, email)
-      `)
-      .single()
-
-    if (error) throw error
-    return data
+      .select(`*, client:profiles(first_name, last_name, email)`)
+      .single();
+    if (error) throw error;
+    return data;
   }
 
   async update(id: string, updates: Partial<HardwareAsset>): Promise<HardwareAsset> {
@@ -50,52 +48,47 @@ export class HardwareService {
       .from('hardware_assets')
       .update(updates)
       .eq('id', id)
-      .select(`
-        *,
-        client:profiles(first_name, last_name, email)
-      `)
-      .single()
-
-    if (error) throw error
-    return data
+      .select(`*, client:profiles(first_name, last_name, email)`)
+      .single();
+    if (error) throw error;
+    return data;
   }
 
   async delete(id: string): Promise<void> {
     const { error } = await supabase
       .from('hardware_assets')
       .delete()
-      .eq('id', id)
-
-    if (error) throw error
+      .eq('id', id);
+    if (error) throw error;
   }
 
   async getStats() {
     const { data: total } = await supabase
       .from('hardware_assets')
-      .select('id', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true });
 
     const { data: active } = await supabase
       .from('hardware_assets')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'active')
+      .eq('status', 'active');
 
     const { data: maintenance } = await supabase
       .from('hardware_assets')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'maintenance')
+      .eq('status', 'maintenance');
 
     const { data: retired } = await supabase
       .from('hardware_assets')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'retired')
+      .eq('status', 'retired');
 
     return {
       total: total?.length || 0,
       active: active?.length || 0,
       maintenance: maintenance?.length || 0,
       retired: retired?.length || 0,
-    }
+    };
   }
 }
 
-export const hardwareService = new HardwareService()
+export const hardwareService = new HardwareService();

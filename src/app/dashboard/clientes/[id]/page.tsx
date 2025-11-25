@@ -45,6 +45,8 @@ const clientSchema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   contact_person: z.string().min(1, 'La persona de contacto es requerida'),
+  nit: z.string().min(1, 'El NIT es requerido'),
+  mantenimientos_al_anio: z.coerce.number().min(0, 'Debe ser un número positivo'),
 })
 
 type ClientFormData = z.infer<typeof clientSchema>
@@ -72,6 +74,8 @@ export default function ClienteDetailPage() {
       phone: '',
       address: '',
       contact_person: '',
+      nit: '',
+      mantenimientos_al_anio: 0,
     },
   })
 
@@ -83,6 +87,8 @@ export default function ClienteDetailPage() {
       phone: client.phone || '',
       address: client.address || '',
       contact_person: client.contact_person,
+      nit: client.nit || '',
+      mantenimientos_al_anio: client.mantenimientos_al_anio ?? 0,
     })
   }
 
@@ -224,7 +230,6 @@ export default function ClienteDetailPage() {
                       </FormItem>
                     )}
                   />
-
                   <FormField
                     control={form.control}
                     name="email"
@@ -233,6 +238,32 @@ export default function ClienteDetailPage() {
                         <FormLabel>Email</FormLabel>
                         <FormControl>
                           <Input type="email" placeholder="email@empresa.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="nit"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>NIT</FormLabel>
+                        <FormControl>
+                          <Input placeholder="NIT de la empresa" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="mantenimientos_al_anio"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Mantenimientos al año</FormLabel>
+                        <FormControl>
+                          <Input type="number" min={0} placeholder="Cantidad anual" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
