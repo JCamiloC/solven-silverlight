@@ -16,7 +16,8 @@ import {
 } from '@/components/ui/dialog';
 
 export default function ClienteHardwarePage() {
-  const { id: clientId } = useParams();
+  const { id } = useParams();
+  const clientId = typeof id === 'string' ? id : '';
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { data: assets, isLoading, error } = useHardwareAssetsByClient(clientId);
 

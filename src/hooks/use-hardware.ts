@@ -41,10 +41,13 @@ export function useHardwareAsset(id: string) {
 }
 
 // Get hardware stats
-export function useHardwareStats() {
+
+// Get hardware stats by client
+export function useHardwareStatsByClient(clientId: string) {
   return useQuery({
-    queryKey: hardwareKeys.stats(),
-    queryFn: hardwareService.getStats,
+    queryKey: [...hardwareKeys.stats(), clientId],
+    queryFn: () => hardwareService.getStatsByClient(clientId),
+    enabled: !!clientId,
     staleTime: 2 * 60 * 1000,
   });
 }

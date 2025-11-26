@@ -1,11 +1,11 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useHardwareStats } from '@/hooks/use-hardware'
+import { useHardwareStatsByClient } from '@/hooks/use-hardware'
 import { Computer, Wrench, Archive, TrendingUp } from 'lucide-react'
 
-export function HardwareStats() {
-  const { data: stats, isLoading } = useHardwareStats()
+export function HardwareStats({ clientId }: { clientId: string }) {
+  const { data: stats, isLoading } = useHardwareStatsByClient(clientId)
 
   if (isLoading) {
     return (

@@ -4,6 +4,37 @@ import { HardwareAsset } from '@/types';
 const supabase = createClient();
 
 export class HardwareService {
+    async getStatsByClient(clientId: string) {
+      const { data: total } = await supabase
+        .from('hardware_assets')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', clientId);
+
+      const { data: active } = await supabase
+        .from('hardware_assets')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'active')
+        .eq('client_id', clientId);
+
+      const { data: maintenance } = await supabase
+        .from('hardware_assets')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'maintenance')
+        .eq('client_id', clientId);
+
+      const { data: retired } = await supabase
+        .from('hardware_assets')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'retired')
+        .eq('client_id', clientId);
+
+      return {
+        total: total?.length || 0,
+        active: active?.length || 0,
+        maintenance: maintenance?.length || 0,
+        retired: retired?.length || 0,
+      };
+    }
   async getAll(): Promise<HardwareAsset[]> {
     const { data, error } = await supabase
       .from('hardware_assets')
