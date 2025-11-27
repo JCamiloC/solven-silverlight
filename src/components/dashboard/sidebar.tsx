@@ -98,6 +98,12 @@ const allNavigationItems: NavigationItem[] = [
     roles: ['administrador', 'lider_soporte'],
   },
   {
+    name: 'Parámetros',
+    href: '/dashboard/parametros',
+    icon: Settings,
+    roles: ['administrador', 'lider_soporte'],
+  },
+  {
     name: 'Usuarios',
     href: '/dashboard/usuarios',
     icon: Users,

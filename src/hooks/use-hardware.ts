@@ -3,6 +3,35 @@ import { hardwareService } from '@/services/hardware';
 import { toast } from 'sonner';
 import { HardwareAsset } from '@/types';
 
+// Estadísticas globales de hardware
+export function useHardwareStats() {
+  return useQuery({
+    queryKey: hardwareKeys.stats(),
+    queryFn: hardwareService.getStats,
+    staleTime: 2 * 60 * 1000,
+  });
+}
+
+// Follow-ups hooks
+export function useGetFollowUps(hardwareId: string) {
+  return useQuery({
+    queryKey: [...hardwareKeys.all, 'followups', hardwareId],
+    queryFn: () => hardwareService.getFollowUps(hardwareId),
+    enabled: !!hardwareId,
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useCreateFollowUp() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ hardwareId, payload }: { hardwareId: string; payload: { tipo: string; detalle: string; creado_por?: string } }) =>
+      hardwareService.createFollowUp(hardwareId, payload),
+    onSuccess: (_, { hardwareId }) => {
+      queryClient.invalidateQueries({ queryKey: [...hardwareKeys.all, 'followups', hardwareId] });
+    },
+  });
+}
 // Query keys
 export const hardwareKeys = {
   all: ['hardware'] as const,
@@ -56,8 +85,10 @@ export function useHardwareStatsByClient(clientId: string) {
 export function useCreateHardware() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Omit<HardwareAsset, 'id' | 'created_at' | 'updated_at'>) =>
-      hardwareService.create(data),
+    mutationFn: (data: Omit<HardwareAsset, 'id' | 'created_at' | 'updated_at'>) => {
+      const cleanData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined));
+      return hardwareService.create(cleanData as any);
+    },
     onMutate: async (newAsset) => {
       await queryClient.cancelQueries({ queryKey: hardwareKeys.list() });
       const previousAssets = queryClient.getQueryData(hardwareKeys.list());
@@ -81,6 +112,11 @@ export function useCreateHardware() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: hardwareKeys.list() });
+      // If payload included client_id, also invalidate that client's list
+      try {
+        const possibleClientId = (arguments && (arguments as any)[2])?.client_id;
+        if (possibleClientId) queryClient.invalidateQueries({ queryKey: hardwareKeys.byClient(possibleClientId) });
+      } catch (e) {}
       queryClient.invalidateQueries({ queryKey: hardwareKeys.stats() });
     },
   });
@@ -90,8 +126,11 @@ export function useCreateHardware() {
 export function useUpdateHardware() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: Partial<HardwareAsset> }) =>
-      hardwareService.update(id, updates),
+    mutationFn: ({ id, updates }: { id: string; updates: Partial<HardwareAsset> }) => {
+      // Elimina campos undefined para evitar errores en el backend
+      const cleanUpdates = Object.fromEntries(Object.entries(updates).filter(([_, v]) => v !== undefined));
+      return hardwareService.update(id, cleanUpdates);
+    },
     onMutate: async ({ id, updates }) => {
       await queryClient.cancelQueries({ queryKey: hardwareKeys.list() });
       await queryClient.cancelQueries({ queryKey: hardwareKeys.detail(id) });
@@ -118,6 +157,13 @@ export function useUpdateHardware() {
     onSettled: (_, __, { id }) => {
       queryClient.invalidateQueries({ queryKey: hardwareKeys.list() });
       queryClient.invalidateQueries({ queryKey: hardwareKeys.detail(id) });
+      // Try to invalidate the by-client cache for this asset. Prefer previousAsset from context if available.
+      try {
+        const ctx = (arguments as any)[3];
+        const prev = ctx?.previousAsset;
+        const possibleClientId = prev?.client_id || (arguments && (arguments as any)[2])?.updates?.client_id;
+        if (possibleClientId) queryClient.invalidateQueries({ queryKey: hardwareKeys.byClient(possibleClientId) });
+      } catch (e) {}
       queryClient.invalidateQueries({ queryKey: hardwareKeys.stats() });
     },
   });

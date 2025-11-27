@@ -49,7 +49,9 @@ import {
 } from 'lucide-react'
 import { HardwareAsset } from '@/types'
 import { HardwareForm } from './hardware-form'
-import { useUpdateHardware, useDeleteHardware } from '@/hooks/use-hardware'
+import { SeguimientoForm } from './seguimiento-form'
+import { SeguimientosList } from './seguimientos-list'
+import { useUpdateHardware, useDeleteHardware, useGetFollowUps } from '@/hooks/use-hardware'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -120,20 +122,19 @@ export function HardwareTable({ data, isLoading }: HardwareTableProps) {
       cell: ({ row }) => getStatusBadge(row.getValue('status')),
     },
     {
-      accessorKey: 'assigned_to',
-      header: 'Asignado a',
+      accessorKey: 'persona_responsable',
+      header: 'Persona Responsable',
       cell: ({ row }) => {
-        const assignedTo = row.getValue('assigned_to') as string
-        return assignedTo || 'No asignado'
+        const persona = row.getValue('persona_responsable') as string
+        return persona || '-'
       },
     },
     {
-      accessorKey: 'purchase_date',
-      header: 'Fecha de Compra',
+      id: 'followup_count',
+      header: '# Seguimientos',
       cell: ({ row }) => {
-        const date = row.getValue('purchase_date') as string
-        if (!date) return '-'
-        return format(new Date(date), 'dd/MM/yyyy', { locale: es })
+        const asset = row.original
+        return <FollowupCount hardwareId={asset.id} />
       },
     },
     {
@@ -149,11 +150,19 @@ export function HardwareTable({ data, isLoading }: HardwareTableProps) {
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end">
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => setEditingAsset(asset)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Editar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setViewingAsset(asset); setViewFollowupsOpen(true); }}>
+                <FileText className="mr-2 h-4 w-4" />
+                Ver Seguimientos
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setViewingAsset(asset); setAddFollowupOpen(true); }}>
+                <Download className="mr-2 h-4 w-4" />
+                Registrar Seguimiento
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => generateLifesheet(asset)}>
                 <FileText className="mr-2 h-4 w-4" />
@@ -195,11 +204,21 @@ export function HardwareTable({ data, isLoading }: HardwareTableProps) {
     },
   })
 
+  function FollowupCount({ hardwareId }: { hardwareId: string }) {
+    const { data, isLoading } = useGetFollowUps(hardwareId)
+    if (isLoading) return <span className="text-sm text-muted-foreground">...</span>
+    return <span className="text-sm">{data ? data.length : 0}</span>
+  }
+
   const handleDelete = async (asset: HardwareAsset) => {
     if (confirm(`¿Está seguro de que desea eliminar el equipo "${asset.name}"?`)) {
       deleteMutation.mutate(asset.id)
     }
   }
+
+  const [viewingAsset, setViewingAsset] = useState<HardwareAsset | null>(null)
+  const [viewFollowupsOpen, setViewFollowupsOpen] = useState(false)
+  const [addFollowupOpen, setAddFollowupOpen] = useState(false)
 
   const generateLifesheet = (asset: HardwareAsset) => {
     console.log('Generate lifesheet for:', asset)
@@ -318,14 +337,33 @@ export function HardwareTable({ data, isLoading }: HardwareTableProps) {
             </DialogDescription>
           </DialogHeader>
           {editingAsset && (
-            <HardwareForm 
+            <HardwareForm
               asset={editingAsset}
+              clientId={editingAsset?.client_id}
               onSuccess={() => setEditingAsset(null)}
               onCancel={() => setEditingAsset(null)}
             />
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Registrar Seguimiento Dialog */}
+      {viewingAsset && (
+        <SeguimientoForm
+          hardwareId={viewingAsset.id}
+          open={addFollowupOpen}
+          onOpenChange={(open) => { if (!open) setViewingAsset(null); setAddFollowupOpen(open); }}
+          onSaved={() => setViewFollowupsOpen(true)}
+        />
+      )}
+      {/* Ver Seguimientos Dialog */}
+      {viewingAsset && (
+        <SeguimientosList
+          hardwareId={viewingAsset.id}
+          open={viewFollowupsOpen}
+          onOpenChange={(open) => { if (!open) setViewingAsset(null); setViewFollowupsOpen(open); }}
+        />
+      )}
     </div>
   )
 }

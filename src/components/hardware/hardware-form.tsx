@@ -25,12 +25,21 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { HardwareAsset } from '@/types';
-import { useCreateHardware, useUpdateHardware } from '@/hooks/use-hardware';
+import { useCreateHardware, useUpdateHardware, hardwareKeys } from '@/hooks/use-hardware';
+import { useQueryClient } from '@tanstack/react-query';
 
 const softwareExtraSchema = z.object({
   nombre: z.string().min(1, 'Nombre requerido'),
   sl: z.boolean(),
   fecha_vencimiento: z.string().optional(),
+}).superRefine((val, ctx) => {
+  if (!val.sl && (!val.fecha_vencimiento || val.fecha_vencimiento.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Fecha de vencimiento requerida cuando SL no está seleccionado',
+      path: ['fecha_vencimiento'],
+    });
+  }
 });
 
 const hardwareSchema = z.object({
@@ -50,21 +59,33 @@ const hardwareSchema = z.object({
     nombre: z.string().min(1, 'SO requerido'),
     sl: z.boolean(),
     fecha_vencimiento: z.string().optional(),
+  }).superRefine((val, ctx) => {
+    if (!val.sl && (!val.fecha_vencimiento || val.fecha_vencimiento.trim() === '')) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Fecha de vencimiento requerida', path: ['fecha_vencimiento'] });
+    }
   }),
   ms_office: z.object({
     nombre: z.string().min(1, 'MS Office requerido'),
     sl: z.boolean(),
     fecha_vencimiento: z.string().optional(),
+  }).superRefine((val, ctx) => {
+    if (!val.sl && (!val.fecha_vencimiento || val.fecha_vencimiento.trim() === '')) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Fecha de vencimiento requerida', path: ['fecha_vencimiento'] });
+    }
   }),
   antivirus: z.object({
     nombre: z.string().min(1, 'Antivirus requerido'),
     sl: z.boolean(),
     fecha_vencimiento: z.string().optional(),
+  }).superRefine((val, ctx) => {
+    if (!val.sl && (!val.fecha_vencimiento || val.fecha_vencimiento.trim() === '')) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Fecha de vencimiento requerida', path: ['fecha_vencimiento'] });
+    }
   }),
   software_extra: z.array(softwareExtraSchema).optional(),
-  mouse: z.boolean().optional(),
-  diadema: z.boolean().optional(),
-  teclado: z.boolean().optional(),
+  mouse: z.boolean().optional().default(false),
+  diadema: z.boolean().optional().default(false),
+  teclado: z.boolean().optional().default(false),
   otro_periferico: z.string().optional(),
   observaciones: z.string().optional(),
   client_id: z.string().min(1),
@@ -82,6 +103,10 @@ interface HardwareFormProps {
 export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareFormProps) {
   const createMutation = useCreateHardware();
   const updateMutation = useUpdateHardware();
+  const queryClient = useQueryClient();
+
+  // Debug: show the asset received when opening the form
+  console.log('HardwareForm opened with asset:', asset, 'clientId:', clientId)
 
   const form = useForm<HardwareFormData>({
     resolver: zodResolver(hardwareSchema),
@@ -98,13 +123,62 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
       procesador: asset?.procesador || '',
       memoria_ram: asset?.memoria_ram || '',
       disco_duro: asset?.disco_duro || '',
-      sistema_operativo: asset?.sistema_operativo || { nombre: '', sl: false, fecha_vencimiento: '' },
-      ms_office: asset?.ms_office || { nombre: '', sl: false, fecha_vencimiento: '' },
-      antivirus: asset?.antivirus || { nombre: '', sl: false, fecha_vencimiento: '' },
-      software_extra: asset?.software_extra || [],
-      mouse: asset?.mouse || false,
-      diadema: asset?.diadema || false,
-      teclado: asset?.teclado || false,
+      // Parse nested JSON fields that may be returned as strings from Supabase
+      sistema_operativo: (() => {
+        const raw = asset?.sistema_operativo as any
+        let parsed = raw
+        try {
+          if (typeof raw === 'string' && raw.trim() !== '') parsed = JSON.parse(raw)
+        } catch (e) {
+          parsed = raw
+        }
+        return {
+          nombre: parsed?.nombre ?? '',
+          sl: parsed?.sl ?? false,
+          fecha_vencimiento: parsed?.fecha_vencimiento ?? '',
+        }
+      })(),
+      ms_office: (() => {
+        const raw = asset?.ms_office as any
+        let parsed = raw
+        try {
+          if (typeof raw === 'string' && raw.trim() !== '') parsed = JSON.parse(raw)
+        } catch (e) {
+          parsed = raw
+        }
+        return {
+          nombre: parsed?.nombre ?? '',
+          sl: parsed?.sl ?? false,
+          fecha_vencimiento: parsed?.fecha_vencimiento ?? '',
+        }
+      })(),
+      antivirus: (() => {
+        const raw = asset?.antivirus as any
+        let parsed = raw
+        try {
+          if (typeof raw === 'string' && raw.trim() !== '') parsed = JSON.parse(raw)
+        } catch (e) {
+          parsed = raw
+        }
+        return {
+          nombre: parsed?.nombre ?? '',
+          sl: parsed?.sl ?? false,
+          fecha_vencimiento: parsed?.fecha_vencimiento ?? '',
+        }
+      })(),
+      software_extra: (() => {
+        const raw = asset?.software_extra as any
+        let arr = raw || []
+        try {
+          if (typeof raw === 'string' && raw.trim() !== '') arr = JSON.parse(raw)
+        } catch (e) {
+          arr = raw || []
+        }
+        return (arr || []).map((s: any) => ({ nombre: s?.nombre ?? '', sl: s?.sl ?? false, fecha_vencimiento: s?.fecha_vencimiento ?? '' }))
+      })(),
+      mouse: asset?.mouse ?? false,
+      diadema: asset?.diadema ?? false,
+      teclado: asset?.teclado ?? false,
       otro_periferico: asset?.otro_periferico || '',
       observaciones: asset?.observaciones || '',
       client_id: clientId,
@@ -123,21 +197,68 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
   const isLoading = createMutation.isPending || updateMutation.isPending;
 
   const onSubmit = async (data: HardwareFormData) => {
+    // Debug: log payload and action
+    console.log('HardwareForm.onSubmit called', {
+      action: asset ? 'update' : 'create',
+      assetId: asset?.id,
+      payload: data,
+    })
+
     try {
       if (asset) {
-        await updateMutation.mutateAsync({ id: asset.id, updates: data });
+        console.log('Calling updateMutation.mutateAsync with:', { id: asset.id, updates: data })
+        const res = await updateMutation.mutateAsync({ id: asset.id, updates: data })
+        console.log('updateMutation response:', res)
+        try {
+          // Invalidate client-specific cache so list/modal refreshes
+          if (clientId) queryClient.invalidateQueries({ queryKey: hardwareKeys.byClient(clientId) })
+          queryClient.invalidateQueries({ queryKey: hardwareKeys.detail(asset.id) })
+          queryClient.invalidateQueries({ queryKey: hardwareKeys.list() })
+        } catch (e) {
+          console.warn('Failed to invalidate queries after update', e)
+        }
       } else {
-        await createMutation.mutateAsync(data);
+        console.log('Calling createMutation.mutateAsync with:', data)
+        const res = await createMutation.mutateAsync(data)
+        console.log('createMutation response:', res)
+        try {
+          if (clientId) queryClient.invalidateQueries({ queryKey: hardwareKeys.byClient(clientId) })
+          queryClient.invalidateQueries({ queryKey: hardwareKeys.list() })
+        } catch (e) {
+          console.warn('Failed to invalidate queries after create', e)
+        }
       }
       onSuccess?.();
-    } catch (error) {
-      console.error('Error saving hardware:', error);
+    } catch (error: any) {
+      // Try to extract server error details if present
+      try {
+        console.error('Error saving hardware (detailed):', {
+          message: error?.message,
+          code: error?.code,
+          details: error?.details,
+          hint: error?.hint,
+          stack: error?.stack,
+        })
+      } catch (logErr) {
+        console.error('Error saving hardware:', error)
+      }
+      throw error
     }
   };
 
+  const onError = (errors: any) => {
+    console.log('HardwareForm validation errors:', errors)
+    try {
+      const firstKey = Object.keys(errors)[0]
+      if (firstKey) form.setFocus(firstKey as any)
+    } catch (err) {
+      // ignore
+    }
+  }
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit, onError)} className="space-y-6">
         {/* Sección 1: Datos Generales */}
         <h3 className="text-base font-semibold mb-2">Datos Generales</h3>
         <div className="grid grid-cols-2 gap-4">
@@ -259,49 +380,91 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
         {/* Sección 3: Software */}
         <h3 className="text-base font-semibold mb-2">Software</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FormField control={form.control} name="sistema_operativo" render={({ field }) => (
+          <FormField control={form.control} name="sistema_operativo" render={() => (
             <FormItem>
               <FormLabel>Sistema Operativo</FormLabel>
               <FormControl>
                 <div className="flex flex-col gap-2">
-                  <Input placeholder="Nombre" value={field.value.nombre} onChange={e => field.onChange({ ...field.value, nombre: e.target.value })} />
+                  <Input placeholder="Nombre" {...form.register('sistema_operativo.nombre')} />
                   <div className="flex items-center gap-2">
                     <Label>SL</Label>
-                    <Input type="checkbox" checked={field.value.sl} onChange={e => field.onChange({ ...field.value, sl: e.target.checked })} />
+                    {
+                      (() => {
+                        const soSL = form.watch('sistema_operativo.sl');
+                        return (
+                          <Input
+                            type="checkbox"
+                            checked={!!soSL}
+                            onChange={(e) => form.setValue('sistema_operativo.sl', e.target.checked)}
+                          />
+                        );
+                      })()
+                    }
                   </div>
-                  <Input type="date" value={field.value.fecha_vencimiento} onChange={e => field.onChange({ ...field.value, fecha_vencimiento: e.target.value })} disabled={field.value.sl} />
+                  <Input type="date" {...form.register('sistema_operativo.fecha_vencimiento')} disabled={!!form.watch('sistema_operativo.sl')} />
+                  {form.formState.errors?.sistema_operativo?.fecha_vencimiento && (
+                    <p className="text-xs text-destructive mt-1">{(form.formState.errors.sistema_operativo as any).fecha_vencimiento?.message}</p>
+                  )}
                 </div>
               </FormControl>
               <FormMessage />
             </FormItem>
           )} />
-          <FormField control={form.control} name="ms_office" render={({ field }) => (
+          <FormField control={form.control} name="ms_office" render={() => (
             <FormItem>
               <FormLabel>MS Office</FormLabel>
               <FormControl>
                 <div className="flex flex-col gap-2">
-                  <Input placeholder="Nombre" value={field.value.nombre} onChange={e => field.onChange({ ...field.value, nombre: e.target.value })} />
+                  <Input placeholder="Nombre" {...form.register('ms_office.nombre')} />
                   <div className="flex items-center gap-2">
                     <Label>SL</Label>
-                    <Input type="checkbox" checked={field.value.sl} onChange={e => field.onChange({ ...field.value, sl: e.target.checked })} />
+                    {
+                      (() => {
+                        const msSL = form.watch('ms_office.sl');
+                        return (
+                          <Input
+                            type="checkbox"
+                            checked={!!msSL}
+                            onChange={(e) => form.setValue('ms_office.sl', e.target.checked)}
+                          />
+                        );
+                      })()
+                    }
                   </div>
-                  <Input type="date" value={field.value.fecha_vencimiento} onChange={e => field.onChange({ ...field.value, fecha_vencimiento: e.target.value })} disabled={field.value.sl} />
+                  <Input type="date" {...form.register('ms_office.fecha_vencimiento')} disabled={!!form.watch('ms_office.sl')} />
+                  {form.formState.errors?.ms_office?.fecha_vencimiento && (
+                    <p className="text-xs text-destructive mt-1">{(form.formState.errors.ms_office as any).fecha_vencimiento?.message}</p>
+                  )}
                 </div>
               </FormControl>
               <FormMessage />
             </FormItem>
           )} />
-          <FormField control={form.control} name="antivirus" render={({ field }) => (
+          <FormField control={form.control} name="antivirus" render={() => (
             <FormItem>
               <FormLabel>Antivirus</FormLabel>
               <FormControl>
                 <div className="flex flex-col gap-2">
-                  <Input placeholder="Nombre" value={field.value.nombre} onChange={e => field.onChange({ ...field.value, nombre: e.target.value })} />
+                  <Input placeholder="Nombre" {...form.register('antivirus.nombre')} />
                   <div className="flex items-center gap-2">
                     <Label>SL</Label>
-                    <Input type="checkbox" checked={field.value.sl} onChange={e => field.onChange({ ...field.value, sl: e.target.checked })} />
+                    {
+                      (() => {
+                        const avSL = form.watch('antivirus.sl');
+                        return (
+                          <Input
+                            type="checkbox"
+                            checked={!!avSL}
+                            onChange={(e) => form.setValue('antivirus.sl', e.target.checked)}
+                          />
+                        );
+                      })()
+                    }
                   </div>
-                  <Input type="date" value={field.value.fecha_vencimiento} onChange={e => field.onChange({ ...field.value, fecha_vencimiento: e.target.value })} disabled={field.value.sl} />
+                  <Input type="date" {...form.register('antivirus.fecha_vencimiento')} disabled={!!form.watch('antivirus.sl')} />
+                  {form.formState.errors?.antivirus?.fecha_vencimiento && (
+                    <p className="text-xs text-destructive mt-1">{(form.formState.errors.antivirus as any).fecha_vencimiento?.message}</p>
+                  )}
                 </div>
               </FormControl>
               <FormMessage />
@@ -310,17 +473,32 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
         </div>
         <div className="space-y-2">
           <Label>Software Extra</Label>
-          {softwareFields.map((field, idx) => (
-            <div key={field.id} className="grid grid-cols-5 gap-2 items-center">
-              <Input {...form.register(`software_extra.${idx}.nombre`)} placeholder="Nombre" />
-              <div className="flex items-center gap-2">
-                <Label>SL</Label>
-                <Input type="checkbox" {...form.register(`software_extra.${idx}.sl`)} />
+          {softwareFields.map((field, idx) => {
+            const slValue = form.watch(`software_extra.${idx}.sl`);
+            return (
+              <div key={field.id} className="grid grid-cols-5 gap-2 items-center">
+                <Input {...form.register(`software_extra.${idx}.nombre`)} placeholder="Nombre" />
+                <div className="flex items-center gap-2">
+                  <Label>SL</Label>
+                  <Input
+                    type="checkbox"
+                    checked={!!slValue}
+                    onChange={(e) => form.setValue(`software_extra.${idx}.sl`, e.target.checked)}
+                  />
+                </div>
+                <Input
+                  type="date"
+                  {...form.register(`software_extra.${idx}.fecha_vencimiento`)}
+                  placeholder="Fecha Vencimiento"
+                  disabled={!!slValue}
+                />
+                {form.formState.errors?.software_extra && form.formState.errors.software_extra[idx]?.fecha_vencimiento && (
+                  <p className="text-xs text-destructive mt-1">{(form.formState.errors.software_extra[idx] as any).fecha_vencimiento?.message}</p>
+                )}
+                <Button type="button" variant="outline" onClick={() => removeSoftware(idx)}>-</Button>
               </div>
-              <Input type="date" {...form.register(`software_extra.${idx}.fecha_vencimiento`)} placeholder="Fecha Vencimiento" disabled={form.watch(`software_extra.${idx}.sl`)} />
-              <Button type="button" variant="outline" onClick={() => removeSoftware(idx)}>-</Button>
-            </div>
-          ))}
+            );
+          })}
           <Button type="button" variant="secondary" onClick={() => appendSoftware({ nombre: '', sl: false, fecha_vencimiento: '' })}>+ Agregar Software</Button>
         </div>
 

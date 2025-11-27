@@ -18,7 +18,6 @@ export function DashboardStats() {
   const { data: ticketStats, isLoading: ticketLoading } = useTicketStats()
   const { data: softwareStats, isLoading: softwareLoading } = useSoftwareStats()
   const { hasRole } = useAuth()
-  
   // Access stats - only for admins
   const isAdmin = hasRole(['administrador'])
   const { data: accessStats, isLoading: accessLoading } = useAccessStats()

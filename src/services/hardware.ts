@@ -38,7 +38,7 @@ export class HardwareService {
   async getAll(): Promise<HardwareAsset[]> {
     const { data, error } = await supabase
       .from('hardware_assets')
-      .select(`*, client:profiles(first_name, last_name, email)`) // adjust as needed
+      .select(`*, client:clients(name, email, contact_person)`) // ajusta los campos según lo que necesites
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];
@@ -57,7 +57,7 @@ export class HardwareService {
   async getById(id: string): Promise<HardwareAsset | null> {
     const { data, error } = await supabase
       .from('hardware_assets')
-      .select(`*, client:profiles(first_name, last_name, email)`)
+      .select(`*, client:clients(name, email, contact_person)`)
       .eq('id', id)
       .single();
     if (error) throw error;
@@ -65,22 +65,26 @@ export class HardwareService {
   }
 
   async create(asset: Omit<HardwareAsset, 'id' | 'created_at' | 'updated_at'>): Promise<HardwareAsset> {
+    console.debug('HardwareService.create payload:', asset)
     const { data, error } = await supabase
       .from('hardware_assets')
       .insert(asset)
-      .select(`*, client:profiles(first_name, last_name, email)`)
+      .select(`*, client:clients(name, email, contact_person)`)
       .single();
+    console.debug('HardwareService.create response:', { data, error })
     if (error) throw error;
     return data;
   }
 
   async update(id: string, updates: Partial<HardwareAsset>): Promise<HardwareAsset> {
+    console.debug('HardwareService.update payload:', { id, updates })
     const { data, error } = await supabase
       .from('hardware_assets')
       .update(updates)
       .eq('id', id)
-      .select(`*, client:profiles(first_name, last_name, email)`)
+      .select(`*, client:clients(name, email, contact_person)`)
       .single();
+    console.debug('HardwareService.update response:', { data, error })
     if (error) throw error;
     return data;
   }
@@ -91,6 +95,32 @@ export class HardwareService {
       .delete()
       .eq('id', id);
     if (error) throw error;
+  }
+
+  // Seguimientos (follow-ups)
+  async getFollowUps(hardwareId: string) {
+    const { data, error } = await supabase
+      .from('hardware_seguimientos')
+      .select(`*, creator:profiles(first_name, last_name)`) // include creator profile
+      .eq('hardware_id', hardwareId)
+      .order('fecha_registro', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async createFollowUp(hardwareId: string, payload: { tipo: string; detalle: string; creado_por?: string }) {
+    const row = {
+      hardware_id: hardwareId,
+      tipo: payload.tipo,
+      detalle: payload.detalle,
+      creado_por: payload.creado_por || null,
+    };
+    const { data, error } = await supabase
+      .from('hardware_seguimientos')
+      .insert(row)
+      .single();
+    if (error) throw error;
+    return data;
   }
 
   async getStats() {
