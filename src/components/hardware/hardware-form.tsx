@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
+import type { Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -109,7 +110,7 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
   console.log('HardwareForm opened with asset:', asset, 'clientId:', clientId)
 
   const form = useForm<HardwareFormData>({
-    resolver: zodResolver(hardwareSchema),
+    resolver: zodResolver(hardwareSchema) as Resolver<HardwareFormData>,
     defaultValues: {
       name: asset?.name || '',
       type: asset?.type || '',

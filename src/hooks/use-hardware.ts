@@ -85,11 +85,11 @@ export function useHardwareStatsByClient(clientId: string) {
 export function useCreateHardware() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Omit<HardwareAsset, 'id' | 'created_at' | 'updated_at'>) => {
+    mutationFn: (data: any) => {
       const cleanData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined));
       return hardwareService.create(cleanData as any);
     },
-    onMutate: async (newAsset) => {
+    onMutate: async (newAsset: any) => {
       await queryClient.cancelQueries({ queryKey: hardwareKeys.list() });
       const previousAssets = queryClient.getQueryData(hardwareKeys.list());
       queryClient.setQueryData(hardwareKeys.list(), (old: HardwareAsset[] = []) => [

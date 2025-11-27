@@ -63,6 +63,7 @@ export default function HardwarePage() {
                 </DialogDescription>
               </DialogHeader>
               <HardwareForm 
+                clientId=""
                 onSuccess={() => setShowCreateDialog(false)}
                 onCancel={() => setShowCreateDialog(false)}
               />
@@ -70,7 +71,7 @@ export default function HardwarePage() {
           </Dialog>
         </div>
 
-        <HardwareStats />
+        <HardwareStats clientId="" />
 
         <div className="space-y-4">
           <div className="flex justify-between items-center">

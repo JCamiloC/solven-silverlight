@@ -62,6 +62,21 @@ export interface HardwareAsset {
   status: 'active' | 'maintenance' | 'retired'
   location: string
   assigned_to?: string
+  sede?: string
+  area_encargada?: string
+  persona_responsable?: string
+  procesador?: string
+  memoria_ram?: string
+  disco_duro?: string
+  sistema_operativo?: any
+  ms_office?: any
+  antivirus?: any
+  software_extra?: any[]
+  mouse?: boolean
+  diadema?: boolean
+  teclado?: boolean
+  otro_periferico?: string
+  observaciones?: string
   created_at: string
   updated_at: string
 }
