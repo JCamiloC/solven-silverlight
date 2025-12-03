@@ -1,6 +1,6 @@
 export type UserRole = 'cliente' | 'agente_soporte' | 'lider_soporte' | 'administrador'
 
-export type UserType = 
+export type ClientType = 
   | 'on_demand_software'
   | 'on_demand_hardware'
   | 'on_demand_ambos'
@@ -27,7 +27,6 @@ export interface Profile {
   last_name: string
   phone?: string
   role: UserRole
-  user_type?: UserType
   avatar_url?: string
   totp_secret?: string
   totp_enabled?: boolean
@@ -44,6 +43,7 @@ export interface Client {
   contact_person: string
   nit?: string
   mantenimientos_al_anio?: number
+  client_type?: ClientType
   created_at: string
   updated_at: string
 }
@@ -91,6 +91,26 @@ export interface MaintenanceLog {
   cost?: number
   notes?: string
   created_at: string
+}
+
+export type TipoSeguimiento = 
+  | 'mantenimiento_programado'
+  | 'mantenimiento_no_programado'
+  | 'soporte_remoto'
+  | 'soporte_en_sitio'
+
+export interface HardwareSeguimiento {
+  id: string
+  hardware_id: string
+  tipo: TipoSeguimiento
+  detalle: string
+  actividades?: string[]
+  foto_url?: string
+  fecha_registro: string
+  creado_por?: string
+  created_at: string
+  updated_at: string
+  creator?: Profile
 }
 
 export interface SoftwareLicense {

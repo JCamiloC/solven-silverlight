@@ -12,7 +12,6 @@ export interface User {
   last_name: string
   phone?: string
   role: UserRole
-  user_type?: string
   avatar_url?: string
   created_at: string
   updated_at: string
@@ -35,7 +34,6 @@ export interface UserUpdate {
   phone?: string
   role?: UserRole
   client_id?: string
-  user_type?: string
   avatar_url?: string
   updated_at?: string
 }
@@ -72,7 +70,6 @@ export class UsersService {
         last_name: profile.last_name,
         phone: profile.phone,
         role: profile.role,
-        user_type: profile.user_type,
         avatar_url: profile.avatar_url,
         created_at: profile.created_at,
         updated_at: profile.updated_at

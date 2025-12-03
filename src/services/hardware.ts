@@ -5,34 +5,34 @@ const supabase = createClient();
 
 export class HardwareService {
     async getStatsByClient(clientId: string) {
-      const { data: total } = await supabase
+      const { count: total } = await supabase
         .from('hardware_assets')
-        .select('id', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .eq('client_id', clientId);
 
-      const { data: active } = await supabase
+      const { count: active } = await supabase
         .from('hardware_assets')
-        .select('id', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .eq('status', 'active')
         .eq('client_id', clientId);
 
-      const { data: maintenance } = await supabase
+      const { count: maintenance } = await supabase
         .from('hardware_assets')
-        .select('id', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .eq('status', 'maintenance')
         .eq('client_id', clientId);
 
-      const { data: retired } = await supabase
+      const { count: retired } = await supabase
         .from('hardware_assets')
-        .select('id', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .eq('status', 'retired')
         .eq('client_id', clientId);
 
       return {
-        total: total?.length || 0,
-        active: active?.length || 0,
-        maintenance: maintenance?.length || 0,
-        retired: retired?.length || 0,
+        total: total || 0,
+        active: active || 0,
+        maintenance: maintenance || 0,
+        retired: retired || 0,
       };
     }
   async getAll(): Promise<HardwareAsset[]> {
@@ -108,16 +108,30 @@ export class HardwareService {
     return data || [];
   }
 
-  async createFollowUp(hardwareId: string, payload: { tipo: string; detalle: string; creado_por?: string }) {
+  async createFollowUp(
+    hardwareId: string, 
+    payload: { 
+      tipo: string
+      detalle: string
+      actividades?: string[]
+      foto_url?: string
+      fecha_registro?: string
+      creado_por?: string
+    }
+  ) {
     const row = {
       hardware_id: hardwareId,
       tipo: payload.tipo,
       detalle: payload.detalle,
+      actividades: payload.actividades || [],
+      foto_url: payload.foto_url || null,
+      fecha_registro: payload.fecha_registro || new Date().toISOString(),
       creado_por: payload.creado_por || null,
     };
     const { data, error } = await supabase
       .from('hardware_seguimientos')
       .insert(row)
+      .select()
       .single();
     if (error) throw error;
     return data;

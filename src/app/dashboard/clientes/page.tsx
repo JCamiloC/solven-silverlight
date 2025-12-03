@@ -110,14 +110,14 @@ export default function ClientesPage() {
   return (
     <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte']}>
       <div className="container mx-auto py-6 space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Clientes</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Clientes</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
               Gestión de clientes y sus recursos
             </p>
           </div>
-          <Button onClick={() => setShowCreateDialog(true)}>
+          <Button onClick={() => setShowCreateDialog(true)} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             Nuevo Cliente
           </Button>
@@ -171,14 +171,14 @@ export default function ClientesPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="rounded-md border">
-                  <table className="w-full">
+                <div className="rounded-md border overflow-x-auto">
+                  <table className="w-full min-w-[800px]">
                     <thead>
                       <tr className="border-b bg-muted/50">
                         {columns.map((column) => (
                           <th
                             key={String(column.key)}
-                            className="h-12 px-4 text-left align-middle font-medium text-muted-foreground"
+                            className="h-12 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap"
                           >
                             {column.label}
                           </th>
@@ -200,7 +200,7 @@ export default function ClientesPage() {
                             return (
                               <td
                                 key={String(column.key)}
-                                className="p-4 align-middle"
+                                className="p-4 align-middle whitespace-nowrap"
                               >
                                 {displayValue}
                               </td>

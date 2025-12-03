@@ -20,6 +20,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Form,
   FormControl,
   FormField,
@@ -37,8 +44,8 @@ import { toast } from 'sonner'
 import { Loading } from '@/components/ui/loading'
 import { Users, Mail, Phone } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { UserType } from '@/types'
-import { getUserTypeLabel, getUserTypeBadgeVariant } from '@/lib/utils/user-type-labels'
+import { ClientType } from '@/types'
+import { getClientTypeLabel, getClientTypeBadgeVariant } from '@/lib/utils/user-type-labels'
 
 const clientSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -48,6 +55,15 @@ const clientSchema = z.object({
   contact_person: z.string().min(1, 'La persona de contacto es requerida'),
   nit: z.string().min(1, 'El NIT es requerido'),
   mantenimientos_al_anio: z.coerce.number().min(0, 'Debe ser un número positivo'),
+  client_type: z.enum([
+    'on_demand_software',
+    'on_demand_hardware',
+    'on_demand_ambos',
+    'contrato_software',
+    'contrato_hardware',
+    'contrato_ambos',
+    'no_aplica'
+  ]).optional(),
 })
 
 type ClientFormData = z.infer<typeof clientSchema>
@@ -77,6 +93,7 @@ export default function ClienteDetailPage() {
       contact_person: '',
       nit: '',
       mantenimientos_al_anio: 0,
+      client_type: 'no_aplica',
     },
   })
 
@@ -90,6 +107,7 @@ export default function ClienteDetailPage() {
       contact_person: client.contact_person,
       nit: client.nit || '',
       mantenimientos_al_anio: client.mantenimientos_al_anio ?? 0,
+      client_type: client.client_type || 'no_aplica',
     })
   }
 
@@ -188,7 +206,7 @@ export default function ClienteDetailPage() {
     <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte']}>
       <div className="container mx-auto py-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -198,8 +216,8 @@ export default function ClienteDetailPage() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">{client.name}</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{client.name}</h1>
+              <p className="text-sm sm:text-base text-muted-foreground">
                 Gestión de recursos del cliente
               </p>
             </div>
@@ -304,6 +322,33 @@ export default function ClienteDetailPage() {
 
                 <FormField
                   control={form.control}
+                  name="client_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo de Servicio</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar tipo de servicio" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="on_demand_software">On demand - Software</SelectItem>
+                          <SelectItem value="on_demand_hardware">On demand - Hardware</SelectItem>
+                          <SelectItem value="on_demand_ambos">On demand - Ambos</SelectItem>
+                          <SelectItem value="contrato_software">Contrato - Software</SelectItem>
+                          <SelectItem value="contrato_hardware">Contrato - Hardware</SelectItem>
+                          <SelectItem value="contrato_ambos">Contrato - Ambos</SelectItem>
+                          <SelectItem value="no_aplica">No Aplica</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="address"
                   render={({ field }) => (
                     <FormItem>
@@ -385,11 +430,6 @@ export default function ClienteDetailPage() {
                           <Badge variant="outline" className="text-xs">
                             {user.role}
                           </Badge>
-                          {user.user_type && (
-                            <Badge variant={getUserTypeBadgeVariant(user.user_type)} className="text-xs">
-                              {getUserTypeLabel(user.user_type)}
-                            </Badge>
-                          )}
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">

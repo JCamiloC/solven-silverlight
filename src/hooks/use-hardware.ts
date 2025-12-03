@@ -25,10 +25,28 @@ export function useGetFollowUps(hardwareId: string) {
 export function useCreateFollowUp() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ hardwareId, payload }: { hardwareId: string; payload: { tipo: string; detalle: string; creado_por?: string } }) =>
+    mutationFn: ({ 
+      hardwareId, 
+      payload 
+    }: { 
+      hardwareId: string
+      payload: { 
+        tipo: string
+        detalle: string
+        actividades?: string[]
+        foto_url?: string
+        fecha_registro?: string
+        creado_por?: string 
+      } 
+    }) =>
       hardwareService.createFollowUp(hardwareId, payload),
     onSuccess: (_, { hardwareId }) => {
       queryClient.invalidateQueries({ queryKey: [...hardwareKeys.all, 'followups', hardwareId] });
+      toast.success('Seguimiento guardado exitosamente');
+    },
+    onError: (error) => {
+      console.error('Error creating follow-up:', error);
+      toast.error('Error al guardar el seguimiento');
     },
   });
 }

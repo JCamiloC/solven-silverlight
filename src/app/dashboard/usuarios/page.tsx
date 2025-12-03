@@ -36,7 +36,6 @@ import {
 import { useAuth } from '@/hooks/use-auth'
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/use-users'
 import { useClients } from '@/hooks/use-clients'
-import { UserType } from '@/types'
 import { useInviteUser, usePendingUsers } from '@/hooks/use-user-invitations'
 import { User, UserInsert, UserUpdate } from '@/lib/services/users'
 
@@ -219,7 +218,6 @@ export default function UsersPage() {
       role: formData.get('role') as User['role'],
       password: formData.get('password') as string,
       client_id: formData.get('client_id') as string,
-      user_type: formData.get('user_type') as UserType,
     }
 
     if (selectedUser) {
@@ -511,31 +509,6 @@ export default function UsersPage() {
               </Select>
               <p className="text-xs text-muted-foreground">
                 Selecciona la empresa cliente a la que pertenece este usuario
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="user_type">Tipo de Usuario *</Label>
-              <Select 
-                name="user_type" 
-                defaultValue={(selectedUser?.user_type as UserType) || 'no_aplica'}
-                required
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="on_demand_software">On demand - Software</SelectItem>
-                  <SelectItem value="on_demand_hardware">On demand - Hardware</SelectItem>
-                  <SelectItem value="on_demand_ambos">On demand - Ambos</SelectItem>
-                  <SelectItem value="contrato_software">Contrato - Software</SelectItem>
-                  <SelectItem value="contrato_hardware">Contrato - Hardware</SelectItem>
-                  <SelectItem value="contrato_ambos">Contrato - Ambos</SelectItem>
-                  <SelectItem value="no_aplica">No Aplica</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Define el tipo de servicio para este usuario
               </p>
             </div>
             

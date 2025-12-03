@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   ColumnDef,
   flexRender,
@@ -49,8 +50,6 @@ import {
 } from 'lucide-react'
 import { HardwareAsset } from '@/types'
 import { HardwareForm } from './hardware-form'
-import { SeguimientoForm } from './seguimiento-form'
-import { SeguimientosList } from './seguimientos-list'
 import { useUpdateHardware, useDeleteHardware, useGetFollowUps } from '@/hooks/use-hardware'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -58,9 +57,11 @@ import { es } from 'date-fns/locale'
 interface HardwareTableProps {
   data: HardwareAsset[]
   isLoading?: boolean
+  clientId?: string  // Added for navigation
 }
 
-export function HardwareTable({ data, isLoading }: HardwareTableProps) {
+export function HardwareTable({ data, isLoading, clientId }: HardwareTableProps) {
+  const router = useRouter()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -156,14 +157,14 @@ export function HardwareTable({ data, isLoading }: HardwareTableProps) {
                 <Edit className="mr-2 h-4 w-4" />
                 Editar
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { setViewingAsset(asset); setViewFollowupsOpen(true); }}>
-                <FileText className="mr-2 h-4 w-4" />
-                Ver Seguimientos
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { setViewingAsset(asset); setAddFollowupOpen(true); }}>
-                <Download className="mr-2 h-4 w-4" />
-                Registrar Seguimiento
-              </DropdownMenuItem>
+              {clientId && (
+                <DropdownMenuItem 
+                  onClick={() => router.push(`/dashboard/clientes/${clientId}/hardware/${asset.id}/seguimientos`)}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Ver Seguimientos
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => generateLifesheet(asset)}>
                 <FileText className="mr-2 h-4 w-4" />
                 Generar Hoja de Vida
@@ -217,8 +218,6 @@ export function HardwareTable({ data, isLoading }: HardwareTableProps) {
   }
 
   const [viewingAsset, setViewingAsset] = useState<HardwareAsset | null>(null)
-  const [viewFollowupsOpen, setViewFollowupsOpen] = useState(false)
-  const [addFollowupOpen, setAddFollowupOpen] = useState(false)
 
   const generateLifesheet = (asset: HardwareAsset) => {
     console.log('Generate lifesheet for:', asset)
@@ -246,7 +245,7 @@ export function HardwareTable({ data, isLoading }: HardwareTableProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center py-4">
-        <div className="relative max-w-sm">
+        <div className="relative w-full sm:max-w-sm">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar hardware..."
@@ -257,8 +256,8 @@ export function HardwareTable({ data, isLoading }: HardwareTableProps) {
         </div>
       </div>
       
-      <div className="rounded-md border">
-        <Table>
+      <div className="rounded-md border overflow-x-auto">
+        <Table className="min-w-[900px]">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -347,23 +346,6 @@ export function HardwareTable({ data, isLoading }: HardwareTableProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Registrar Seguimiento Dialog */}
-      {viewingAsset && (
-        <SeguimientoForm
-          hardwareId={viewingAsset.id}
-          open={addFollowupOpen}
-          onOpenChange={(open) => { if (!open) setViewingAsset(null); setAddFollowupOpen(open); }}
-          onSaved={() => setViewFollowupsOpen(true)}
-        />
-      )}
-      {/* Ver Seguimientos Dialog */}
-      {viewingAsset && (
-        <SeguimientosList
-          hardwareId={viewingAsset.id}
-          open={viewFollowupsOpen}
-          onOpenChange={(open) => { if (!open) setViewingAsset(null); setViewFollowupsOpen(open); }}
-        />
-      )}
     </div>
   )
 }

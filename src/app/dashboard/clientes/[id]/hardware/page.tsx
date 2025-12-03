@@ -1,11 +1,12 @@
 "use client";
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { HardwareTable, HardwareStats, HardwareForm } from '@/components/hardware';
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { useHardwareAssetsByClient } from '@/hooks/use-hardware';
+import { useClient } from '@/hooks/use-clients';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, ArrowLeft } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -14,12 +15,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Loading } from '@/components/ui/loading';
 
 export default function ClienteHardwarePage() {
   const { id } = useParams();
+  const router = useRouter();
   const clientId = typeof id === 'string' ? id : '';
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { data: assets, isLoading, error } = useHardwareAssetsByClient(clientId);
+  const { data: client, isLoading: isLoadingClient } = useClient(clientId);
 
   if (error) {
     return (
@@ -36,19 +40,38 @@ export default function ClienteHardwarePage() {
     );
   }
 
+  if (isLoadingClient) {
+    return (
+      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte']}>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loading size="lg" text="Cargando información del cliente..." />
+        </div>
+      </ProtectedRoute>
+    );
+  }
+
   return (
     <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte']}>
       <div className="container mx-auto py-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Hardware de Cliente</h1>
-            <p className="text-muted-foreground">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-4 mb-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push(`/dashboard/clientes/${clientId}`)}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              Hardware de {client?.name || 'Cliente'}
+            </h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
               Gestión de activos de hardware asignados a este cliente
             </p>
           </div>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Agregar Hardware
               </Button>
@@ -77,6 +100,7 @@ export default function ClienteHardwarePage() {
           <HardwareTable 
             data={assets || []} 
             isLoading={isLoading}
+            clientId={clientId}
           />
         </div>
       </div>
