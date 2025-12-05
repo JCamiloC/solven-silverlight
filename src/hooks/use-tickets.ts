@@ -1,11 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { TicketsService, Ticket, TicketInsert, TicketUpdate, TicketWithRelations } from '@/lib/services/tickets'
+import { createClient } from '@/lib/supabase/client'
+
+const supabase = createClient()
 
 const QUERY_KEYS = {
   tickets: ['tickets'] as const,
   ticket: (id: string) => ['tickets', id] as const,
   stats: ['tickets', 'stats'] as const,
+  clientTickets: (clientId: string) => ['tickets', 'client', clientId] as const,
+  myTickets: ['tickets', 'my'] as const,
 }
 
 // Hook para obtener todos los tickets
@@ -13,6 +18,53 @@ export function useTickets() {
   return useQuery({
     queryKey: QUERY_KEYS.tickets,
     queryFn: () => TicketsService.getAll(),
+  })
+}
+
+// Hook para obtener tickets de un cliente específico
+export function useClientTickets(clientId: string) {
+  return useQuery({
+    queryKey: QUERY_KEYS.clientTickets(clientId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('tickets')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false })
+
+      if (error) throw new Error(`Error al obtener tickets del cliente: ${error.message}`)
+      return data as TicketWithRelations[]
+    },
+    enabled: !!clientId,
+  })
+}
+
+// Hook para obtener tickets del usuario cliente actual
+export function useMyTickets(userId: string) {
+  return useQuery({
+    queryKey: QUERY_KEYS.myTickets,
+    queryFn: async () => {
+      // Primero obtener el client_id del perfil del usuario
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('client_id')
+        .eq('id', userId)
+        .single()
+
+      if (profileError) throw new Error(`Error al obtener perfil: ${profileError.message}`)
+      if (!profile?.client_id) return []
+
+      // Luego obtener los tickets de ese cliente
+      const { data, error } = await supabase
+        .from('tickets')
+        .select('*')
+        .eq('client_id', profile.client_id)
+        .order('created_at', { ascending: false })
+
+      if (error) throw new Error(`Error al obtener mis tickets: ${error.message}`)
+      return data as TicketWithRelations[]
+    },
+    enabled: !!userId,
   })
 }
 
