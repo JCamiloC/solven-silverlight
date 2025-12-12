@@ -11,10 +11,15 @@ ALTER TABLE tickets ENABLE ROW LEVEL SECURITY;
 -- ELIMINAR POLÍTICAS EXISTENTES (si las hay)
 -- =====================================================
 DROP POLICY IF EXISTS "Users can create tickets" ON tickets;
+DROP POLICY IF EXISTS "Authenticated users can create tickets" ON tickets;
 DROP POLICY IF EXISTS "Admins can view all tickets" ON tickets;
+DROP POLICY IF EXISTS "Leaders can view all tickets" ON tickets;
+DROP POLICY IF EXISTS "Agents can view all tickets" ON tickets;
 DROP POLICY IF EXISTS "Support can view all tickets" ON tickets;
 DROP POLICY IF EXISTS "Clients can view their tickets" ON tickets;
 DROP POLICY IF EXISTS "Admins can update all tickets" ON tickets;
+DROP POLICY IF EXISTS "Leaders can update all tickets" ON tickets;
+DROP POLICY IF EXISTS "Agents can update assigned tickets" ON tickets;
 DROP POLICY IF EXISTS "Support can update assigned tickets" ON tickets;
 DROP POLICY IF EXISTS "Admins can delete tickets" ON tickets;
 
@@ -185,6 +190,8 @@ ALTER TABLE ticket_comments ENABLE ROW LEVEL SECURITY;
 
 -- Eliminar políticas existentes (si las hay)
 DROP POLICY IF EXISTS "Admins can view all comments" ON ticket_comments;
+DROP POLICY IF EXISTS "Leaders can view all comments" ON ticket_comments;
+DROP POLICY IF EXISTS "Agents can view all comments" ON ticket_comments;
 DROP POLICY IF EXISTS "Support can view all comments" ON ticket_comments;
 DROP POLICY IF EXISTS "Clients can view public comments" ON ticket_comments;
 DROP POLICY IF EXISTS "Users can create comments" ON ticket_comments;

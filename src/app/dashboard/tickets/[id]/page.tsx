@@ -31,7 +31,11 @@ import {
   Tag,
   Target,
   Loader2,
-  EyeOff
+  EyeOff,
+  Mail,
+  Monitor,
+  Package,
+  Key
 } from 'lucide-react'
 // import { format } from 'date-fns'
 // import { es } from 'date-fns/locale'
@@ -40,6 +44,9 @@ import { useTicket, useUpdateTicket, useUpdateTicketStatus } from '@/hooks/use-t
 import { useTicketComments, useCreateTicketComment, useUpdateTicketComment, useDeleteTicketComment } from '@/hooks/use-ticket-comments'
 import { useAssignableUsers } from '@/hooks/use-users'
 import { useClients } from '@/hooks/use-clients'
+import { useHardwareAsset } from '@/hooks/use-hardware'
+import { useSoftwareLicense } from '@/hooks/use-software'
+import { useAccessCredential } from '@/hooks/use-access-credentials'
 import { TicketCommentInsert } from '@/lib/services/ticket-comments'
 
 export default function TicketDetailPage() {
@@ -52,11 +59,16 @@ export default function TicketDetailPage() {
   const [editingComment, setEditingComment] = useState<string | null>(null)
   const [editCommentText, setEditCommentText] = useState('')
   
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { data: ticket, isLoading: ticketLoading } = useTicket(ticketId)
   const { data: comments = [], isLoading: commentsLoading } = useTicketComments(ticketId)
   const { data: assignableUsers = [] } = useAssignableUsers()
   const { data: clients = [] } = useClients()
+  
+  // Obtener datos relacionados según categoría
+  const { data: relatedHardware } = useHardwareAsset(ticket?.hardware_id || '')
+  const { data: relatedSoftware } = useSoftwareLicense(ticket?.software_id || '')
+  const { data: relatedAccess } = useAccessCredential(ticket?.access_credential_id || '')
   
   const updateTicketMutation = useUpdateTicket()
   const updateStatusMutation = useUpdateTicketStatus()
@@ -199,24 +211,24 @@ export default function TicketDetailPage() {
   const assignedUser = assignableUsers.find(u => u.id === ticket.assigned_to)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6 px-2 md:px-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-2 md:gap-4">
           <Button 
             variant="ghost" 
             size="sm"
             onClick={() => router.push('/dashboard/tickets')}
           >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver
+            <ArrowLeft className="mr-1 md:mr-2 h-4 w-4" />
+            <span className="hidden sm:inline">Volver</span>
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Ticket #{ticket.id.slice(-8)}</h1>
-            <p className="text-muted-foreground">{ticket.title}</p>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg md:text-2xl font-bold truncate">Ticket #{ticket.id.slice(-8)}</h1>
+            <p className="text-sm text-muted-foreground truncate">{ticket.title}</p>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {getStatusBadge(ticket.status)}
           {getPriorityBadge(ticket.priority)}
         </div>
@@ -233,10 +245,47 @@ export default function TicketDetailPage() {
                 Descripción del Ticket
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <div className="prose prose-sm max-w-none">
                 <p className="whitespace-pre-wrap">{ticket.description}</p>
               </div>
+
+              {/* Attachment Section */}
+              {ticket.attachment_url && (
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-semibold mb-3">Archivo Adjunto</h3>
+                  {ticket.attachment_name?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                    <div className="space-y-2">
+                      <img 
+                        src={ticket.attachment_url} 
+                        alt={ticket.attachment_name}
+                        className="max-w-full h-auto rounded-lg border"
+                      />
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-sm text-muted-foreground">
+                        <span className="truncate">{ticket.attachment_name}</span>
+                        <span className="text-xs sm:text-sm">{(ticket.attachment_size! / 1024 / 1024).toFixed(2)} MB</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <a
+                      href={ticket.attachment_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{ticket.attachment_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {ticket.attachment_size && `${(ticket.attachment_size / 1024 / 1024).toFixed(2)} MB`}
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        Descargar
+                      </Button>
+                    </a>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -271,9 +320,9 @@ export default function TicketDetailPage() {
                           : 'bg-background'
                       }`}
                     >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center space-x-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
+                        <div className="flex items-center flex-wrap gap-2">
+                          <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                           <span className="font-medium text-sm">{comment.user.first_name} {comment.user.last_name}</span>
                           {comment.is_internal && (
                             <Badge variant="secondary" className="text-xs">
@@ -282,12 +331,12 @@ export default function TicketDetailPage() {
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center justify-between sm:justify-end gap-2">
                           <span className="text-xs text-muted-foreground">
                             {new Date(comment.created_at).toLocaleDateString()}
                           </span>
                           {user?.id === comment.created_by && (
-                            <div className="flex space-x-1">
+                            <div className="flex gap-1">
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -337,38 +386,54 @@ export default function TicketDetailPage() {
 
               {/* Add Comment Form */}
               <div className="border-t pt-4 space-y-4">
-                <Textarea
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Escribir un comentario..."
-                  rows={3}
-                />
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="internal"
-                      checked={isInternal}
-                      onChange={(e) => setIsInternal(e.target.checked)}
-                      className="rounded"
-                    />
-                    <Label htmlFor="internal" className="text-sm">
-                      <EyeOff className="h-4 w-4 inline mr-1" />
-                      Comentario interno
-                    </Label>
+                {!ticket.assigned_to ? (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Este ticket no tiene un usuario asignado aún</p>
+                    <p className="text-xs">Los comentarios estarán disponibles cuando se asigne a alguien</p>
                   </div>
-                  <Button 
-                    onClick={handleSubmitComment}
-                    disabled={!newComment.trim() || createCommentMutation.isPending}
-                  >
-                    {createCommentMutation.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="mr-2 h-4 w-4" />
-                    )}
-                    Enviar
-                  </Button>
-                </div>
+                ) : (profile?.id === ticket.assigned_to || profile?.client_id === ticket.client_id) ? (
+                  <>
+                    <Textarea
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Escribir un comentario..."
+                      rows={3}
+                    />
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="internal"
+                          checked={isInternal}
+                          onChange={(e) => setIsInternal(e.target.checked)}
+                          className="rounded"
+                        />
+                        <Label htmlFor="internal" className="text-sm">
+                          <EyeOff className="h-4 w-4 inline mr-1" />
+                          Comentario interno
+                        </Label>
+                      </div>
+                      <Button 
+                        onClick={handleSubmitComment}
+                        disabled={!newComment.trim() || createCommentMutation.isPending}
+                        className="w-full sm:w-auto"
+                      >
+                        {createCommentMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="mr-2 h-4 w-4" />
+                        )}
+                        Enviar
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Solo el cliente y el usuario asignado pueden comentar</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -453,11 +518,67 @@ export default function TicketDetailPage() {
               
               <div className="flex items-center space-x-2">
                 <Tag className="h-4 w-4 text-muted-foreground" />
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium">Categoría</p>
                   <p className="text-sm text-muted-foreground capitalize">{ticket.category}</p>
                 </div>
               </div>
+              
+              {/* Información relacionada según categoría */}
+              {ticket.category === 'hardware' && relatedHardware && (
+                <div className="flex items-start space-x-2">
+                  <Monitor className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Hardware</p>
+                    <p className="text-sm text-muted-foreground truncate">{relatedHardware.name}</p>
+                    {relatedHardware.serial_number && (
+                      <p className="text-xs text-muted-foreground">S/N: {relatedHardware.serial_number}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {ticket.category === 'software' && relatedSoftware && (
+                <div className="flex items-start space-x-2">
+                  <Package className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Software</p>
+                    <p className="text-sm text-muted-foreground truncate">{relatedSoftware.name}</p>
+                    {relatedSoftware.license_key && (
+                      <p className="text-xs text-muted-foreground font-mono truncate">{relatedSoftware.license_key}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {ticket.category === 'access' && relatedAccess && (
+                <div className="flex items-start space-x-2">
+                  <Key className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Acceso</p>
+                    <p className="text-sm text-muted-foreground truncate">{relatedAccess.system_name}</p>
+                    {relatedAccess.username && (
+                      <p className="text-xs text-muted-foreground truncate">Usuario: {relatedAccess.username}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Email de contacto */}
+              {ticket.contact_email && (
+                <div className="flex items-start space-x-2">
+                  <Mail className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Email de contacto</p>
+                    <a 
+                      href={`mailto:${ticket.contact_email}`}
+                      className="text-sm text-blue-600 hover:underline truncate block"
+                    >
+                      {ticket.contact_email}
+                    </a>
+                  </div>
+                </div>
+              )}
               
               <div className="flex items-center space-x-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />

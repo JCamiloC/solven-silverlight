@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -24,24 +25,36 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useClients } from '@/hooks/use-clients'
 import { useAssignableUsers } from '@/hooks/use-users'
 import { useCreateTicket, useUpdateTicket } from '@/hooks/use-tickets'
 import { useAuth } from '@/hooks/use-auth'
-import { Loader2 } from 'lucide-react'
+import { useHardwareAssetsByClient } from '@/hooks/use-hardware'
+import { useSoftwareByClient } from '@/hooks/use-software'
+import { useAccessCredentialsByClient } from '@/hooks/use-access-credentials'
+import { createClient } from '@/lib/supabase/client'
+import { Loader2, AlertCircle, Upload, X } from 'lucide-react'
 
 const ticketFormSchema = z.object({
   client_id: z.string().min(1, 'Cliente es obligatorio'),
   title: z.string()
-    .min(5, 'El título debe tener al menos 5 caracteres')
-    .max(200, 'El título no puede exceder 200 caracteres'),
+    .min(5, 'El asunto debe tener al menos 5 caracteres')
+    .max(200, 'El asunto no puede exceder 200 caracteres'),
   description: z.string()
-    .min(20, 'La descripción debe tener al menos 20 caracteres')
-    .max(2000, 'La descripción no puede exceder 2000 caracteres'),
-  category: z.enum(['hardware', 'software', 'network', 'access', 'other']),
+    .min(20, 'La solicitud debe tener al menos 20 caracteres')
+    .max(2000, 'La solicitud no puede exceder 2000 caracteres'),
+  contact_email: z.string()
+    .email('Email inválido')
+    .min(1, 'Email de contacto es obligatorio'),
+  category: z.enum(['hardware', 'software', 'access', 'other']),
   priority: z.enum(['low', 'medium', 'high', 'critical']),
-  status: z.enum(['open', 'in_progress', 'pending', 'resolved', 'closed']).optional(),
+  status: z.enum(['open', 'in_progress', 'closed']).optional(),
   assigned_to: z.string().optional(),
+  // Campos relacionados (solo uno puede estar lleno según categoría)
+  hardware_id: z.string().optional(),
+  software_id: z.string().optional(),
+  access_credential_id: z.string().optional(),
 })
 
 type TicketFormValues = z.infer<typeof ticketFormSchema>
@@ -59,8 +72,7 @@ interface TicketFormProps {
 const categoryLabels = {
   hardware: 'Hardware',
   software: 'Software',
-  network: 'Red/Conectividad',
-  access: 'Accesos/Credenciales',
+  access: 'Accesos',
   other: 'Otro',
 }
 
@@ -73,9 +85,7 @@ const priorityLabels = {
 
 const statusLabels = {
   open: 'Abierto',
-  in_progress: 'En Progreso',
-  pending: 'Pendiente',
-  resolved: 'Resuelto',
+  in_progress: 'En Revisión',
   closed: 'Cerrado',
 }
 
@@ -98,6 +108,12 @@ export function TicketForm({
   const isClientLocked = !!clientId
   const isEditMode = mode === 'edit'
   const canChangeStatus = isAdmin() || isLeader() || isSupport()
+  const isClient = useAuth().isClient
+  
+  // Estado para mostrar error y archivo
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
 
   const form = useForm<TicketFormValues>({
     resolver: zodResolver(ticketFormSchema),
@@ -105,12 +121,45 @@ export function TicketForm({
       client_id: clientId || '',
       title: '',
       description: '',
+      contact_email: user?.email || '',
       category: 'other',
       priority: 'medium',
       status: 'open',
       assigned_to: undefined,
+      hardware_id: undefined,
+      software_id: undefined,
+      access_credential_id: undefined,
     },
   })
+
+  // Watchear cliente y categoría seleccionados
+  const selectedClientId = form.watch('client_id')
+  const selectedCategory = form.watch('category')
+  
+  // Obtener datos según categoría y cliente
+  const { data: hardwareList, isLoading: loadingHardware } = useHardwareAssetsByClient(selectedClientId || '')
+  const { data: softwareList, isLoading: loadingSoftware } = useSoftwareByClient(selectedClientId || '')
+  const { data: accessList, isLoading: loadingAccess } = useAccessCredentialsByClient(selectedClientId || '')
+  
+  // Función para manejar selección de archivo
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    
+    // Validar tamaño (máx 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage('El archivo no puede superar los 5MB')
+      return
+    }
+    
+    setSelectedFile(file)
+    setErrorMessage(null)
+  }
+  
+  // Función para remover archivo seleccionado
+  const handleRemoveFile = () => {
+    setSelectedFile(null)
+  }
 
   // Actualizar client_id si cambia el prop
   useEffect(() => {
@@ -131,7 +180,45 @@ export function TicketForm({
   const onSubmit = async (data: TicketFormValues) => {
     if (!user?.id) return
 
+    // Limpiar error previo
+    setErrorMessage(null)
+
     try {
+      // 1. Subir archivo si existe
+      let attachmentData: { url?: string; name?: string; size?: number } = {}
+      if (selectedFile) {
+        setIsUploading(true)
+        const supabase = createClient()
+        const fileExt = selectedFile.name.split('.').pop()
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+        
+        console.log('📤 Intentando subir archivo:', { fileName, size: selectedFile.size, type: selectedFile.type })
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('ticket-attachments')
+          .upload(fileName, selectedFile, {
+            cacheControl: '3600',
+            upsert: false
+          })
+        
+        console.log('📤 Resultado de subida:', { uploadData, uploadError })
+
+        if (uploadError) {
+          throw new Error(`Error al subir archivo: ${uploadError.message}`)
+        }
+
+        // Obtener URL pública
+        const { data: { publicUrl } } = supabase.storage
+          .from('ticket-attachments')
+          .getPublicUrl(fileName)
+
+        attachmentData = {
+          url: publicUrl,
+          name: selectedFile.name,
+          size: selectedFile.size
+        }
+        setIsUploading(false)
+      }
       if (isEditMode && ticketId) {
         // Modo edición
         const updates: any = {
@@ -145,8 +232,8 @@ export function TicketForm({
         // Solo permitir cambiar estado si tiene permisos
         if (canChangeStatus && data.status) {
           updates.status = data.status
-          // Si se marca como resuelto, agregar timestamp
-          if (data.status === 'resolved') {
+          // Si se marca como cerrado, agregar timestamp
+          if (data.status === 'closed') {
             updates.resolved_at = new Date().toISOString()
           }
         }
@@ -166,15 +253,31 @@ export function TicketForm({
         }
       } else {
         // Modo creación
-        const newTicket = await createTicket.mutateAsync({
+        const ticketData = {
           client_id: data.client_id,
           title: data.title,
           description: data.description,
+          contact_email: data.contact_email,
           category: data.category,
           priority: data.priority,
+          status: 'open' as const, // Siempre crear como "open"
           assigned_to: data.assigned_to || undefined,
           created_by: user.id,
-        })
+          // Campos relacionados según categoría
+          hardware_id: data.category === 'hardware' && data.hardware_id !== 'other' ? data.hardware_id : undefined,
+          software_id: data.category === 'software' && data.software_id !== 'other' ? data.software_id : undefined,
+          access_credential_id: data.category === 'access' && data.access_credential_id !== 'other' ? data.access_credential_id : undefined,
+          // Datos del archivo adjunto
+          attachment_url: attachmentData.url,
+          attachment_name: attachmentData.name,
+          attachment_size: attachmentData.size,
+        }
+        
+        // Log para diagnóstico
+        console.log('🎫 Creando ticket con datos:', ticketData)
+        console.log('👤 Usuario actual:', { id: user.id, email: user.email })
+        
+        const newTicket = await createTicket.mutateAsync(ticketData)
 
         // Callback personalizado o redirección
         if (onSuccess) {
@@ -185,14 +288,36 @@ export function TicketForm({
           router.push('/dashboard/tickets')
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error ${isEditMode ? 'updating' : 'creating'} ticket:`, error)
+      
+      // Resetear estado de React Query
+      if (isEditMode) {
+        updateTicket.reset()
+      } else {
+        createTicket.reset()
+      }
+      
+      // Mostrar mensaje de error al usuario
+      const errorMsg = error?.message || 'Ocurrió un error al procesar el ticket'
+      setErrorMessage(errorMsg)
+      
+      // Scroll al inicio para ver el error
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {/* Mensaje de Error */}
+        {errorMessage && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        )}
+
         {/* Información del Ticket */}
         <Card>
           <CardHeader>
@@ -245,13 +370,13 @@ export function TicketForm({
               )}
             />
 
-            {/* Título */}
+            {/* Asunto */}
             <FormField
               control={form.control}
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Título *</FormLabel>
+                  <FormLabel>Asunto *</FormLabel>
                   <FormControl>
                     <Input {...field} placeholder="Breve descripción del problema" />
                   </FormControl>
@@ -260,18 +385,37 @@ export function TicketForm({
               )}
             />
 
-            {/* Descripción */}
+            {/* Solicitud/Descripción */}
             <FormField
               control={form.control}
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Descripción *</FormLabel>
+                  <FormLabel>Solicitud *</FormLabel>
                   <FormControl>
                     <Textarea
                       {...field}
-                      placeholder="Describa el problema en detalle..."
+                      placeholder="Describa detalladamente su solicitud o problema..."
                       rows={4}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Email de Contacto */}
+            <FormField
+              control={form.control}
+              name="contact_email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email de Contacto *</FormLabel>
+                  <FormControl>
+                    <Input 
+                      {...field} 
+                      type="email"
+                      placeholder="correo@ejemplo.com" 
                     />
                   </FormControl>
                   <FormMessage />
@@ -371,38 +515,177 @@ export function TicketForm({
               )}
             </div>
 
-            {/* Asignar a (opcional) */}
-            <FormField
-              control={form.control}
-              name="assigned_to"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Asignar a (opcional)</FormLabel>
-                  <FormControl>
-                    <Select
-                      onValueChange={(value) => {
-                        field.onChange(value === 'unassigned' ? undefined : value)
-                      }}
-                      defaultValue={field.value || 'unassigned'}
-                      disabled={loadingUsers}
+            {/* Selector dinámico según categoría */}
+            {selectedCategory === 'hardware' && selectedClientId && (
+              <FormField
+                control={form.control}
+                name="hardware_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Equipo de Hardware</FormLabel>
+                    <FormControl>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        disabled={loadingHardware}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={loadingHardware ? "Cargando..." : "Seleccione un equipo"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {hardwareList?.map((hw) => (
+                            <SelectItem key={hw.id} value={hw.id}>
+                              {hw.type} - {hw.brand} {hw.model} (S/N: {hw.serial_number})
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="other">Otro (no está en la lista)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {selectedCategory === 'software' && selectedClientId && (
+              <FormField
+                control={form.control}
+                name="software_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Licencia de Software</FormLabel>
+                    <FormControl>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        disabled={loadingSoftware}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={loadingSoftware ? "Cargando..." : "Seleccione una licencia"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {softwareList?.map((sw) => (
+                            <SelectItem key={sw.id} value={sw.id}>
+                              {sw.name} {sw.version} - {sw.license_type}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="other">Otro (no está en la lista)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {selectedCategory === 'access' && selectedClientId && (
+              <FormField
+                control={form.control}
+                name="access_credential_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Credencial de Acceso</FormLabel>
+                    <FormControl>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        disabled={loadingAccess}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={loadingAccess ? "Cargando..." : "Seleccione una credencial"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accessList?.map((acc) => (
+                            <SelectItem key={acc.id} value={acc.id}>
+                              {acc.system_name} - {acc.username}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="other">Otro (no está en la lista)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {/* Archivo adjunto */}
+            <div className="space-y-2">
+              <Label htmlFor="attachment">Archivo Adjunto (opcional)</Label>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                {!selectedFile ? (
+                  <div className="flex-1 w-full">
+                    <Input
+                      id="attachment"
+                      type="file"
+                      onChange={handleFileSelect}
+                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip"
+                      disabled={isUploading}
+                      className="cursor-pointer"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Máximo 5MB. Formatos: imágenes, PDF, Word, Excel, texto, ZIP
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex-1 w-full flex items-center gap-2 p-2 border rounded-md bg-muted">
+                    <Upload className="h-4 w-4 flex-shrink-0" />
+                    <span className="text-sm flex-1 truncate">{selectedFile.name}</span>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {(selectedFile.size / 1024).toFixed(2)} KB
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleRemoveFile}
+                      disabled={isUploading}
+                      className="flex-shrink-0"
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sin asignar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">Sin asignar</SelectItem>
-                        {assignableUsers?.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.first_name} {user.last_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Asignar a (opcional) - Solo para admin/soporte */}
+            {!isClient() && (
+              <FormField
+                control={form.control}
+                name="assigned_to"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Asignar a (opcional)</FormLabel>
+                    <FormControl>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(value === 'unassigned' ? undefined : value)
+                        }}
+                        defaultValue={field.value || 'unassigned'}
+                        disabled={loadingUsers}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sin asignar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Sin asignar</SelectItem>
+                          {assignableUsers?.map((user) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.first_name} {user.last_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
           </CardContent>
         </Card>
 

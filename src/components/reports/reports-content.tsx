@@ -59,7 +59,7 @@ interface ReportsContentProps {
 }
 
 export function ReportsContent({}: ReportsContentProps = {}) {
-  const { hasRole } = useAuth()
+  const { hasRole, loading } = useAuth()
   const [filters, setFilters] = useState<ReportFilters>({
     period: 'month'
   })
@@ -78,6 +78,18 @@ export function ReportsContent({}: ReportsContentProps = {}) {
   // Permisos
   const canViewReports = hasRole(['administrador', 'lider_soporte'])
   const canExport = hasRole(['administrador', 'lider_soporte'])
+
+  // Mostrar loading mientras se verifica autenticación
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center space-y-4">
+          <BarChart3 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
+          <p className="text-muted-foreground">Cargando reportes...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!canViewReports) {
     return (

@@ -1,20 +1,30 @@
 import { createClient } from '@/lib/supabase/client'
 
-const supabase = createClient()
-
 export interface Ticket {
   id: string
   client_id: string
   title: string
   description: string
   priority: 'low' | 'medium' | 'high' | 'critical'
-  status: 'open' | 'in_progress' | 'pending' | 'resolved' | 'closed'
-  category: 'hardware' | 'software' | 'network' | 'access' | 'other'
+  status: 'open' | 'in_progress' | 'closed'
+  category: 'hardware' | 'software' | 'access' | 'other'
   assigned_to?: string
   created_by: string
   resolved_at?: string
   created_at: string
   updated_at: string
+  // Campos de archivos y relaciones
+  contact_email?: string
+  attachment_url?: string
+  attachment_name?: string
+  attachment_size?: number
+  hardware_id?: string
+  software_id?: string
+  access_credential_id?: string
+  // Campos de notificaciones
+  has_update?: boolean
+  last_update_by?: string
+  last_update_type?: 'comment' | 'status_change' | 'assignment'
 }
 
 export interface TicketInsert {
@@ -22,21 +32,39 @@ export interface TicketInsert {
   title: string
   description: string
   priority?: 'low' | 'medium' | 'high' | 'critical'
-  status?: 'open' | 'in_progress' | 'pending' | 'resolved' | 'closed'
-  category: 'hardware' | 'software' | 'network' | 'access' | 'other'
+  status?: 'open' | 'in_progress' | 'closed'
+  category: 'hardware' | 'software' | 'access' | 'other'
   assigned_to?: string
   created_by: string
+  // Nuevos campos
+  contact_email?: string
+  attachment_url?: string
+  attachment_name?: string
+  attachment_size?: number
+  hardware_id?: string
+  software_id?: string
+  access_credential_id?: string
 }
 
 export interface TicketUpdate {
   title?: string
   description?: string
   priority?: 'low' | 'medium' | 'high' | 'critical'
-  status?: 'open' | 'in_progress' | 'pending' | 'resolved' | 'closed'
-  category?: 'hardware' | 'software' | 'network' | 'access' | 'other'
+  status?: 'open' | 'in_progress' | 'closed'
+  category?: 'hardware' | 'software' | 'access' | 'other'
   assigned_to?: string
   resolved_at?: string
   updated_at?: string
+  contact_email?: string
+  attachment_url?: string
+  attachment_name?: string
+  attachment_size?: number
+  hardware_id?: string
+  software_id?: string
+  access_credential_id?: string
+  has_update?: boolean
+  last_update_by?: string
+  last_update_type?: 'comment' | 'status_change' | 'assignment'
 }
 
 export interface TicketWithRelations extends Ticket {
@@ -73,6 +101,8 @@ export interface TicketWithRelations extends Ticket {
 
 export class TicketsService {
   static async getAll(): Promise<TicketWithRelations[]> {
+    const supabase = createClient()
+    
     // Primero intentar con consulta simple
     const { data, error } = await supabase
       .from('tickets')
@@ -88,6 +118,8 @@ export class TicketsService {
   }
 
   static async getById(id: string): Promise<TicketWithRelations | null> {
+    const supabase = createClient()
+    
     try {
       // Primero intentar una consulta simple
       const { data, error } = await supabase
@@ -117,6 +149,8 @@ export class TicketsService {
   }
 
   static async create(ticket: TicketInsert): Promise<TicketWithRelations> {
+    const supabase = createClient()
+    
     const { data, error } = await supabase
       .from('tickets')
       .insert(ticket)
@@ -132,6 +166,8 @@ export class TicketsService {
   }
 
   static async update(id: string, updates: TicketUpdate): Promise<TicketWithRelations> {
+    const supabase = createClient()
+    
     const { data, error } = await supabase
       .from('tickets')
       .update({
@@ -151,6 +187,8 @@ export class TicketsService {
   }
 
   static async delete(id: string): Promise<void> {
+    const supabase = createClient()
+    
     const { error } = await supabase
       .from('tickets')
       .delete()
@@ -168,15 +206,12 @@ export class TicketsService {
       updated_at: new Date().toISOString()
     }
 
-    // Si se marca como resuelto, agregar timestamp
-    if (status === 'resolved') {
-      updates.resolved_at = new Date().toISOString()
-    }
-
     return this.update(id, updates)
   }
 
   static async getStats() {
+    const supabase = createClient()
+    
     const { data, error } = await supabase
       .from('tickets')
       .select('status, priority, category')
@@ -213,8 +248,6 @@ export class TicketsService {
       total: tickets.length,
       open: tickets.filter((t: any) => t.status === 'open').length,
       in_progress: tickets.filter((t: any) => t.status === 'in_progress').length,
-      pending: tickets.filter((t: any) => t.status === 'pending').length,
-      resolved: tickets.filter((t: any) => t.status === 'resolved').length,
       closed: tickets.filter((t: any) => t.status === 'closed').length,
       by_priority: {
         critical: tickets.filter((t: any) => t.priority === 'critical').length,
@@ -225,12 +258,45 @@ export class TicketsService {
       by_category: {
         hardware: tickets.filter((t: any) => t.category === 'hardware').length,
         software: tickets.filter((t: any) => t.category === 'software').length,
-        network: tickets.filter((t: any) => t.category === 'network').length,
         access: tickets.filter((t: any) => t.category === 'access').length,
         other: tickets.filter((t: any) => t.category === 'other').length,
       }
     }
 
     return stats
+  }
+
+  /**
+   * Marcar la notificación de actualización como leída
+   */
+  static async markUpdateAsRead(id: string): Promise<void> {
+    const supabase = createClient()
+    
+    const { error } = await supabase.rpc('mark_ticket_update_as_read', {
+      ticket_id_param: id
+    })
+
+    if (error) {
+      console.error('Error marking update as read:', error)
+      throw new Error(`Error marking update as read: ${error.message}`)
+    }
+  }
+
+  /**
+   * Obtener tickets con notificaciones pendientes para el usuario actual
+   */
+  static async getWithPendingUpdates(): Promise<TicketWithRelations[]> {
+    const supabase = createClient()
+    
+    const { data, error } = await supabase
+      .from('tickets_with_pending_updates')
+      .select('*')
+
+    if (error) {
+      console.error('Error fetching tickets with pending updates:', error)
+      throw new Error(`Error fetching tickets with pending updates: ${error.message}`)
+    }
+
+    return data as TicketWithRelations[]
   }
 }

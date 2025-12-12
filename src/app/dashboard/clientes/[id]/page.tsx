@@ -174,8 +174,8 @@ export default function ClienteDetailPage() {
     },
     {
       title: 'Software',
-      description: 'Ver y gestionar licencias',
-      icon: Monitor,
+      description: 'Aplicaciones personalizadas',
+      icon: Code,
       href: `/dashboard/clientes/${clientId}/software`,
       color: 'bg-green-500 hover:bg-green-600',
     },
@@ -185,13 +185,6 @@ export default function ClienteDetailPage() {
       icon: Key,
       href: `/dashboard/clientes/${clientId}/accesos`,
       color: 'bg-purple-500 hover:bg-purple-600',
-    },
-    {
-      title: 'Aplicativos',
-      description: 'Ver y gestionar aplicativos',
-      icon: Code,
-      href: `/dashboard/clientes/${clientId}/aplicativos`,
-      color: 'bg-orange-500 hover:bg-orange-600',
     },
     {
       title: 'Tickets',

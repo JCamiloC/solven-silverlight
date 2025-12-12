@@ -130,6 +130,62 @@ export interface SoftwareLicense {
   updated_at: string
 }
 
+export interface CustomApplication {
+  id: string
+  client_id: string
+  // Información Básica
+  name: string
+  description?: string
+  status: 'active' | 'development' | 'maintenance' | 'inactive'
+  // URLs y Accesos
+  production_url?: string
+  staging_url?: string
+  development_url?: string
+  admin_panel_url?: string
+  // Hosting
+  hosting_provider?: string
+  hosting_plan?: string
+  hosting_renewal_date?: string
+  // Dominio
+  domain_registrar?: string
+  domain_expiry_date?: string
+  // Base de Datos
+  database_type?: string
+  database_name?: string
+  database_host?: string
+  // Repositorio
+  repository_url?: string
+  repository_branch?: string
+  // Tecnologías
+  frontend_tech?: string
+  backend_tech?: string
+  mobile_tech?: string
+  // Additional
+  ssl_certificate?: string
+  cdn_provider?: string
+  // Notas
+  notes?: string
+  // Metadatos
+  created_at: string
+  updated_at: string
+  clients?: {
+    name: string
+  }
+}
+
+export interface CustomAppFollowup {
+  id: string
+  application_id: string
+  fecha_registro: string
+  tipo: 'actualizacion' | 'mantenimiento' | 'soporte' | 'backup' | 'migracion' | 'optimizacion' | 'bug_fix' | 'nueva_funcionalidad' | 'otro'
+  actividades: string[]
+  detalle: string
+  foto_url?: string
+  tecnico_responsable: string
+  created_at: string
+  updated_at: string
+}
+
 export interface AccessCredential {
   id: string
   client_id: string

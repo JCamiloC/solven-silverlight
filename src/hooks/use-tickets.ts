@@ -11,6 +11,7 @@ const QUERY_KEYS = {
   stats: ['tickets', 'stats'] as const,
   clientTickets: (clientId: string) => ['tickets', 'client', clientId] as const,
   myTickets: ['tickets', 'my'] as const,
+  pendingUpdates: ['tickets', 'pending-updates'] as const,
 }
 
 // Hook para obtener todos los tickets
@@ -104,7 +105,6 @@ export function useCreateTicket() {
         ...newTicket,
         status: newTicket.status || 'open',
         priority: newTicket.priority || 'medium',
-        resolved_at: undefined,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
@@ -253,8 +253,7 @@ export function useUpdateTicketStatus() {
 
       const updates = {
         status,
-        updated_at: new Date().toISOString(),
-        ...(status === 'resolved' && { resolved_at: new Date().toISOString() })
+        updated_at: new Date().toISOString()
       }
 
       // Optimistically update tickets list
@@ -287,9 +286,7 @@ export function useUpdateTicketStatus() {
     onSuccess: (data) => {
       const statusLabels = {
         open: 'abierto',
-        in_progress: 'en progreso',
-        pending: 'pendiente',
-        resolved: 'resuelto',
+        in_progress: 'en revisión',
         closed: 'cerrado'
       }
       
@@ -301,6 +298,41 @@ export function useUpdateTicketStatus() {
       // Refetch
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tickets })
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.stats })
+    },
+  })
+}
+/**
+ * Hook para obtener tickets con notificaciones pendientes
+ */
+export function useTicketsWithPendingUpdates() {
+  return useQuery({
+    queryKey: QUERY_KEYS.pendingUpdates,
+    queryFn: () => TicketsService.getWithPendingUpdates(),
+    staleTime: 30 * 1000, // 30 segundos - refetch más frecuente para notificaciones
+    refetchInterval: 60 * 1000, // Auto refetch cada minuto
+  })
+}
+
+/**
+ * Hook para marcar una actualización como leída
+ */
+export function useMarkTicketUpdateAsRead() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (ticketId: string) => TicketsService.markUpdateAsRead(ticketId),
+    onSuccess: (_, ticketId) => {
+      // Invalidar las queries relevantes
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tickets })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ticket(ticketId) })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pendingUpdates })
+      
+      toast.success('Notificación marcada como leída')
+    },
+    onError: (error) => {
+      toast.error('Error al marcar como leída', {
+        description: error.message,
+      })
     },
   })
 }

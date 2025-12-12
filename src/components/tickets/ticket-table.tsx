@@ -15,6 +15,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Eye, Loader2 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useClients } from '@/hooks/use-clients'
+import { useAssignableUsers } from '@/hooks/use-users'
 import type { TicketWithRelations } from '@/lib/services/tickets'
 
 interface TicketTableProps {
@@ -69,6 +71,8 @@ export function TicketTable({
   emptyMessage = 'No hay tickets registrados',
 }: TicketTableProps) {
   const router = useRouter()
+  const { data: clients = [] } = useClients()
+  const { data: assignableUsers = [] } = useAssignableUsers()
 
   if (isLoading) {
     return (
@@ -118,7 +122,11 @@ export function TicketTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tickets.map((ticket) => (
+              {tickets.map((ticket) => {
+                const client = clients.find(c => c.id === ticket.client_id)
+                const assignedUser = assignableUsers.find(u => u.id === ticket.assigned_to)
+                
+                return (
                 <TableRow
                   key={ticket.id}
                   className="cursor-pointer hover:bg-muted/50"
@@ -129,7 +137,7 @@ export function TicketTable({
                   </TableCell>
                   {showClientColumn && (
                     <TableCell className="whitespace-nowrap">
-                      {ticket.client?.name || 'N/A'}
+                      {client?.name || 'N/A'}
                     </TableCell>
                   )}
                   <TableCell className="max-w-[300px]">
@@ -157,9 +165,9 @@ export function TicketTable({
                     })}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
-                    {ticket.assigned_user ? (
+                    {assignedUser ? (
                       <span className="text-sm">
-                        {ticket.assigned_user.first_name} {ticket.assigned_user.last_name}
+                        {assignedUser.first_name} {assignedUser.last_name}
                       </span>
                     ) : (
                       <span className="text-sm text-muted-foreground">Sin asignar</span>
@@ -178,7 +186,7 @@ export function TicketTable({
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))}
+              )})}
             </TableBody>
           </Table>
         </div>

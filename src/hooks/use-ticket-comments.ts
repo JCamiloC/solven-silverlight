@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { TicketCommentsService, TicketCommentWithUser, TicketCommentInsert } from '@/lib/services/ticket-comments'
+import { useAuth } from './use-auth'
 
 const QUERY_KEYS = {
   comments: (ticketId: string) => ['ticket-comments', ticketId] as const,
@@ -18,9 +19,19 @@ export function useTicketComments(ticketId: string) {
 // Hook para crear comentario
 export function useCreateTicketComment() {
   const queryClient = useQueryClient()
+  const { profile } = useAuth()
 
   return useMutation({
-    mutationFn: (data: TicketCommentInsert) => TicketCommentsService.create(data),
+    mutationFn: (data: TicketCommentInsert) => {
+      // Agregar automáticamente el nombre del comentarista si existe el perfil
+      const enrichedData: TicketCommentInsert = {
+        ...data,
+        commenter_name: profile ? `${profile.first_name} ${profile.last_name}` : 'Usuario Actual',
+        commenter_role: profile?.role as any
+      }
+      
+      return TicketCommentsService.create(enrichedData)
+    },
     onMutate: async (newComment) => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: QUERY_KEYS.comments(newComment.ticket_id) })

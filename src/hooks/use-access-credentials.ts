@@ -110,17 +110,10 @@ export function useAccessStats() {
 
 // Hook para obtener credenciales por cliente
 export function useAccessCredentialsByClient(clientId: string) {
-  const { requireVerification } = useSecurityContext()
-
   return useQuery({
     queryKey: accessKeys.byClient(clientId),
     queryFn: async () => {
       if (!clientId) return []
-      
-      const verified = await requireVerification()
-      if (!verified) {
-        throw new Error('2FA verification required')
-      }
       
       return accessCredentialsService.getByClient(clientId)
     },

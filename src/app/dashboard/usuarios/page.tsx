@@ -47,7 +47,7 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<string>('all')
   const [showPassword, setShowPassword] = useState(false)
 
-  const { user: currentUser, hasRole } = useAuth()
+  const { user: currentUser, hasRole, loading } = useAuth()
   const { data: users = [], isLoading: usersLoading } = useUsers()
   const { data: clients = [] } = useClients()
   // Log para depuración de clientes
@@ -73,6 +73,18 @@ export default function UsersPage() {
   const canCreateUsers = hasRole(['administrador'])
   const canEditUsers = hasRole(['administrador'])
   const canDeleteUsers = hasRole(['administrador'])
+
+  // Mostrar loading mientras se verifica autenticación
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto" />
+          <p className="text-muted-foreground">Verificando permisos...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!canViewUsers) {
     return (

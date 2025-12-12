@@ -10,6 +10,8 @@ export interface TicketComment {
   is_internal: boolean
   created_at: string
   updated_at: string
+  commenter_name?: string
+  commenter_role?: 'cliente' | 'agente_soporte' | 'lider_soporte' | 'administrador'
 }
 
 export interface TicketCommentWithUser extends TicketComment {
@@ -26,6 +28,8 @@ export interface TicketCommentInsert {
   comment: string
   created_by: string
   is_internal?: boolean
+  commenter_name?: string
+  commenter_role?: 'cliente' | 'agente_soporte' | 'lider_soporte' | 'administrador'
 }
 
 export class TicketCommentsService {
@@ -46,15 +50,19 @@ export class TicketCommentsService {
       }
 
       // Si la consulta funciona, mapear los datos básicos
-      return (data || []).map(comment => ({
-        ...comment,
-        user: {
-          id: comment.created_by,
-          first_name: 'Usuario',
-          last_name: 'Desconocido',
-          email: 'usuario@desconocido.com'
+      return (data || []).map(comment => {
+        // Usar commenter_name si existe, sino usar valores por defecto
+        const [firstName = 'Usuario', lastName = 'Desconocido'] = (comment.commenter_name || 'Usuario Desconocido').split(' ')
+        return {
+          ...comment,
+          user: {
+            id: comment.created_by,
+            first_name: firstName,
+            last_name: lastName || '',
+            email: 'usuario@sistema.com'
+          }
         }
-      })) as TicketCommentWithUser[]
+      }) as TicketCommentWithUser[]
 
     } catch (err) {
       console.error('Error in getByTicketId:', err)

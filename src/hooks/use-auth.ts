@@ -24,16 +24,35 @@ export function useAuth() {
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (session?.user) {
-        const profile = await getProfile(session.user.id)
-        setAuthState({
-          user: session.user,
-          profile,
-          loading: false,
-        })
-      } else {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('Error getting session:', error)
+          setAuthState({
+            user: null,
+            profile: null,
+            loading: false,
+          })
+          return
+        }
+        
+        if (session?.user) {
+          const profile = await getProfile(session.user.id)
+          setAuthState({
+            user: session.user,
+            profile,
+            loading: false,
+          })
+        } else {
+          setAuthState({
+            user: null,
+            profile: null,
+            loading: false,
+          })
+        }
+      } catch (error) {
+        console.error('Error in getInitialSession:', error)
         setAuthState({
           user: null,
           profile: null,
@@ -49,37 +68,47 @@ export function useAuth() {
       async (event, session) => {
         console.log('Auth event:', event, session ? 'Session exists' : 'No session')
         
-        if (session?.user) {
-          const profile = await getProfile(session.user.id)
-          setAuthState({
-            user: session.user,
-            profile,
-            loading: false,
-          })
-        } else {
+        try {
+          if (session?.user) {
+            const profile = await getProfile(session.user.id)
+            setAuthState({
+              user: session.user,
+              profile,
+              loading: false,
+            })
+          } else {
+            setAuthState({
+              user: null,
+              profile: null,
+              loading: false,
+            })
+            
+            // Handle different logout scenarios
+            if (event === 'SIGNED_OUT') {
+              router.push('/auth/login')
+            } else if (event === 'TOKEN_REFRESHED' && !session) {
+              // Token refresh failed, likely expired
+              console.log('Token refresh failed, redirecting to login')
+              router.push('/auth/login?reason=expired')
+            }
+          }
+        } catch (error) {
+          console.error('Error in auth state change:', error)
           setAuthState({
             user: null,
             profile: null,
             loading: false,
           })
-          
-          // Handle different logout scenarios
-          if (event === 'SIGNED_OUT') {
-            router.push('/auth/login')
-          } else if (event === 'TOKEN_REFRESHED' && !session) {
-            // Token refresh failed, likely expired
-            console.log('Token refresh failed, redirecting to login')
-            router.push('/auth/login?reason=expired')
-          }
         }
       }
     )
 
     return () => subscription.unsubscribe()
-  }, [router, supabase.auth])
+  }, [])
 
   const getProfile = async (userId: string): Promise<Profile | null> => {
     try {
+      console.log('[useAuth] Fetching profile for user:', userId)
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -87,13 +116,14 @@ export function useAuth() {
         .single()
 
       if (error) {
-        console.error('Error fetching profile:', error)
+        console.error('[useAuth] Error fetching profile:', error)
         return null
       }
       
+      console.log('[useAuth] Profile fetched successfully:', data?.role)
       return data
     } catch (error) {
-      console.error('Error fetching profile:', error)
+      console.error('[useAuth] Exception fetching profile:', error)
       return null
     }
   }
@@ -101,6 +131,47 @@ export function useAuth() {
   const signOut = async () => {
     const { error } = await supabase.auth.signOut()
     if (error) throw error
+  }
+
+  const refresh = async () => {
+    console.log('[useAuth] Manual refresh triggered')
+    setAuthState(prev => ({ ...prev, loading: true }))
+    
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
+      if (error) {
+        console.error('[useAuth] Error refreshing session:', error)
+        setAuthState({
+          user: null,
+          profile: null,
+          loading: false,
+        })
+        return
+      }
+      
+      if (session?.user) {
+        const profile = await getProfile(session.user.id)
+        setAuthState({
+          user: session.user,
+          profile,
+          loading: false,
+        })
+      } else {
+        setAuthState({
+          user: null,
+          profile: null,
+          loading: false,
+        })
+      }
+    } catch (error) {
+      console.error('[useAuth] Exception refreshing:', error)
+      setAuthState({
+        user: null,
+        profile: null,
+        loading: false,
+      })
+    }
   }
 
   const hasRole = (roles: UserRole[]): boolean => {
@@ -116,6 +187,7 @@ export function useAuth() {
   return {
     ...authState,
     signOut,
+    refresh,
     hasRole,
     isAdmin,
     isLeader,
