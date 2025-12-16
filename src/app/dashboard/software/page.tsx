@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { CustomAppStats, CustomAppTable, CustomAppForm } from '@/components/custom-apps'
+import { useCustomApplications } from '@/hooks/use-custom-applications'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -14,8 +15,13 @@ import {
 import { Plus } from 'lucide-react'
 
 export default function SoftwarePage() {
+  const { data: applications } = useCustomApplications()
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [editingAppId, setEditingAppId] = useState<string | null>(null)
+
+  const editingApp = editingAppId 
+    ? applications?.find(app => app.id === editingAppId)
+    : undefined
 
   const handleEdit = (id: string) => {
     setEditingAppId(id)
@@ -64,6 +70,7 @@ export default function SoftwarePage() {
               </DialogDescription>
             </DialogHeader>
             <CustomAppForm
+              application={editingApp}
               onSuccess={handleCloseDialog}
               onCancel={handleCloseDialog}
             />

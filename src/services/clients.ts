@@ -9,6 +9,9 @@ export interface ClientInsert {
   phone?: string
   address?: string
   contact_person: string
+  nit?: string
+  mantenimientos_al_anio?: number
+  client_type?: 'on_demand_software' | 'on_demand_hardware' | 'on_demand_ambos' | 'contrato_software' | 'contrato_hardware' | 'contrato_ambos' | 'no_aplica'
 }
 
 export interface ClientUpdate {
@@ -17,6 +20,9 @@ export interface ClientUpdate {
   phone?: string
   address?: string
   contact_person?: string
+  nit?: string
+  mantenimientos_al_anio?: number
+  client_type?: 'on_demand_software' | 'on_demand_hardware' | 'on_demand_ambos' | 'contrato_software' | 'contrato_hardware' | 'contrato_ambos' | 'no_aplica'
 }
 
 export class ClientService {
@@ -63,15 +69,22 @@ export class ClientService {
   }
 
   async update(id: string, updates: ClientUpdate): Promise<Client> {
-    const { data, error } = await supabase
+    // Primero hacer el update
+    const { data: updateData, error: updateError } = await supabase
       .from('clients')
       .update(updates)
       .eq('id', id)
       .select()
-      .single()
-
-    if (error) throw error
-    return data
+    
+    if (updateError) {
+      throw updateError
+    }
+    
+    if (!updateData || updateData.length === 0) {
+      throw new Error('No se pudo actualizar el cliente. Verifica los permisos.')
+    }
+    
+    return updateData[0]
   }
 
   async delete(id: string): Promise<void> {

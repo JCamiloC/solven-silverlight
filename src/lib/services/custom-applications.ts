@@ -30,6 +30,7 @@ export interface CustomApplicationInsert {
   backend_tech?: string | null
   mobile_tech?: string | null
   ssl_certificate?: string | null
+  ssl_expiry_date?: string | null
   cdn_provider?: string | null
   notes?: string | null
 }
@@ -57,6 +58,7 @@ export interface CustomApplicationUpdate {
   backend_tech?: string | null
   mobile_tech?: string | null
   ssl_certificate?: string | null
+  ssl_expiry_date?: string | null
   cdn_provider?: string | null
   notes?: string | null
 }
@@ -228,14 +230,53 @@ export class CustomApplicationsService {
   // Obtener seguimientos de una aplicación
   async getFollowups(applicationId: string): Promise<CustomAppFollowup[]> {
     const supabase = createClient()
-    const { data, error } = await supabase
+    
+    console.log('getFollowups - applicationId:', applicationId)
+    
+    // Obtener seguimientos sin join primero
+    const { data: followups, error } = await supabase
       .from('custom_app_followups')
       .select('*')
       .eq('application_id', applicationId)
       .order('fecha_registro', { ascending: false })
 
-    if (error) throw error
-    return data || []
+    console.log('getFollowups - followups:', followups)
+    console.log('getFollowups - error:', error)
+
+    if (error) {
+      console.error('Error fetching followups:', error)
+      throw error
+    }
+
+    if (!followups || followups.length === 0) {
+      return []
+    }
+
+    // Obtener los IDs únicos de técnicos
+    const tecnicoIds = [...new Set(followups.map(f => f.tecnico_responsable).filter(Boolean))]
+    
+    if (tecnicoIds.length === 0) {
+      return followups.map(f => ({ ...f, tecnico: null }))
+    }
+
+    // Obtener los perfiles de los técnicos
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, email')
+      .in('id', tecnicoIds)
+
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError)
+      return followups.map(f => ({ ...f, tecnico: null }))
+    }
+
+    // Mapear los seguimientos con sus técnicos
+    const profilesMap = new Map(profiles?.map(p => [p.id, p]) || [])
+    
+    return followups.map(f => ({
+      ...f,
+      tecnico: f.tecnico_responsable ? profilesMap.get(f.tecnico_responsable) || null : null
+    }))
   }
 
   // Crear seguimiento

@@ -10,6 +10,7 @@ export interface SoftwareLicense {
   version: string
   license_key: string
   license_type: 'perpetual' | 'subscription' | 'oem'
+  periodicidad?: 'mensual' | 'anual'
   seats: number
   purchase_date: string
   expiry_date?: string
@@ -26,10 +27,11 @@ export interface SoftwareLicenseInsert {
   version: string
   license_key: string
   license_type?: 'perpetual' | 'subscription' | 'oem'
+  periodicidad?: 'mensual' | 'anual'
   seats: number
-  purchase_date: string
+  purchase_date?: string
   expiry_date?: string
-  cost: number
+  cost?: number
   status?: 'active' | 'expired' | 'cancelled'
 }
 
@@ -40,6 +42,7 @@ export interface SoftwareLicenseUpdate {
   version?: string
   license_key?: string
   license_type?: 'perpetual' | 'subscription' | 'oem'
+  periodicidad?: 'mensual' | 'anual'
   seats?: number
   purchase_date?: string
   expiry_date?: string

@@ -249,16 +249,18 @@ export function CustomAppTable({ clientId, onEdit }: CustomAppTableProps) {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => router.push(`/dashboard/software/${app.id}`)}
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            Ver detalles
-                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => onEdit?.(app.id)}>
                             <Pencil className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
+                          {clientId && (
+                            <DropdownMenuItem
+                              onClick={() => router.push(`/dashboard/clientes/${clientId}/software/${app.id}/seguimientos`)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              Ver seguimientos
+                            </DropdownMenuItem>
+                          )}
                           {app.production_url && (
                             <DropdownMenuItem asChild>
                               <a

@@ -108,6 +108,7 @@ export function useCreateSoftwareLicense() {
     onSuccess: (data) => {
       // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: softwareKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: softwareKeys.byClient(data.client_id) })
       queryClient.invalidateQueries({ queryKey: softwareKeys.stats() })
       toast.success('Licencia creada exitosamente')
     },
@@ -162,6 +163,7 @@ export function useUpdateSoftwareLicense() {
     onSuccess: (data) => {
       // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: softwareKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: softwareKeys.byClient(data.client_id) })
       queryClient.invalidateQueries({ queryKey: softwareKeys.detail(data.id) })
       queryClient.invalidateQueries({ queryKey: softwareKeys.stats() })
       toast.success('Licencia actualizada exitosamente')

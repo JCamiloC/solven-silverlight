@@ -31,7 +31,7 @@ import {
   Settings,
   Loader2,
   Search,
-  Filter
+  SlidersHorizontal
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/use-users'
@@ -339,7 +339,7 @@ export default function UsersPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
+            <SlidersHorizontal className="h-5 w-5" />
             Filtros
           </CardTitle>
         </CardHeader>

@@ -80,7 +80,7 @@ export default function TicketDetailPage() {
     const variants = {
       open: { variant: 'destructive' as const, icon: AlertTriangle, label: 'Abierto' },
       in_progress: { variant: 'default' as const, icon: Clock, label: 'En Progreso' },
-      pending: { variant: 'secondary' as const, icon: Clock, label: 'Pendiente' },
+      pendiente_confirmacion: { variant: 'secondary' as const, icon: Clock, label: 'Pendiente Confirmación' },
       resolved: { variant: 'outline' as const, icon: CheckCircle, label: 'Resuelto' },
       closed: { variant: 'secondary' as const, icon: XCircle, label: 'Cerrado' },
     }
@@ -386,13 +386,9 @@ export default function TicketDetailPage() {
 
               {/* Add Comment Form */}
               <div className="border-t pt-4 space-y-4">
-                {!ticket.assigned_to ? (
-                  <div className="text-center py-4 text-muted-foreground">
-                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Este ticket no tiene un usuario asignado aún</p>
-                    <p className="text-xs">Los comentarios estarán disponibles cuando se asigne a alguien</p>
-                  </div>
-                ) : (profile?.id === ticket.assigned_to || profile?.client_id === ticket.client_id) ? (
+                {/* Los técnicos siempre pueden comentar, los clientes solo si están asignados */}
+                {(profile?.role === 'administrador' || profile?.role === 'lider_soporte' || profile?.role === 'agente_soporte') || 
+                 (profile?.client_id === ticket.client_id && ticket.assigned_to) ? (
                   <>
                     <Textarea
                       value={newComment}
@@ -400,6 +396,7 @@ export default function TicketDetailPage() {
                       placeholder="Escribir un comentario..."
                       rows={3}
                     />
+                    
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="flex items-center space-x-2">
                         <input
@@ -427,11 +424,61 @@ export default function TicketDetailPage() {
                         Enviar
                       </Button>
                     </div>
+                    
+                    {/* Acciones Rápidas - Solo para técnicos */}
+                    {(profile?.role === 'administrador' || profile?.role === 'lider_soporte' || profile?.role === 'agente_soporte') && (
+                      <div className="border-t pt-4 mt-4">
+                        <h4 className="text-sm font-semibold mb-3">Acciones Rápidas</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-sm">Estado del Ticket</Label>
+                            <Select 
+                              value={ticket.status} 
+                              onValueChange={handleStatusChange}
+                              disabled={updateStatusMutation.isPending}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="open">Abierto</SelectItem>
+                                <SelectItem value="in_progress">En Progreso</SelectItem>
+                                <SelectItem value="pendiente_confirmacion">Pendiente Confirmación</SelectItem>
+                                <SelectItem value="resolved">Resuelto</SelectItem>
+                                <SelectItem value="closed">Cerrado</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-sm">Asignar a</Label>
+                            <Select 
+                              value={ticket.assigned_to || 'unassigned'} 
+                              onValueChange={handleAssignmentChange}
+                              disabled={updateTicketMutation.isPending}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Sin asignar" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="unassigned">Sin asignar</SelectItem>
+                                {assignableUsers.map((user) => (
+                                  <SelectItem key={user.id} value={user.id}>
+                                    {user.first_name} {user.last_name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="text-center py-4 text-muted-foreground">
                     <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Solo el cliente y el usuario asignado pueden comentar</p>
+                    <p className="text-sm">Este ticket no tiene un usuario asignado aún</p>
+                    <p className="text-xs">Los comentarios estarán disponibles cuando se asigne a alguien</p>
                   </div>
                 )}
               </div>
@@ -441,55 +488,6 @@ export default function TicketDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Acciones Rápidas</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Estado del Ticket</Label>
-                <Select 
-                  value={ticket.status} 
-                  onValueChange={handleStatusChange}
-                  disabled={updateStatusMutation.isPending}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="open">Abierto</SelectItem>
-                    <SelectItem value="in_progress">En Progreso</SelectItem>
-                    <SelectItem value="pending">Pendiente</SelectItem>
-                    <SelectItem value="resolved">Resuelto</SelectItem>
-                    <SelectItem value="closed">Cerrado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Asignar a</Label>
-                <Select 
-                  value={ticket.assigned_to || 'unassigned'} 
-                  onValueChange={handleAssignmentChange}
-                  disabled={updateTicketMutation.isPending}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sin asignar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Sin asignar</SelectItem>
-                    {assignableUsers.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.first_name} {user.last_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Ticket Info */}
           <Card>
             <CardHeader>
@@ -569,13 +567,19 @@ export default function TicketDetailPage() {
                 <div className="flex items-start space-x-2">
                   <Mail className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">Email de contacto</p>
-                    <a 
-                      href={`mailto:${ticket.contact_email}`}
-                      className="text-sm text-blue-600 hover:underline truncate block"
-                    >
-                      {ticket.contact_email}
-                    </a>
+                    <p className="text-sm font-medium">Email de Contacto</p>
+                    <p className="text-sm text-muted-foreground truncate">{ticket.contact_email}</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Usuario Afectado */}
+              {ticket.usuario_afectado && (
+                <div className="flex items-start space-x-2">
+                  <User className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">Usuario Afectado</p>
+                    <p className="text-sm text-muted-foreground truncate">{ticket.usuario_afectado}</p>
                   </div>
                 </div>
               )}

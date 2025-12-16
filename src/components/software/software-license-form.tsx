@@ -39,10 +39,9 @@ const formSchema = z.object({
   version: z.string().min(1, 'La versión es requerida'),
   license_key: z.string().min(1, 'La clave de licencia es requerida'),
   license_type: z.enum(['perpetual', 'subscription', 'oem']),
+  periodicidad: z.enum(['mensual', 'anual']).optional(),
   seats: z.number().min(1, 'Debe tener al menos 1 puesto'),
-  purchase_date: z.string().min(1, 'La fecha de compra es requerida'),
   expiry_date: z.string().optional(),
-  cost: z.number().min(0, 'El costo debe ser positivo'),
   status: z.enum(['active', 'expired', 'cancelled']),
 })
 
@@ -79,10 +78,9 @@ export function SoftwareLicenseForm({
       version: licenseData?.version || '',
       license_key: licenseData?.license_key || '',
       license_type: licenseData?.license_type || 'subscription',
+      periodicidad: licenseData?.periodicidad || undefined,
       seats: licenseData?.seats || 1,
-      purchase_date: licenseData?.purchase_date || '',
       expiry_date: licenseData?.expiry_date || '',
-      cost: licenseData?.cost || 0,
       status: licenseData?.status || 'active',
     },
   })
@@ -96,12 +94,14 @@ export function SoftwareLicenseForm({
         version: licenseData.version,
         license_key: licenseData.license_key,
         license_type: licenseData.license_type,
+        periodicidad: licenseData.periodicidad || undefined,
         seats: licenseData.seats,
-        purchase_date: licenseData.purchase_date,
         expiry_date: licenseData.expiry_date || '',
-        cost: licenseData.cost,
         status: licenseData.status,
       })
+    } else if (clientId) {
+      // Si no hay licenseData pero sí clientId, actualizar solo el cliente
+      form.setValue('client_id', clientId)
     }
   }, [licenseData, form, clientId])
 
@@ -213,7 +213,7 @@ export function SoftwareLicenseForm({
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Nombre de la Licencia *</FormLabel>
+                <FormLabel>Tipo de producto *</FormLabel>
                 <FormControl>
                   <Input
                     {...field}
@@ -332,6 +332,7 @@ export function SoftwareLicenseForm({
                       min={1}
                       placeholder="1"
                       disabled={isSubmitting}
+                      onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
                     />
                   </FormControl>
                   <FormMessage />
@@ -341,29 +342,11 @@ export function SoftwareLicenseForm({
           </div>
         </div>
 
-        {/* Fechas y Costo */}
+        {/* Fechas y Periodicidad */}
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Fechas y Costo</h3>
+          <h3 className="text-lg font-semibold">Fechas y Periodicidad</h3>
           
           <div className="grid gap-4 md:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="purchase_date"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Fecha de Compra *</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      type="date"
-                      disabled={isSubmitting}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <FormField
               control={form.control}
               name="expiry_date"
@@ -384,31 +367,36 @@ export function SoftwareLicenseForm({
                 </FormItem>
               )}
             />
-          </div>
 
-          <FormField
-            control={form.control}
-            name="cost"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Costo Total *</FormLabel>
-                <FormControl>
-                  <Input
-                    {...field}
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder="0.00"
+            <FormField
+              control={form.control}
+              name="periodicidad"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Periodicidad</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
                     disabled={isSubmitting}
-                  />
-                </FormControl>
-                <FormDescription>
-                  Costo en la moneda local
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccione la periodicidad" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="mensual">Mensual</SelectItem>
+                      <SelectItem value="anual">Anual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Frecuencia de pago o renovación
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
         </div>
 
         {/* Buttons */}

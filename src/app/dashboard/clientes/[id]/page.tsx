@@ -36,10 +36,9 @@ import {
 } from '@/components/ui/form'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ProtectedRoute } from '@/components/auth/protected-route'
-import { useClient } from '@/hooks/use-clients'
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
+import { useClient, useUpdateClient } from '@/hooks/use-clients'
+import { useQuery } from '@tanstack/react-query'
 import { clientService } from '@/services/clients'
-import { clientKeys } from '@/hooks/use-clients'
 import { toast } from 'sonner'
 import { Loading } from '@/components/ui/loading'
 import { Users, Mail, Phone } from 'lucide-react'
@@ -72,9 +71,9 @@ export default function ClienteDetailPage() {
   const router = useRouter()
   const params = useParams()
   const clientId = params.id as string
-  const queryClient = useQueryClient()
   
   const { data: client, isLoading, error } = useClient(clientId)
+  const updateClient = useUpdateClient()
   
   // Obtener usuarios del cliente
   const { data: clientUsers = [], isLoading: isLoadingUsers } = useQuery({
@@ -111,24 +110,8 @@ export default function ClienteDetailPage() {
     })
   }
 
-  const updateMutation = useMutation({
-    mutationFn: (data: ClientFormData) => clientService.update(clientId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: clientKeys.detail(clientId) })
-      queryClient.invalidateQueries({ queryKey: clientKeys.list() })
-      toast.success('Cliente actualizado correctamente')
-    },
-    onError: (error: Error) => {
-      toast.error(`Error al actualizar: ${error.message}`)
-    },
-  })
-
   const onSubmit = async (data: ClientFormData) => {
-    try {
-      await updateMutation.mutateAsync(data)
-    } catch (error) {
-      console.error('Error updating client:', error)
-    }
+    updateClient.mutate({ id: clientId, updates: data })
   }
 
   if (isLoading) {
@@ -361,10 +344,10 @@ export default function ClienteDetailPage() {
                 <div className="flex justify-end">
                   <Button 
                     type="submit" 
-                    disabled={updateMutation.isPending}
+                    disabled={updateClient.isPending}
                   >
                     <Save className="mr-2 h-4 w-4" />
-                    {updateMutation.isPending ? 'Guardando...' : 'Guardar Cambios'}
+                    {updateClient.isPending ? 'Guardando...' : 'Guardar Cambios'}
                   </Button>
                 </div>
               </form>

@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/form'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ClientSearchCombobox } from '@/components/ui/client-search-combobox'
 import { useClients } from '@/hooks/use-clients'
 import { useAssignableUsers } from '@/hooks/use-users'
 import { useCreateTicket, useUpdateTicket } from '@/hooks/use-tickets'
@@ -47,9 +48,12 @@ const ticketFormSchema = z.object({
   contact_email: z.string()
     .email('Email inválido')
     .min(1, 'Email de contacto es obligatorio'),
+  usuario_afectado: z.string()
+    .min(1, 'Usuario afectado es obligatorio')
+    .max(100, 'El nombre no puede exceder 100 caracteres'),
   category: z.enum(['hardware', 'software', 'access', 'other']),
   priority: z.enum(['low', 'medium', 'high', 'critical']),
-  status: z.enum(['open', 'in_progress', 'closed']).optional(),
+  status: z.enum(['open', 'in_progress', 'pendiente_confirmacion', 'resolved', 'closed']).optional(),
   assigned_to: z.string().optional(),
   // Campos relacionados (solo uno puede estar lleno según categoría)
   hardware_id: z.string().optional(),
@@ -86,6 +90,8 @@ const priorityLabels = {
 const statusLabels = {
   open: 'Abierto',
   in_progress: 'En Revisión',
+  pendiente_confirmacion: 'Pendiente Confirmación',
+  resolved: 'Resuelto',
   closed: 'Cerrado',
 }
 
@@ -122,6 +128,7 @@ export function TicketForm({
       title: '',
       description: '',
       contact_email: user?.email || '',
+      usuario_afectado: '',
       category: 'other',
       priority: 'medium',
       status: 'open',
@@ -258,6 +265,7 @@ export function TicketForm({
           title: data.title,
           description: data.description,
           contact_email: data.contact_email,
+          usuario_afectado: data.usuario_afectado,
           category: data.category,
           priority: data.priority,
           status: 'open' as const, // Siempre crear como "open"
@@ -347,22 +355,18 @@ export function TicketForm({
                         />
                       </div>
                     ) : (
-                      <Select
+                      <ClientSearchCombobox
+                        options={clients?.map((client) => ({
+                          value: client.id,
+                          label: client.name,
+                        })) || []}
+                        value={field.value}
                         onValueChange={field.onChange}
-                        defaultValue={field.value}
+                        placeholder="Seleccione un cliente"
+                        searchPlaceholder="Buscar cliente..."
+                        emptyMessage="No se encontraron clientes"
                         disabled={loadingClients}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione un cliente" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {clients?.map((client) => (
-                            <SelectItem key={client.id} value={client.id}>
-                              {client.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      />
                     )}
                   </FormControl>
                   <FormMessage />
@@ -416,6 +420,25 @@ export function TicketForm({
                       {...field} 
                       type="email"
                       placeholder="correo@ejemplo.com" 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Usuario Afectado */}
+            <FormField
+              control={form.control}
+              name="usuario_afectado"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Usuario Afectado *</FormLabel>
+                  <FormControl>
+                    <Input 
+                      {...field} 
+                      type="text"
+                      placeholder="Nombre del usuario que reporta el problema" 
                     />
                   </FormControl>
                   <FormMessage />
@@ -554,7 +577,7 @@ export function TicketForm({
                 name="software_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Licencia de Software</FormLabel>
+                    <FormLabel>Software</FormLabel>
                     <FormControl>
                       <Select
                         onValueChange={field.onChange}

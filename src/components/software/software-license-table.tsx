@@ -158,7 +158,6 @@ export function SoftwareLicenseTable({ clientId, onEdit }: SoftwareLicenseTableP
               <TableHead>Puestos</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Vencimiento</TableHead>
-              <TableHead>Costo</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -209,9 +208,6 @@ export function SoftwareLicenseTable({ clientId, onEdit }: SoftwareLicenseTableP
                       ) : (
                         <span className="text-sm text-muted-foreground">Sin vencimiento</span>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-medium">${license.cost.toLocaleString()}</span>
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>

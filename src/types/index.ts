@@ -121,10 +121,11 @@ export interface SoftwareLicense {
   version: string
   license_key: string
   license_type: 'perpetual' | 'subscription' | 'oem'
+  periodicidad?: 'mensual' | 'anual'
   seats: number
-  purchase_date: string
+  purchase_date?: string // Opcional para mantener compatibilidad
   expiry_date?: string
-  cost: number
+  cost?: number // Opcional para mantener compatibilidad
   status: 'active' | 'expired' | 'cancelled'
   created_at: string
   updated_at: string
@@ -162,6 +163,7 @@ export interface CustomApplication {
   mobile_tech?: string
   // Additional
   ssl_certificate?: string
+  ssl_expiry_date?: string
   cdn_provider?: string
   // Notas
   notes?: string
@@ -216,10 +218,11 @@ export interface Ticket {
   title: string
   description: string
   priority: 'low' | 'medium' | 'high' | 'critical'
-  status: 'open' | 'in_progress' | 'pending' | 'resolved' | 'closed'
+  status: 'open' | 'in_progress' | 'pendiente_confirmacion' | 'resolved' | 'closed'
   category: 'hardware' | 'software' | 'network' | 'access' | 'other'
   assigned_to?: string
   created_by: string
+  usuario_afectado?: string
   resolved_at?: string
   created_at: string
   updated_at: string

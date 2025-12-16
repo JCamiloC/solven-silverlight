@@ -284,14 +284,16 @@ export function useUpdateTicketStatus() {
       })
     },
     onSuccess: (data) => {
-      const statusLabels = {
+      const statusLabels: Record<string, string> = {
         open: 'abierto',
         in_progress: 'en revisión',
+        pendiente_confirmacion: 'pendiente confirmación',
+        resolved: 'resuelto',
         closed: 'cerrado'
       }
       
       toast.success('Estado actualizado', {
-        description: `Ticket marcado como ${statusLabels[data.status]}`,
+        description: `Ticket marcado como ${statusLabels[data.status] || data.status}`,
       })
     },
     onSettled: () => {

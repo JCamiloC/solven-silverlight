@@ -6,10 +6,11 @@ export interface Ticket {
   title: string
   description: string
   priority: 'low' | 'medium' | 'high' | 'critical'
-  status: 'open' | 'in_progress' | 'closed'
+  status: 'open' | 'in_progress' | 'pendiente_confirmacion' | 'resolved' | 'closed'
   category: 'hardware' | 'software' | 'access' | 'other'
   assigned_to?: string
   created_by: string
+  usuario_afectado?: string
   resolved_at?: string
   created_at: string
   updated_at: string
@@ -32,10 +33,11 @@ export interface TicketInsert {
   title: string
   description: string
   priority?: 'low' | 'medium' | 'high' | 'critical'
-  status?: 'open' | 'in_progress' | 'closed'
+  status?: 'open' | 'in_progress' | 'pendiente_confirmacion' | 'resolved' | 'closed'
   category: 'hardware' | 'software' | 'access' | 'other'
   assigned_to?: string
   created_by: string
+  usuario_afectado?: string
   // Nuevos campos
   contact_email?: string
   attachment_url?: string
@@ -50,9 +52,10 @@ export interface TicketUpdate {
   title?: string
   description?: string
   priority?: 'low' | 'medium' | 'high' | 'critical'
-  status?: 'open' | 'in_progress' | 'closed'
+  status?: 'open' | 'in_progress' | 'pendiente_confirmacion' | 'resolved' | 'closed'
   category?: 'hardware' | 'software' | 'access' | 'other'
   assigned_to?: string
+  usuario_afectado?: string
   resolved_at?: string
   updated_at?: string
   contact_email?: string

@@ -68,6 +68,7 @@ const formSchema = z.object({
   
   // Additional
   ssl_certificate: z.string().optional(),
+  ssl_expiry_date: z.string().optional(),
   cdn_provider: z.string().optional(),
   notes: z.string().optional(),
 })
@@ -116,10 +117,42 @@ export function CustomAppForm({
       backend_tech: application?.backend_tech || '',
       mobile_tech: application?.mobile_tech || '',
       ssl_certificate: application?.ssl_certificate || '',
+      ssl_expiry_date: application?.ssl_expiry_date || '',
       cdn_provider: application?.cdn_provider || '',
       notes: application?.notes || '',
     },
   })
+
+  // Actualizar el formulario cuando cambian los props
+  useEffect(() => {
+    form.reset({
+      client_id: clientId || application?.client_id || '',
+      name: application?.name || '',
+      description: application?.description || '',
+      status: application?.status || 'development',
+      production_url: application?.production_url || '',
+      staging_url: application?.staging_url || '',
+      development_url: application?.development_url || '',
+      admin_panel_url: application?.admin_panel_url || '',
+      hosting_provider: application?.hosting_provider || '',
+      hosting_plan: application?.hosting_plan || '',
+      hosting_renewal_date: application?.hosting_renewal_date || '',
+      domain_registrar: application?.domain_registrar || '',
+      domain_expiry_date: application?.domain_expiry_date || '',
+      database_type: application?.database_type || '',
+      database_host: application?.database_host || '',
+      database_name: application?.database_name || '',
+      repository_url: application?.repository_url || '',
+      repository_branch: application?.repository_branch || 'main',
+      frontend_tech: application?.frontend_tech || '',
+      backend_tech: application?.backend_tech || '',
+      mobile_tech: application?.mobile_tech || '',
+      ssl_certificate: application?.ssl_certificate || '',
+      ssl_expiry_date: application?.ssl_expiry_date || '',
+      cdn_provider: application?.cdn_provider || '',
+      notes: application?.notes || '',
+    })
+  }, [application, clientId, form])
 
   const onSubmit = async (data: FormValues) => {
     try {
@@ -445,6 +478,25 @@ export function CustomAppForm({
                       disabled={isSubmitting}
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="ssl_expiry_date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Fecha Vencimiento SSL</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="date"
+                      disabled={isSubmitting}
+                    />
+                  </FormControl>
+                  <FormDescription>Fecha de vencimiento del certificado SSL</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

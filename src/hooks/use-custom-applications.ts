@@ -115,6 +115,10 @@ export function useCreateCustomApplication() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: customAppsKeys.lists() })
       queryClient.invalidateQueries({ queryKey: customAppsKeys.stats() })
+      // Invalidar queries por cliente
+      if (data.client_id) {
+        queryClient.invalidateQueries({ queryKey: customAppsKeys.byClient(data.client_id) })
+      }
       toast.success('Aplicación creada exitosamente')
     },
   })
@@ -164,6 +168,10 @@ export function useUpdateCustomApplication() {
       queryClient.invalidateQueries({ queryKey: customAppsKeys.lists() })
       queryClient.invalidateQueries({ queryKey: customAppsKeys.detail(data.id) })
       queryClient.invalidateQueries({ queryKey: customAppsKeys.stats() })
+      // Invalidar queries por cliente
+      if (data.client_id) {
+        queryClient.invalidateQueries({ queryKey: customAppsKeys.byClient(data.client_id) })
+      }
       toast.success('Aplicación actualizada exitosamente')
     },
   })
@@ -192,9 +200,11 @@ export function useDeleteCustomApplication() {
       }
       toast.error('Error al eliminar la aplicación: ' + (err as Error).message)
     },
-    onSuccess: () => {
+    onSuccess: (_, deletedId) => {
       queryClient.invalidateQueries({ queryKey: customAppsKeys.lists() })
       queryClient.invalidateQueries({ queryKey: customAppsKeys.stats() })
+      // Invalidar todas las queries por cliente ya que no tenemos el client_id aquí
+      queryClient.invalidateQueries({ queryKey: [...customAppsKeys.all, 'client'] })
       toast.success('Aplicación eliminada exitosamente')
     },
   })

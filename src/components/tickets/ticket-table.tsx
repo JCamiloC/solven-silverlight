@@ -29,7 +29,7 @@ interface TicketTableProps {
 const statusLabels = {
   open: 'Abierto',
   in_progress: 'En Progreso',
-  pending: 'Pendiente',
+  pendiente_confirmacion: 'Pendiente Confirmación',
   resolved: 'Resuelto',
   closed: 'Cerrado',
 }
@@ -37,7 +37,7 @@ const statusLabels = {
 const statusColors = {
   open: 'bg-blue-500',
   in_progress: 'bg-yellow-500',
-  pending: 'bg-orange-500',
+  pendiente_confirmacion: 'bg-orange-500',
   resolved: 'bg-green-500',
   closed: 'bg-gray-500',
 }

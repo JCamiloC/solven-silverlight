@@ -1,7 +1,7 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Key, Calendar, AlertCircle, TrendingUp, Loader2, DollarSign } from 'lucide-react'
+import { Key, Calendar, AlertCircle, TrendingUp, Loader2, AlertTriangle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { useSoftwareStats, useSoftwareByClient } from '@/hooks/use-software'
 import { useEffect, useState } from 'react'
@@ -95,12 +95,13 @@ export function SoftwareLicenseStats({ clientId }: SoftwareLicenseStatsProps) {
       badge: stats.expiringSoon > 0,
     },
     {
-      title: 'Costo Total',
-      value: `$${stats.totalCost.toLocaleString()}`,
-      icon: DollarSign,
-      description: 'Inversión en licencias',
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100',
+      title: 'Licencias Vencidas',
+      value: stats.expired,
+      icon: AlertTriangle,
+      description: 'Requieren renovación',
+      color: stats.expired > 0 ? 'text-red-600' : 'text-gray-600',
+      bgColor: stats.expired > 0 ? 'bg-red-100' : 'bg-gray-100',
+      badge: stats.expired > 0,
     },
   ]
 

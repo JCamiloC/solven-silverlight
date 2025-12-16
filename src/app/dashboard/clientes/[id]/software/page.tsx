@@ -26,8 +26,34 @@ export default function ClienteSoftwarePage() {
   const [activeTab, setActiveTab] = useState('applications');
   const [showAppDialog, setShowAppDialog] = useState(false);
   const [showLicenseDialog, setShowLicenseDialog] = useState(false);
+  const [editingAppId, setEditingAppId] = useState<string | null>(null);
+  const [editingLicenseId, setEditingLicenseId] = useState<string | null>(null);
   const { data: applications, isLoading, error } = useCustomApplicationsByClient(clientId);
   const { data: client, isLoading: isLoadingClient } = useClient(clientId);
+
+  const editingApp = editingAppId 
+    ? applications?.find(app => app.id === editingAppId)
+    : undefined;
+
+  const handleEditApp = (id: string) => {
+    setEditingAppId(id);
+    setShowAppDialog(true);
+  };
+
+  const handleCloseAppDialog = () => {
+    setShowAppDialog(false);
+    setEditingAppId(null);
+  };
+
+  const handleEditLicense = (id: string) => {
+    setEditingLicenseId(id);
+    setShowLicenseDialog(true);
+  };
+
+  const handleCloseLicenseDialog = () => {
+    setShowLicenseDialog(false);
+    setEditingLicenseId(null);
+  };
 
   if (error) {
     return (
@@ -113,7 +139,7 @@ export default function ClienteSoftwarePage() {
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Aplicaciones Personalizadas</h2>
               </div>
-              <CustomAppTable clientId={clientId} />
+              <CustomAppTable clientId={clientId} onEdit={handleEditApp} />
             </div>
           </TabsContent>
 
@@ -124,40 +150,50 @@ export default function ClienteSoftwarePage() {
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Licencias Comerciales</h2>
               </div>
-              <SoftwareLicenseTable clientId={clientId} />
+              <SoftwareLicenseTable clientId={clientId} onEdit={handleEditLicense} />
             </div>
           </TabsContent>
         </Tabs>
 
         {/* Application Dialog */}
-        <Dialog open={showAppDialog} onOpenChange={setShowAppDialog}>
+        <Dialog open={showAppDialog} onOpenChange={handleCloseAppDialog}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Agregar Nueva Aplicación</DialogTitle>
+              <DialogTitle>
+                {editingAppId ? 'Editar Aplicación' : 'Agregar Nueva Aplicación'}
+              </DialogTitle>
               <DialogDescription>
-                Complete los datos de la aplicación personalizada.
+                {editingAppId
+                  ? 'Actualiza la información de la aplicación'
+                  : 'Complete los datos de la aplicación personalizada.'}
               </DialogDescription>
             </DialogHeader>
             <CustomAppForm 
-              onSuccess={() => setShowAppDialog(false)}
-              onCancel={() => setShowAppDialog(false)}
+              application={editingApp}
+              onSuccess={handleCloseAppDialog}
+              onCancel={handleCloseAppDialog}
               clientId={clientId}
             />
           </DialogContent>
         </Dialog>
 
         {/* License Dialog */}
-        <Dialog open={showLicenseDialog} onOpenChange={setShowLicenseDialog}>
+        <Dialog open={showLicenseDialog} onOpenChange={handleCloseLicenseDialog}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Agregar Nueva Licencia</DialogTitle>
+              <DialogTitle>
+                {editingLicenseId ? 'Editar Licencia' : 'Agregar Nueva Licencia'}
+              </DialogTitle>
               <DialogDescription>
-                Complete los datos de la licencia comercial.
+                {editingLicenseId
+                  ? 'Actualiza la información de la licencia'
+                  : 'Complete los datos de la licencia comercial.'}
               </DialogDescription>
             </DialogHeader>
             <SoftwareLicenseForm 
-              onSuccess={() => setShowLicenseDialog(false)}
-              onCancel={() => setShowLicenseDialog(false)}
+              licenseId={editingLicenseId || undefined}
+              onSuccess={handleCloseLicenseDialog}
+              onCancel={handleCloseLicenseDialog}
               clientId={clientId}
             />
           </DialogContent>
