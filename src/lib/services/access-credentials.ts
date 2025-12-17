@@ -225,14 +225,15 @@ export class AccessCredentialsService {
       // Encrypt the password
       const encryptedPassword = CryptoService.encrypt(credential.password)
 
+      // Destructure to remove password field
+      const { password, ...credentialWithoutPassword } = credential
+
       const { data, error } = await supabase
         .from('access_credentials')
         .insert([{
-          ...credential,
+          ...credentialWithoutPassword,
           password_hash: encryptedPassword,
           status: credential.status || 'active',
-          // Remove plain password from insert
-          password: undefined
         }])
         .select()
         .single()
@@ -356,6 +357,42 @@ export class AccessCredentialsService {
     const { count: totalAccesses } = await supabase
       .from('access_logs')
       .select('*', { count: 'exact', head: true })
+
+    const stats: AccessStats = {
+      total: credentials.length,
+      active: credentials.filter(c => c.status === 'active').length,
+      inactive: credentials.filter(c => c.status === 'inactive').length,
+      recentlyAccessed: credentials.filter(c => {
+        if (!c.last_accessed) return false
+        return new Date(c.last_accessed) >= sevenDaysAgo
+      }).length,
+      totalAccesses: totalAccesses || 0
+    }
+
+    return stats
+  }
+
+  /**
+   * Get access statistics by client
+   */
+  async getStatsByClient(clientId: string): Promise<AccessStats> {
+    const { data, error } = await supabase
+      .from('access_credentials')
+      .select('*')
+      .eq('client_id', clientId)
+
+    if (error) throw error
+
+    const credentials = data || []
+    const now = new Date()
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+    // Get access logs count for this client's credentials
+    const credentialIds = credentials.map(c => c.id)
+    const { count: totalAccesses } = await supabase
+      .from('access_logs')
+      .select('*', { count: 'exact', head: true })
+      .in('credential_id', credentialIds)
 
     const stats: AccessStats = {
       total: credentials.length,
