@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/form';
 import { HardwareAsset } from '@/types';
 import { useCreateHardware, useUpdateHardware, hardwareKeys } from '@/hooks/use-hardware';
+import { useParameters } from '@/hooks/use-parameters';
 import { useQueryClient } from '@tanstack/react-query';
 
 const softwareExtraSchema = z.object({
@@ -85,8 +86,11 @@ const hardwareSchema = z.object({
   }),
   software_extra: z.array(softwareExtraSchema).optional(),
   mouse: z.boolean().optional().default(false),
+  mouse_serial: z.string().optional(),
   diadema: z.boolean().optional().default(false),
+  diadema_serial: z.string().optional(),
   teclado: z.boolean().optional().default(false),
+  teclado_serial: z.string().optional(),
   otro_periferico: z.string().optional(),
   observaciones: z.string().optional(),
   client_id: z.string().min(1),
@@ -105,6 +109,18 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
   const createMutation = useCreateHardware();
   const updateMutation = useUpdateHardware();
   const queryClient = useQueryClient();
+  const { data: parameters } = useParameters();
+
+  // Helper function to get parameter options by key
+  const getParameterOptions = (key: string): Array<{ value: string; label: string }> => {
+    const param = parameters?.find((p: any) => p.key === key);
+    if (!param || !Array.isArray(param.options)) return [];
+    // Handle both object format {value, label} and string format
+    return param.options.map((opt: any) => {
+      if (typeof opt === 'string') return { value: opt, label: opt };
+      return { value: opt.value || opt, label: opt.label || opt };
+    });
+  };
 
   // Debug: show the asset received when opening the form
   console.log('HardwareForm opened with asset:', asset, 'clientId:', clientId)
@@ -178,8 +194,11 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
         return (arr || []).map((s: any) => ({ nombre: s?.nombre ?? '', sl: s?.sl ?? false, fecha_vencimiento: s?.fecha_vencimiento ?? '' }))
       })(),
       mouse: asset?.mouse ?? false,
+      mouse_serial: asset?.mouse_serial || '',
       diadema: asset?.diadema ?? false,
+      diadema_serial: asset?.diadema_serial || '',
       teclado: asset?.teclado ?? false,
+      teclado_serial: asset?.teclado_serial || '',
       otro_periferico: asset?.otro_periferico || '',
       observaciones: asset?.observaciones || '',
       client_id: clientId,
@@ -381,12 +400,21 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
         {/* Sección 3: Software */}
         <h3 className="text-base font-semibold mb-2">Software</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FormField control={form.control} name="sistema_operativo" render={() => (
+          <FormField control={form.control} name="sistema_operativo.nombre" render={({ field }) => (
             <FormItem>
               <FormLabel>Sistema Operativo</FormLabel>
               <FormControl>
                 <div className="flex flex-col gap-2">
-                  <Input placeholder="Nombre" {...form.register('sistema_operativo.nombre')} />
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona un SO" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getParameterOptions('sistemas_operativos').map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <div className="flex items-center gap-2">
                     <Label>SL</Label>
                     {
@@ -411,12 +439,21 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
               <FormMessage />
             </FormItem>
           )} />
-          <FormField control={form.control} name="ms_office" render={() => (
+          <FormField control={form.control} name="ms_office.nombre" render={({ field }) => (
             <FormItem>
               <FormLabel>MS Office</FormLabel>
               <FormControl>
                 <div className="flex flex-col gap-2">
-                  <Input placeholder="Nombre" {...form.register('ms_office.nombre')} />
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona MS Office" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getParameterOptions('ms_office').map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <div className="flex items-center gap-2">
                     <Label>SL</Label>
                     {
@@ -441,12 +478,21 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
               <FormMessage />
             </FormItem>
           )} />
-          <FormField control={form.control} name="antivirus" render={() => (
+          <FormField control={form.control} name="antivirus.nombre" render={({ field }) => (
             <FormItem>
               <FormLabel>Antivirus</FormLabel>
               <FormControl>
                 <div className="flex flex-col gap-2">
-                  <Input placeholder="Nombre" {...form.register('antivirus.nombre')} />
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona un antivirus" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getParameterOptions('antivirus').map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <div className="flex items-center gap-2">
                     <Label>SL</Label>
                     {
@@ -505,25 +551,66 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
 
         {/* Sección 4: Periféricos */}
         <h3 className="text-base font-semibold mb-2">Periféricos</h3>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField control={form.control} name="mouse" render={({ field }) => (
             <FormItem>
               <FormLabel>Mouse</FormLabel>
-              <FormControl><Input type="checkbox" checked={field.value} onChange={e => field.onChange(e.target.checked)} /></FormControl>
-            </FormItem>
-          )} />
-          <FormField control={form.control} name="diadema" render={({ field }) => (
-            <FormItem>
-              <FormLabel>Diadema</FormLabel>
-              <FormControl><Input type="checkbox" checked={field.value} onChange={e => field.onChange(e.target.checked)} /></FormControl>
+              <div className="flex flex-col gap-2">
+                <FormControl>
+                  <Input type="checkbox" checked={field.value} onChange={e => field.onChange(e.target.checked)} />
+                </FormControl>
+                {field.value && (
+                  <FormField control={form.control} name="mouse_serial" render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input {...field} placeholder="Serial (opcional)" />
+                      </FormControl>
+                    </FormItem>
+                  )} />
+                )}
+              </div>
             </FormItem>
           )} />
           <FormField control={form.control} name="teclado" render={({ field }) => (
             <FormItem>
               <FormLabel>Teclado</FormLabel>
-              <FormControl><Input type="checkbox" checked={field.value} onChange={e => field.onChange(e.target.checked)} /></FormControl>
+              <div className="flex flex-col gap-2">
+                <FormControl>
+                  <Input type="checkbox" checked={field.value} onChange={e => field.onChange(e.target.checked)} />
+                </FormControl>
+                {field.value && (
+                  <FormField control={form.control} name="teclado_serial" render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input {...field} placeholder="Serial (opcional)" />
+                      </FormControl>
+                    </FormItem>
+                  )} />
+                )}
+              </div>
             </FormItem>
           )} />
+          <FormField control={form.control} name="diadema" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Diadema</FormLabel>
+              <div className="flex flex-col gap-2">
+                <FormControl>
+                  <Input type="checkbox" checked={field.value} onChange={e => field.onChange(e.target.checked)} />
+                </FormControl>
+                {field.value && (
+                  <FormField control={form.control} name="diadema_serial" render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input {...field} placeholder="Serial (opcional)" />
+                      </FormControl>
+                    </FormItem>
+                  )} />
+                )}
+              </div>
+            </FormItem>
+          )} />
+        </div>
+        <div>
           <FormField control={form.control} name="otro_periferico" render={({ field }) => (
             <FormItem>
               <FormLabel>Otro Periférico</FormLabel>

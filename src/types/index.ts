@@ -73,8 +73,11 @@ export interface HardwareAsset {
   antivirus?: any
   software_extra?: any[]
   mouse?: boolean
+  mouse_serial?: string
   diadema?: boolean
+  diadema_serial?: string
   teclado?: boolean
+  teclado_serial?: string
   otro_periferico?: string
   observaciones?: string
   created_at: string
