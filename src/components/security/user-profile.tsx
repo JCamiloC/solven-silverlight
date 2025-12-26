@@ -35,12 +35,23 @@ export function UserProfile() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!profile || !user) return
+    if (!profile || !user) {
+      toast.error('No se pudo cargar la información del usuario')
+      return
+    }
 
     setLoading(true)
     try {
-      // Actualizar perfil en la tabla profiles
-      const { error: profileError } = await supabase
+      console.log('Actualizando perfil con datos:', {
+        user_id: profile.user_id,
+        profile_id: profile.id,
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        phone: formData.phone,
+      })
+
+      // Actualizar perfil en la tabla profiles usando el ID del perfil, no user_id
+      const { data: updatedData, error: profileError } = await supabase
         .from('profiles')
         .update({
           first_name: formData.first_name,
@@ -48,9 +59,17 @@ export function UserProfile() {
           phone: formData.phone,
           updated_at: new Date().toISOString(),
         })
-        .eq('user_id', profile.user_id)
+        .eq('id', profile.id) // Usar profile.id en lugar de user_id
+        .select()
+        .single()
 
-      if (profileError) throw profileError
+      if (profileError) {
+        console.error('Error al actualizar perfil:', profileError)
+        toast.error(`Error al actualizar el perfil: ${profileError.message}`)
+        return
+      }
+
+      console.log('Perfil actualizado exitosamente:', updatedData)
 
       // Actualizar email en auth.users si ha cambiado
       if (formData.email !== user.email) {
@@ -59,6 +78,7 @@ export function UserProfile() {
         })
         
         if (emailError) {
+          console.error('Error al actualizar email:', emailError)
           // Si falla la actualización de email, mostramos advertencia pero no error total
           toast.warning('Perfil actualizado, pero no se pudo cambiar el email. Verifica el nuevo email.')
         } else {
@@ -67,9 +87,14 @@ export function UserProfile() {
       } else {
         toast.success('Perfil actualizado correctamente')
       }
-    } catch (error) {
+
+      // Recargar la página después de 1 segundo para obtener los nuevos datos
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+    } catch (error: any) {
       console.error('Error updating profile:', error)
-      toast.error('Error al actualizar el perfil')
+      toast.error(`Error al actualizar el perfil: ${error.message || 'Error desconocido'}`)
     } finally {
       setLoading(false)
     }

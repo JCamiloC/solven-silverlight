@@ -108,6 +108,22 @@ export function useAccessStats() {
   })
 }
 
+// Hook para obtener estadísticas de accesos por cliente
+export function useAccessStatsByClient(clientId: string) {
+  return useQuery({
+    queryKey: [...accessKeys.stats(), 'client', clientId],
+    queryFn: async () => {
+      if (!clientId) {
+        return { total: 0, active: 0, inactive: 0, recentlyAccessed: 0, totalAccesses: 0 } as AccessStats
+      }
+      
+      return accessCredentialsService.getStatsByClient(clientId)
+    },
+    enabled: !!clientId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+}
+
 // Hook para obtener credenciales por cliente
 export function useAccessCredentialsByClient(clientId: string) {
   return useQuery({
@@ -201,6 +217,8 @@ export function useCreateAccessCredential() {
       // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: accessKeys.lists() })
       queryClient.invalidateQueries({ queryKey: accessKeys.stats() })
+      // Invalidate by client queries
+      queryClient.invalidateQueries({ queryKey: accessKeys.all })
       toast.success('Credencial creada exitosamente')
     },
   })
@@ -274,6 +292,8 @@ export function useUpdateAccessCredential() {
       queryClient.invalidateQueries({ queryKey: accessKeys.lists() })
       queryClient.invalidateQueries({ queryKey: accessKeys.detail(data.id) })
       queryClient.invalidateQueries({ queryKey: accessKeys.stats() })
+      // Invalidate by client queries
+      queryClient.invalidateQueries({ queryKey: accessKeys.all })
       toast.success('Credencial actualizada exitosamente')
     },
   })
@@ -320,6 +340,8 @@ export function useDeleteAccessCredential() {
       // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: accessKeys.lists() })
       queryClient.invalidateQueries({ queryKey: accessKeys.stats() })
+      // Invalidate by client queries
+      queryClient.invalidateQueries({ queryKey: accessKeys.all })
       toast.success('Credencial eliminada exitosamente')
     },
   })

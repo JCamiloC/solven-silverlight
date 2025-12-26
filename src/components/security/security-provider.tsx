@@ -382,7 +382,7 @@ interface SecureRouteProps {
 
 export function SecureRoute({ children, requireAdmin = false }: SecureRouteProps) {
   const { profile, hasRole } = useAuth()
-  const { is2FAEnabled, requireVerification, setup2FA } = useSecurityContext()
+  const { is2FAEnabled, isVerified, requireVerification, setup2FA } = useSecurityContext()
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
   const [showSetupPrompt, setShowSetupPrompt] = useState(false)
@@ -410,15 +410,24 @@ export function SecureRoute({ children, requireAdmin = false }: SecureRouteProps
       return
     }
 
-    // Require 2FA verification
+    // Si ya está verificado, no pedir verificación de nuevo
+    if (isVerified) {
+      setIsAuthorized(true)
+      setIsChecking(false)
+      return
+    }
+
+    // Require 2FA verification solo si no está verificado
     const verified = await requireVerification()
     setIsAuthorized(verified)
     setIsChecking(false)
-  }, [requireAdmin, hasRole, is2FAEnabled, requireVerification])
+  }, [requireAdmin, hasRole, is2FAEnabled, isVerified, requireVerification])
 
   useEffect(() => {
-    checkAuthorization()
-  }, [profile, is2FAEnabled, checkAuthorization])
+    if (profile) {
+      checkAuthorization()
+    }
+  }, [profile?.id, is2FAEnabled, isVerified]) // Dependencias específicas para evitar loops
 
   if (isChecking) {
     return (
