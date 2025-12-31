@@ -8,7 +8,9 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { authService } from '@/services/auth'
+import { NavigationLoader } from '@/components/ui/navigation-loader'
 import Link from 'next/link'
+import { Loader2 } from 'lucide-react'
 
 function LoginForm() {
   const [email, setEmail] = useState('')
@@ -46,6 +48,7 @@ function LoginForm() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
+      <NavigationLoader />
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-slate-800">Solven</h1>
@@ -97,6 +100,7 @@ function LoginForm() {
               </div>
               
               <Button type="submit" className="w-full" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
               </Button>
             </form>

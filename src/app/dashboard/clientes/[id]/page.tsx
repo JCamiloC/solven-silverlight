@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/form'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ProtectedRoute } from '@/components/auth/protected-route'
+import { LoadingLink } from '@/components/ui/loading-link'
 import { useClient, useUpdateClient } from '@/hooks/use-clients'
 import { useQuery } from '@tanstack/react-query'
 import { clientService } from '@/services/clients'
@@ -452,25 +453,28 @@ export default function ClienteDetailPage() {
             {navigationButtons.map((button) => {
               const Icon = button.icon
               return (
-                <Card 
+                <LoadingLink
                   key={button.title}
-                  className="cursor-pointer hover:shadow-lg transition-shadow"
-                  onClick={() => router.push(button.href)}
+                  href={button.href}
+                  className="block"
+                  showSpinner={false}
                 >
-                  <CardContent className="p-6">
-                    <div className="flex items-start space-x-4">
-                      <div className={`${button.color} p-3 rounded-lg text-white`}>
-                        <Icon className="h-6 w-6" />
+                  <Card className="cursor-pointer hover:shadow-lg transition-shadow h-full">
+                    <CardContent className="p-6">
+                      <div className="flex items-start space-x-4">
+                        <div className={`${button.color} p-3 rounded-lg text-white`}>
+                          <Icon className="h-6 w-6" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-lg mb-1">{button.title}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {button.description}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg mb-1">{button.title}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {button.description}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </LoadingLink>
               )
             })}
           </div>

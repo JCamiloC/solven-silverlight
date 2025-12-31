@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/dashboard'
 import { Header } from '@/components/dashboard/header'
 import { SecurityProvider } from '@/components/security/security-provider'
 import { SidebarProvider, useSidebar } from '@/components/dashboard/sidebar-context'
+import { NavigationLoader } from '@/components/ui/navigation-loader'
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed, isHovered } = useSidebar()
@@ -12,6 +13,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen">
+      {/* Navigation Loading Bar */}
+      <NavigationLoader />
+      
       {/* Fixed Sidebar - Solo visible en desktop */}
       <div className={`hidden md:block fixed left-0 top-0 z-30 h-screen p-2 transition-all duration-300 ${sidebarWidth}`}>
         <div className="w-full h-full bg-white/80 backdrop-blur-sm rounded-[5px] shadow-sm border border-white/20 overflow-hidden">

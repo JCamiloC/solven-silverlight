@@ -1,11 +1,11 @@
 'use client'
 
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { LoadingLink } from '@/components/ui/loading-link'
 import { useAuth } from '@/hooks/use-auth'
 import { useSidebar } from './sidebar-context'
 import { 
@@ -53,10 +53,10 @@ const NavButton = ({ item, isActive, showText, isCollapsed, isHovered, onNavigat
       )}
       asChild
     >
-      <Link href={item.href} onClick={onNavigate}>
+      <LoadingLink href={item.href} onClick={onNavigate} showSpinner={showText}>
         <item.icon className={cn('h-4 w-4', showText && 'mr-2')} />
         {showText && item.name}
-      </Link>
+      </LoadingLink>
     </Button>
   )
 
