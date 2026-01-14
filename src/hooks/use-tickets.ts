@@ -19,6 +19,8 @@ export function useTickets() {
   return useQuery({
     queryKey: QUERY_KEYS.tickets,
     queryFn: () => TicketsService.getAll(),
+    staleTime: 2 * 60 * 1000, // 2 minutos
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -37,6 +39,8 @@ export function useClientTickets(clientId: string) {
       return data as TicketWithRelations[]
     },
     enabled: !!clientId,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -66,6 +70,8 @@ export function useMyTickets(userId: string) {
       return data as TicketWithRelations[]
     },
     enabled: !!userId,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: true,
   })
 }
 

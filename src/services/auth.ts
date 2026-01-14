@@ -1,14 +1,26 @@
 import { createClient } from '@/lib/supabase/client'
 import { User, Profile, UserRole } from '@/types'
 
+// Helper para agregar timeout a operaciones de auth
+function withAuthTimeout<T>(promise: Promise<T>, timeoutMs: number = 10000): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('Operación de autenticación timeout. Por favor, verifica tu conexión.')), timeoutMs)
+    ),
+  ])
+}
+
 export class AuthService {
   private supabase = createClient()
 
   async signIn(email: string, password: string) {
-    const { data, error } = await this.supabase.auth.signInWithPassword({
+    const signInPromise = this.supabase.auth.signInWithPassword({
       email,
       password,
     })
+    
+    const { data, error } = await withAuthTimeout(signInPromise)
     
     if (error) throw error
     return data
@@ -19,7 +31,7 @@ export class AuthService {
     lastName: string
     role: UserRole
   }) {
-    const { data, error } = await this.supabase.auth.signUp({
+    const signUpPromise = this.supabase.auth.signUp({
       email,
       password,
       options: {
@@ -31,17 +43,19 @@ export class AuthService {
       },
     })
     
+    const { data, error } = await withAuthTimeout(signUpPromise)
+    
     if (error) throw error
     return data
   }
 
   async signOut() {
-    const { error } = await this.supabase.auth.signOut()
+    const { error } = await withAuthTimeout(this.supabase.auth.signOut(), 5000)
     if (error) throw error
   }
 
   async getCurrentUser() {
-    const { data: { user }, error } = await this.supabase.auth.getUser()
+    const { data: { user }, error } = await withAuthTimeout(this.supabase.auth.getUser())
     if (error) throw error
     return user
   }

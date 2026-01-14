@@ -116,6 +116,32 @@ export interface HardwareSeguimiento {
   creator?: Profile
 }
 
+export interface HardwareUpgrade {
+  id: string
+  hardware_id: string
+  // Valores anteriores
+  previous_procesador?: string
+  previous_memoria_ram?: string
+  previous_disco_duro?: string
+  // Valores nuevos
+  new_procesador?: string
+  new_memoria_ram?: string
+  new_disco_duro?: string
+  // Campos cambiados
+  changed_fields: string[]
+  // Auditoría
+  updated_by?: string
+  update_reason?: string
+  notes?: string
+  created_at: string
+  // Relaciones opcionales
+  updater?: {
+    first_name: string
+    last_name: string
+    email: string
+  }
+}
+
 export interface SoftwareLicense {
   id: string
   client_id: string

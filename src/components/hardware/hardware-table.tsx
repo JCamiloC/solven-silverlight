@@ -46,13 +46,19 @@ import {
   Edit,
   Trash2,
   FileText,
-  Download
+  Download,
+  Loader2
 } from 'lucide-react'
 import { HardwareAsset } from '@/types'
 import { HardwareForm } from './hardware-form'
 import { useUpdateHardware, useDeleteHardware, useGetFollowUps } from '@/hooks/use-hardware'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { hardwareService } from '@/services/hardware'
+import { HardwareLifesheetPDF } from '@/lib/services/hardware-lifesheet-pdf'
+import { HardwareDeliveryActaPDF } from '@/lib/services/hardware-delivery-acta-pdf'
+import { toast } from 'sonner'
+import { Progress } from '@/components/ui/progress'
 
 interface HardwareTableProps {
   data: HardwareAsset[]
@@ -66,6 +72,9 @@ export function HardwareTable({ data, isLoading, clientId }: HardwareTableProps)
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState('')
   const [editingAsset, setEditingAsset] = useState<HardwareAsset | null>(null)
+  const [generatingPDF, setGeneratingPDF] = useState(false)
+  const [pdfProgress, setPdfProgress] = useState(0)
+  const [pdfProgressText, setPdfProgressText] = useState('')
   
   const updateMutation = useUpdateHardware()
   const deleteMutation = useDeleteHardware()
@@ -169,9 +178,9 @@ export function HardwareTable({ data, isLoading, clientId }: HardwareTableProps)
                 <FileText className="mr-2 h-4 w-4" />
                 Generar Hoja de Vida
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => downloadReport(asset)}>
+              <DropdownMenuItem onClick={() => downloadActa(asset)}>
                 <Download className="mr-2 h-4 w-4" />
-                Descargar Reporte
+                Descargar Acta
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
@@ -219,14 +228,119 @@ export function HardwareTable({ data, isLoading, clientId }: HardwareTableProps)
 
   const [viewingAsset, setViewingAsset] = useState<HardwareAsset | null>(null)
 
-  const generateLifesheet = (asset: HardwareAsset) => {
-    console.log('Generate lifesheet for:', asset)
-    // TODO: Implement PDF generation
+  const generateLifesheet = async (asset: HardwareAsset) => {
+    try {
+      setGeneratingPDF(true)
+      setPdfProgress(0)
+      setPdfProgressText('Iniciando generación...')
+
+      // Simular progreso mientras se cargan los datos
+      const progressInterval = setInterval(() => {
+        setPdfProgress((prev) => {
+          if (prev >= 90) return prev
+          return prev + Math.random() * 15
+        })
+      }, 500)
+
+      // Paso 1: Obtener datos del hardware
+      setPdfProgressText('Cargando información del equipo...')
+      setPdfProgress(20)
+      const hardware = await hardwareService.getById(asset.id)
+
+      if (!hardware) {
+        throw new Error('No se pudo obtener la información del hardware')
+      }
+
+      // Paso 2: Obtener upgrades
+      setPdfProgressText('Cargando historial de actualizaciones...')
+      setPdfProgress(40)
+      const upgrades = await hardwareService.getUpgrades(asset.id)
+
+      // Paso 3: Obtener seguimientos
+      setPdfProgressText('Cargando historial de mantenimientos...')
+      setPdfProgress(60)
+      const followUps = await hardwareService.getFollowUps(asset.id)
+
+      // Paso 4: Generar PDF
+      setPdfProgressText('Generando documento PDF...')
+      setPdfProgress(80)
+      await HardwareLifesheetPDF.generateLifesheet(hardware, upgrades, followUps)
+
+      clearInterval(progressInterval)
+      setPdfProgress(100)
+      setPdfProgressText('¡Completado!')
+
+      setTimeout(() => {
+        setGeneratingPDF(false)
+        setPdfProgress(0)
+        toast.success('Hoja de Vida generada exitosamente', {
+          description: 'El PDF se ha descargado correctamente.',
+        })
+      }, 1000)
+
+    } catch (error) {
+      console.error('Error generating lifesheet:', error)
+      setGeneratingPDF(false)
+      setPdfProgress(0)
+      toast.error('Error al generar la Hoja de Vida', {
+        description: 'No se pudo generar el documento PDF.',
+      })
+    }
   }
 
-  const downloadReport = (asset: HardwareAsset) => {
-    console.log('Download report for:', asset)
-    // TODO: Implement report download
+  const downloadActa = async (asset: HardwareAsset) => {
+    try {
+      setGeneratingPDF(true)
+      setPdfProgress(0)
+      setPdfProgressText('Generando Acta de Entrega...')
+
+      // Simular progreso
+      const progressInterval = setInterval(() => {
+        setPdfProgress((prev) => {
+          if (prev >= 90) return prev
+          return prev + Math.random() * 10
+        })
+      }, 300)
+
+      setPdfProgress(30)
+      const hardware = await hardwareService.getById(asset.id)
+
+      if (!hardware) {
+        throw new Error('No se pudo obtener la información del hardware')
+      }
+
+      setPdfProgressText('Generando documento PDF...')
+      setPdfProgress(70)
+
+      // Generar el acta con los datos
+      await HardwareDeliveryActaPDF.generateActa({
+        hardware,
+        entregadoPor: {
+          nombre: 'Silverlight Colombia',
+          cargo: 'Técnico de Soporte',
+        },
+      })
+
+      clearInterval(progressInterval)
+      setPdfProgress(100)
+      setPdfProgressText('¡Completado!')
+
+      setTimeout(() => {
+        setGeneratingPDF(false)
+        setPdfProgress(0)
+        toast.success('Acta de Entrega generada', {
+          description: 'El PDF se ha descargado correctamente.',
+        })
+      }, 1000)
+
+    } catch (error) {
+      console.error('Error generating acta:', error)
+      setGeneratingPDF(false)
+      setPdfProgress(0)
+      toast.error('Error al generar el Acta', {
+        description: 'No se pudo generar el documento.',
+      })
+    }
   }
 
   if (isLoading) {
@@ -343,6 +457,36 @@ export function HardwareTable({ data, isLoading, clientId }: HardwareTableProps)
               onCancel={() => setEditingAsset(null)}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* PDF Generation Progress Dialog */}
+      <Dialog open={generatingPDF} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              Generando Hoja de Vida
+            </DialogTitle>
+            <DialogDescription>
+              Por favor espera mientras se genera el documento PDF...
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{pdfProgressText}</span>
+                <span className="font-medium">{Math.round(pdfProgress)}%</span>
+              </div>
+              <Progress value={pdfProgress} className="h-2" />
+            </div>
+            {pdfProgress === 100 && (
+              <div className="flex items-center justify-center text-sm text-green-600">
+                <FileText className="mr-2 h-4 w-4" />
+                PDF descargado exitosamente
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

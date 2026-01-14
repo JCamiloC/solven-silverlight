@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import { Profile, UserRole } from '@/types'
+import { toast } from 'sonner'
 
 interface AuthState {
   user: User | null
@@ -71,20 +72,35 @@ export function useAuth() {
     if (isInitializedRef.current) return
     isInitializedRef.current = true
 
-    // Timeout de seguridad: si después de 10 segundos sigue cargando, forzar estado
+    // Timeout de seguridad: si después de 8 segundos sigue cargando, forzar estado
     loadingTimeoutRef.current = setTimeout(() => {
       console.warn('[useAuth] Loading timeout, forcing non-loading state')
       setAuthState(prev => ({
         ...prev,
         loading: false
       }))
-    }, 10000)
+      // Si sigue cargando después de 8s, probablemente hay un problema de sesión
+      toast.error('Problema detectado con la sesión. Redirigiendo...')
+      setTimeout(() => {
+        window.location.href = '/auth/login?reason=timeout'
+      }, 1500)
+    }, 8000) // Reducido de 10s a 8s
 
-    // Get initial session
+    // Get initial session con timeout
     const getInitialSession = async () => {
       try {
         console.log('[useAuth] Getting initial session...')
-        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        // Crear timeout para getSession
+        const sessionPromise = supabase.auth.getSession()
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Session timeout')), 5000)
+        )
+        
+        const { data: { session }, error } = await Promise.race([
+          sessionPromise,
+          timeoutPromise
+        ]) as any
         
         if (loadingTimeoutRef.current) {
           clearTimeout(loadingTimeoutRef.current)
@@ -102,6 +118,24 @@ export function useAuth() {
         
         if (session?.user) {
           console.log('[useAuth] Session found, fetching profile...')
+          
+          // Verificar si el token está próximo a expirar (menos de 5 minutos)
+          const expiresAt = session.expires_at
+          if (expiresAt) {
+            const expiresIn = expiresAt - Math.floor(Date.now() / 1000)
+            if (expiresIn < 300) { // Menos de 5 minutos
+              console.log('[useAuth] Token expiring soon, refreshing...')
+              try {
+                const { data: { session: refreshedSession } } = await supabase.auth.refreshSession()
+                if (refreshedSession) {
+                  console.log('[useAuth] Token refreshed successfully')
+                }
+              } catch (refreshError) {
+                console.error('[useAuth] Error refreshing token:', refreshError)
+              }
+            }
+          }
+          
           const profile = await getProfile(session.user.id)
           setAuthState({
             user: session.user,
@@ -121,6 +155,12 @@ export function useAuth() {
         if (loadingTimeoutRef.current) {
           clearTimeout(loadingTimeoutRef.current)
         }
+        
+        // Si es timeout, mostrar mensaje específico
+        if (error instanceof Error && error.message.includes('timeout')) {
+          toast.error('La verificación de sesión está tardando demasiado. Por favor, refresca la página.')
+        }
+        
         setAuthState({
           user: null,
           profile: null,
@@ -130,6 +170,19 @@ export function useAuth() {
     }
 
     getInitialSession()
+    
+    // Auto-refresh token cada 4 minutos (antes de que expire)
+    const refreshInterval = setInterval(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          console.log('[useAuth] Auto-refreshing token...')
+          await supabase.auth.refreshSession()
+        }
+      } catch (error) {
+        console.error('[useAuth] Error in auto-refresh:', error)
+      }
+    }, 4 * 60 * 1000) // 4 minutos
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -179,6 +232,7 @@ export function useAuth() {
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current)
       }
+      clearInterval(refreshInterval)
     }
   }, [getProfile, router, supabase.auth])
 

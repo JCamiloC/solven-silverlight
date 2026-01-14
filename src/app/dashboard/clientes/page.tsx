@@ -2,20 +2,39 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Building2 } from 'lucide-react'
+import { Plus, Search, Building2, X } from 'lucide-react'
 import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ProtectedRoute } from '@/components/auth/protected-route'
-import { useClients } from '@/hooks/use-clients'
-import { Client } from '@/types'
+import { useClients, useCreateClient } from '@/hooks/use-clients'
+import { Client, ClientType } from '@/types'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { getClientTypeLabel } from '@/lib/utils/user-type-labels'
 
 export default function ClientesPage() {
   const router = useRouter()
   const { data: clients, isLoading, error } = useClients()
+  const { mutate: createClient, isPending: isCreating } = useCreateClient()
   const [searchTerm, setSearchTerm] = useState('')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [formData, setFormData] = useState({
@@ -26,13 +45,9 @@ export default function ClientesPage() {
     contact_person: '',
     nit: '',
     mantenimientos_al_anio: 0,
+    client_type: 'no_aplica' as ClientType,
   })
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
-  const { mutate: createClient } = require('@/hooks/use-clients').useCreateClient?.() || { mutate: () => {} }
-  // Reemplazar require por import directo
-  // import { useCreateClient } from '@/hooks/use-clients'
-  // const { mutate: createClient } = useCreateClient()
 
   const filteredClients = clients?.filter((client) => {
     const search = searchTerm.toLowerCase()
@@ -70,6 +85,11 @@ export default function ClientesPage() {
       key: 'nit',
       label: 'NIT',
       render: (value: string | undefined) => value || '-',
+    },
+    {
+      key: 'client_type',
+      label: 'Tipo de Servicio',
+      render: (value: string | undefined) => getClientTypeLabel(value as ClientType),
     },
     {
       key: 'mantenimientos_al_anio',
@@ -216,119 +236,185 @@ export default function ClientesPage() {
           </CardContent>
         </Card>
       </div>
-      {/* Modal para crear nuevo cliente */}
-      {showCreateDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-lg relative">
-            <button className="absolute top-2 right-2 text-xl" onClick={() => setShowCreateDialog(false)}>&times;</button>
-            <h2 className="text-2xl font-bold mb-4">Crear Nuevo Cliente</h2>
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setIsSubmitting(true);
-                setFormError('');
-                try {
-                  await createClient(formData, {
-                    onSuccess: () => {
-                      setShowCreateDialog(false);
-                      setFormData({ name: '', email: '', phone: '', address: '', contact_person: '', nit: '', mantenimientos_al_anio: 0 });
-                    },
-                    onError: (err: any) => {
-                      setFormError(err?.message || 'Error al crear cliente');
-                    },
-                  });
-                } catch (err) {
-                  setFormError('Error inesperado');
-                }
-                setIsSubmitting(false);
-              }}
-              className="space-y-4"
-            >
+      
+      {/* Modal para crear nuevo cliente - Mejorado con Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Crear Nuevo Cliente</DialogTitle>
+            <DialogDescription>
+              Completa la información del nuevo cliente. Los campos marcados con * son obligatorios.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              setFormError('')
+              
+              createClient(formData, {
+                onSuccess: () => {
+                  setShowCreateDialog(false)
+                  setFormData({ 
+                    name: '', 
+                    email: '', 
+                    phone: '', 
+                    address: '', 
+                    contact_person: '', 
+                    nit: '', 
+                    mantenimientos_al_anio: 0,
+                    client_type: 'no_aplica',
+                  })
+                },
+                onError: (err: Error) => {
+                  setFormError(err.message || 'Error al crear cliente')
+                },
+              })
+            }}
+            className="space-y-4"
+          >
+            {formError && (
+              <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+                {formError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Nombre */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Nombre *</label>
-                <input
+                <Label htmlFor="name">Nombre de la Empresa *</Label>
+                <Input
+                  id="name"
                   type="text"
                   required
                   value={formData.name}
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full border rounded px-3 py-2"
-                  placeholder="Nombre de la empresa"
+                  placeholder="Ej: Acme Corporation"
                 />
               </div>
+
+              {/* NIT */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium">NIT</label>
-                <input
+                <Label htmlFor="nit">NIT *</Label>
+                <Input
+                  id="nit"
                   type="text"
+                  required
                   value={formData.nit}
                   onChange={e => setFormData({ ...formData, nit: e.target.value })}
-                  className="w-full border rounded px-3 py-2"
-                  placeholder="NIT de la empresa"
+                  placeholder="Ej: 900123456-7"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Email */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Email *</label>
-                <input
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
                   type="email"
                   required
                   value={formData.email}
                   onChange={e => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full border rounded px-3 py-2"
-                  placeholder="Email de contacto"
+                  placeholder="contacto@empresa.com"
                 />
               </div>
+
+              {/* Teléfono */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Teléfono</label>
-                <input
+                <Label htmlFor="phone">Teléfono</Label>
+                <Input
+                  id="phone"
                   type="text"
                   value={formData.phone}
                   onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full border rounded px-3 py-2"
-                  placeholder="Teléfono de contacto"
+                  placeholder="Ej: +57 300 123 4567"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Persona de contacto */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Dirección</label>
-                <input
-                  type="text"
-                  value={formData.address}
-                  onChange={e => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full border rounded px-3 py-2"
-                  placeholder="Dirección de la empresa"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">Persona de contacto *</label>
-                <input
+                <Label htmlFor="contact_person">Persona de Contacto *</Label>
+                <Input
+                  id="contact_person"
                   type="text"
                   required
                   value={formData.contact_person}
                   onChange={e => setFormData({ ...formData, contact_person: e.target.value })}
-                  className="w-full border rounded px-3 py-2"
-                  placeholder="Nombre de la persona de contacto"
+                  placeholder="Nombre completo"
                 />
               </div>
+
+              {/* Mantenimientos al año */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Mantenimientos al año</label>
-                <input
+                <Label htmlFor="mantenimientos">Mantenimientos al Año</Label>
+                <Input
+                  id="mantenimientos"
                   type="number"
                   min={0}
                   value={formData.mantenimientos_al_anio}
                   onChange={e => setFormData({ ...formData, mantenimientos_al_anio: Number(e.target.value) })}
-                  className="w-full border rounded px-3 py-2"
-                  placeholder="Cantidad de mantenimientos"
+                  placeholder="Ej: 4"
                 />
               </div>
-              {formError && <div className="text-red-600 text-sm">{formError}</div>}
-              <div className="flex justify-end gap-2">
-                <button type="button" className="px-4 py-2 rounded border" onClick={() => setShowCreateDialog(false)}>Cancelar</button>
-                <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white" disabled={isSubmitting}>
-                  {isSubmitting ? 'Creando...' : 'Crear Cliente'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </div>
+
+            {/* Tipo de Servicio */}
+            <div className="space-y-2">
+              <Label htmlFor="client_type">Tipo de Servicio *</Label>
+              <Select
+                value={formData.client_type}
+                onValueChange={(value: ClientType) => setFormData({ ...formData, client_type: value })}
+              >
+                <SelectTrigger id="client_type">
+                  <SelectValue placeholder="Seleccionar tipo de servicio" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="on_demand_software">On demand - Software</SelectItem>
+                  <SelectItem value="on_demand_hardware">On demand - Hardware</SelectItem>
+                  <SelectItem value="on_demand_ambos">On demand - Ambos</SelectItem>
+                  <SelectItem value="contrato_software">Contrato - Software</SelectItem>
+                  <SelectItem value="contrato_hardware">Contrato - Hardware</SelectItem>
+                  <SelectItem value="contrato_ambos">Contrato - Ambos</SelectItem>
+                  <SelectItem value="no_aplica">No Aplica</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Dirección */}
+            <div className="space-y-2">
+              <Label htmlFor="address">Dirección</Label>
+              <Textarea
+                id="address"
+                value={formData.address}
+                onChange={e => setFormData({ ...formData, address: e.target.value })}
+                placeholder="Dirección completa de la empresa"
+                rows={3}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button 
+                type="button" 
+                variant="outline"
+                onClick={() => setShowCreateDialog(false)}
+                disabled={isCreating}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={isCreating}
+              >
+                {isCreating ? 'Creando...' : 'Crear Cliente'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </ProtectedRoute>
   )
 }

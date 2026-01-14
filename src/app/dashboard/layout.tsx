@@ -5,6 +5,7 @@ import { Header } from '@/components/dashboard/header'
 import { SecurityProvider } from '@/components/security/security-provider'
 import { SidebarProvider, useSidebar } from '@/components/dashboard/sidebar-context'
 import { NavigationLoader } from '@/components/ui/navigation-loader'
+import { SessionDebugger } from '@/components/debug/session-debugger'
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed, isHovered } = useSidebar()
@@ -43,6 +44,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </div>
+      
+      {/* Session Debugger - Solo en desarrollo */}
+      <SessionDebugger />
     </div>
   )
 }
