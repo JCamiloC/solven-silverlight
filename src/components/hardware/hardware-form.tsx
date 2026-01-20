@@ -300,6 +300,7 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
                   <SelectItem value="printer">Impresora</SelectItem>
                   <SelectItem value="monitor">Monitor</SelectItem>
                   <SelectItem value="server">Servidor</SelectItem>
+                  <SelectItem value="celular">Celular</SelectItem>
                   <SelectItem value="network">Red</SelectItem>
                   <SelectItem value="other">Otro</SelectItem>
                 </SelectContent>
