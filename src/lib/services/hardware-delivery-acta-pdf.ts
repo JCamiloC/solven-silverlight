@@ -381,17 +381,37 @@ export class HardwareDeliveryActaPDF {
   }
 
   /**
-   * Helper: Formatea campos de software que pueden ser string u objeto
+   * Helper: Formatea campos de software que pueden ser string JSON u objeto
    */
   private static formatSoftwareField(field: any): string {
     if (!field) return 'No especificado'
-    if (typeof field === 'string') return field
-    if (typeof field === 'object') {
-      // Si es un objeto, intentar extraer información útil
-      if (field.name) return field.name
-      if (field.version) return field.version
-      return JSON.stringify(field)
+    
+    try {
+      // Si es un string, intentar parsearlo como JSON
+      if (typeof field === 'string') {
+        try {
+          const parsed = JSON.parse(field)
+          // Si tiene nombre, usarlo
+          if (parsed.nombre) {
+            return parsed.nombre
+          }
+          return field
+        } catch {
+          // Si no es JSON, retornar el string tal cual
+          return field
+        }
+      }
+      
+      // Si ya es un objeto
+      if (typeof field === 'object' && field !== null) {
+        if (field.nombre) return field.nombre
+        if (field.name) return field.name
+        if (field.version) return field.version
+      }
+      
+      return String(field)
+    } catch {
+      return 'No especificado'
     }
-    return String(field)
   }
 }

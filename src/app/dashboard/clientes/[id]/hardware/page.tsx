@@ -6,7 +6,7 @@ import { useHardwareAssetsByClient } from '@/hooks/use-hardware';
 import { useClient } from '@/hooks/use-clients';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowLeft } from 'lucide-react';
+import { Plus, ArrowLeft, BarChart3 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -69,28 +69,38 @@ export default function ClienteHardwarePage() {
               Gestión de activos de hardware asignados a este cliente
             </p>
           </div>
-          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-            <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto">
-                <Plus className="mr-2 h-4 w-4" />
-                Agregar Hardware
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Agregar Nuevo Hardware</DialogTitle>
-                <DialogDescription>
-                  Complete los datos del nuevo activo de hardware.
-                </DialogDescription>
-              </DialogHeader>
-              <HardwareForm 
-                onSuccess={() => setShowCreateDialog(false)}
-                onCancel={() => setShowCreateDialog(false)}
-                asset={undefined}
-                clientId={clientId}
-              />
-            </DialogContent>
-          </Dialog>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button 
+              variant="outline" 
+              className="w-full sm:w-auto"
+              onClick={() => router.push(`/dashboard/clientes/${clientId}/hardware/reporte`)}
+            >
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Ver Reporte
+            </Button>
+            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+              <DialogTrigger asChild>
+                <Button className="w-full sm:w-auto">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Agregar Hardware
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Agregar Nuevo Hardware</DialogTitle>
+                  <DialogDescription>
+                    Complete los datos del nuevo activo de hardware.
+                  </DialogDescription>
+                </DialogHeader>
+                <HardwareForm 
+                  onSuccess={() => setShowCreateDialog(false)}
+                  onCancel={() => setShowCreateDialog(false)}
+                  asset={undefined}
+                  clientId={clientId}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
         <HardwareStats clientId={clientId} />
         <div className="space-y-4">
