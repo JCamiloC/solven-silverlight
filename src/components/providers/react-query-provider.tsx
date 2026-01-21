@@ -40,38 +40,9 @@ export function ReactQueryProvider({ children }: { children: React.ReactNode }) 
               
               return failureCount < 2 // Reducir reintentos de 3 a 2
             },
-            // Handler global de errores
-            onError: (error) => {
-              console.error('[React Query] Query error:', error)
-              
-              // Manejar timeout
-              if (error instanceof Error && error.message.includes('timeout')) {
-                toast.error('La operación está tardando demasiado. Por favor, refresca la página.')
-              }
-              
-              // Manejar sesión expirada
-              if (error instanceof Error && 
-                  (error.message.includes('JWT') || 
-                   error.message.includes('session') ||
-                   error.message.toLowerCase().includes('expired'))) {
-                toast.error('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.')
-                // Redirigir al login después de 2 segundos
-                setTimeout(() => {
-                  window.location.href = '/auth/login?reason=expired'
-                }, 2000)
-              }
-            },
           },
           mutations: {
             retry: false,
-            // Handler global de errores para mutaciones
-            onError: (error) => {
-              console.error('[React Query] Mutation error:', error)
-              
-              if (error instanceof Error && error.message.includes('timeout')) {
-                toast.error('La operación está tardando demasiado. Por favor, intenta de nuevo.')
-              }
-            },
           },
         },
       })

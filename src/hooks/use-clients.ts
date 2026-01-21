@@ -47,9 +47,9 @@ export function useCreateClient() {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           client_type: newClient.client_type || 'no_aplica',
-          phone: newClient.phone || null,
-          address: newClient.address || null,
-          nit: newClient.nit || null,
+          phone: newClient.phone || undefined,
+          address: newClient.address || undefined,
+          nit: newClient.nit || undefined,
           mantenimientos_al_anio: newClient.mantenimientos_al_anio || 0,
         }
         
