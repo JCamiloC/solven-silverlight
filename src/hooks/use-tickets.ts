@@ -108,6 +108,7 @@ export function useCreateTicket() {
       // Optimistically update
       const optimisticTicket: TicketWithRelations = {
         id: `temp-${Date.now()}`,
+        ticket_number: `Silver${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-000`, // Temporal
         ...newTicket,
         status: newTicket.status || 'open',
         priority: newTicket.priority || 'medium',
