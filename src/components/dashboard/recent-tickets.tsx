@@ -91,7 +91,7 @@ export function RecentTickets() {
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center space-x-2">
                     <p className="text-sm font-medium leading-none">
-                      #{ticket.id.slice(0, 8)} - {ticket.title}
+                      {ticket.ticket_number || `#${ticket.id.slice(0, 8)}`} - {ticket.title}
                     </p>
                     {getStatusBadge(ticket.status)}
                     {getPriorityBadge(ticket.priority)}

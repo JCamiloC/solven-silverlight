@@ -224,7 +224,7 @@ export default function TicketDetailPage() {
             <span className="hidden sm:inline">Volver</span>
           </Button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg md:text-2xl font-bold truncate">Ticket #{ticket.id.slice(-8)}</h1>
+            <h1 className="text-lg md:text-2xl font-bold truncate">{ticket.ticket_number || `Ticket #${ticket.id.slice(-8)}`}</h1>
             <p className="text-sm text-muted-foreground truncate">{ticket.title}</p>
           </div>
         </div>

@@ -133,7 +133,7 @@ export function TicketTable({
                   onClick={() => router.push(`/dashboard/tickets/${ticket.id}`)}
                 >
                   <TableCell className="font-mono text-xs whitespace-nowrap">
-                    #{ticket.id.slice(-8)}
+                    {ticket.ticket_number || `#${ticket.id.slice(-8)}`}
                   </TableCell>
                   {showClientColumn && (
                     <TableCell className="whitespace-nowrap">

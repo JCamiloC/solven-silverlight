@@ -131,7 +131,7 @@ export function useCreateTicket() {
     },
     onSuccess: (data) => {
       toast.success('Ticket creado exitosamente', {
-        description: `Ticket #${data.id.slice(-8)} ha sido creado`,
+        description: `Ticket ${data.ticket_number} ha sido creado`,
       })
     },
     onSettled: () => {
@@ -189,7 +189,7 @@ export function useUpdateTicket() {
     },
     onSuccess: (data) => {
       toast.success('Ticket actualizado', {
-        description: `Ticket #${data.id.slice(-8)} ha sido actualizado`,
+        description: `Ticket ${data.ticket_number} ha sido actualizado`,
       })
     },
     onSettled: () => {
@@ -212,6 +212,9 @@ export function useDeleteTicket() {
 
       // Snapshot previous value
       const previousTickets = queryClient.getQueryData<TicketWithRelations[]>(QUERY_KEYS.tickets)
+      
+      // Get ticket to show in success message
+      const deletedTicket = previousTickets?.find(t => t.id === id)
 
       // Optimistically update
       queryClient.setQueryData<TicketWithRelations[]>(
@@ -219,7 +222,7 @@ export function useDeleteTicket() {
         (old) => old?.filter((ticket) => ticket.id !== id) || []
       )
 
-      return { previousTickets }
+      return { previousTickets, deletedTicket }
     },
     onError: (error, id, context) => {
       // Rollback
@@ -228,9 +231,10 @@ export function useDeleteTicket() {
         description: error.message,
       })
     },
-    onSuccess: (_, id) => {
+    onSuccess: (_, id, context) => {
+      const ticketNumber = context?.deletedTicket?.ticket_number || `#${id.slice(-8)}`
       toast.success('Ticket eliminado', {
-        description: `Ticket #${id.slice(-8)} ha sido eliminado`,
+        description: `Ticket ${ticketNumber} ha sido eliminado`,
       })
     },
     onSettled: () => {

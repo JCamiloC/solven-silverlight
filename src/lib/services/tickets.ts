@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/client'
 
 export interface Ticket {
   id: string
+  ticket_number: string
   client_id: string
   title: string
   description: string
