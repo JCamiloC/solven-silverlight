@@ -35,7 +35,8 @@ import {
   Mail,
   Monitor,
   Package,
-  Key
+  Key,
+  FileText
 } from 'lucide-react'
 // import { format } from 'date-fns'
 // import { es } from 'date-fns/locale'
@@ -48,6 +49,8 @@ import { useHardwareAsset } from '@/hooks/use-hardware'
 import { useSoftwareLicense } from '@/hooks/use-software'
 import { useAccessCredential } from '@/hooks/use-access-credentials'
 import { TicketCommentInsert } from '@/lib/services/ticket-comments'
+import { TicketDetailPDF } from '@/lib/services/ticket-detail-pdf'
+import { toast } from 'sonner'
 
 export default function TicketDetailPage() {
   const params = useParams()
@@ -58,6 +61,7 @@ export default function TicketDetailPage() {
   const [isInternal, setIsInternal] = useState(false)
   const [editingComment, setEditingComment] = useState<string | null>(null)
   const [editCommentText, setEditCommentText] = useState('')
+  const [generatingPDF, setGeneratingPDF] = useState(false)
   
   const { user, profile } = useAuth()
   const { data: ticket, isLoading: ticketLoading } = useTicket(ticketId)
@@ -75,6 +79,25 @@ export default function TicketDetailPage() {
   const createCommentMutation = useCreateTicketComment()
   const updateCommentMutation = useUpdateTicketComment()
   const deleteCommentMutation = useDeleteTicketComment()
+
+  // Función para generar PDF del ticket
+  const handleGeneratePDF = async () => {
+    if (!ticket) return
+
+    setGeneratingPDF(true)
+    try {
+      const client = clients.find(c => c.id === ticket.client_id)
+      const clientName = client?.name || 'Cliente'
+      
+      await TicketDetailPDF.generateTicketPDF(ticket, comments, clientName)
+      toast.success('PDF generado exitosamente')
+    } catch (error) {
+      console.error('Error generando PDF:', error)
+      toast.error('Error al generar el PDF')
+    } finally {
+      setGeneratingPDF(false)
+    }
+  }
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -229,6 +252,24 @@ export default function TicketDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleGeneratePDF}
+            disabled={generatingPDF}
+          >
+            {generatingPDF ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generando...
+              </>
+            ) : (
+              <>
+                <FileText className="mr-2 h-4 w-4" />
+                Generar PDF
+              </>
+            )}
+          </Button>
           {getStatusBadge(ticket.status)}
           {getPriorityBadge(ticket.priority)}
         </div>

@@ -8,7 +8,7 @@ export interface Ticket {
   description: string
   priority: 'low' | 'medium' | 'high' | 'critical'
   status: 'open' | 'in_progress' | 'pendiente_confirmacion' | 'resolved' | 'closed'
-  category: 'hardware' | 'software' | 'access' | 'other'
+  category: 'hardware' | 'software' | 'network' | 'access' | 'other'
   assigned_to?: string
   created_by: string
   usuario_afectado?: string
@@ -35,7 +35,7 @@ export interface TicketInsert {
   description: string
   priority?: 'low' | 'medium' | 'high' | 'critical'
   status?: 'open' | 'in_progress' | 'pendiente_confirmacion' | 'resolved' | 'closed'
-  category: 'hardware' | 'software' | 'access' | 'other'
+  category: 'hardware' | 'software' | 'network' | 'access' | 'other'
   assigned_to?: string
   created_by: string
   usuario_afectado?: string

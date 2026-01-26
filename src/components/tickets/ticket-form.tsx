@@ -51,10 +51,12 @@ const ticketFormSchema = z.object({
   usuario_afectado: z.string()
     .min(1, 'Usuario afectado es obligatorio')
     .max(100, 'El nombre no puede exceder 100 caracteres'),
-  category: z.enum(['hardware', 'software', 'access', 'other']),
+  category: z.enum(['hardware', 'software', 'network', 'access', 'other']),
   priority: z.enum(['low', 'medium', 'high', 'critical']),
   status: z.enum(['open', 'in_progress', 'pendiente_confirmacion', 'resolved', 'closed']).optional(),
   assigned_to: z.string().optional(),
+  created_at: z.string().optional(), // Campo de fecha de creación personalizada
+  created_at_time: z.string().optional(), // Campo de hora opcional
   // Campos relacionados (solo uno puede estar lleno según categoría)
   hardware_id: z.string().optional(),
   software_id: z.string().optional(),
@@ -260,7 +262,7 @@ export function TicketForm({
         }
       } else {
         // Modo creación
-        const ticketData = {
+        const ticketData: any = {
           client_id: data.client_id,
           title: data.title,
           description: data.description,
@@ -279,6 +281,14 @@ export function TicketForm({
           attachment_url: attachmentData.url,
           attachment_name: attachmentData.name,
           attachment_size: attachmentData.size,
+        }
+
+        // Si se especificó una fecha de creación personalizada, agregarla
+        if (data.created_at) {
+          // Si también se especificó hora, combinarlas; si no, usar 00:00
+          const timeStr = data.created_at_time || '00:00'
+          // Formato: YYYY-MM-DDTHH:mm:ss.000Z
+          ticketData.created_at = new Date(data.created_at + 'T' + timeStr + ':00.000Z').toISOString()
         }
         
         // Log para diagnóstico
@@ -445,6 +455,52 @@ export function TicketForm({
                 </FormItem>
               )}
             />
+
+            {/* Fecha y Hora de Creación (opcional) */}
+            {!isEditMode && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="created_at"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fecha de Creación (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          type="date"
+                          placeholder="Dejar vacío para usar fecha actual"
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">
+                        Dejar vacío para usar fecha actual
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="created_at_time"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Hora (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          type="time"
+                          placeholder="00:00"
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">
+                        Dejar vacío para usar 00:00
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
 
             {/* Categoría, Prioridad y Estado */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

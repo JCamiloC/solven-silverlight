@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button'
 import { TicketTable } from '@/components/tickets'
 import { useTickets, useMyTickets } from '@/hooks/use-tickets'
 import { useAuth } from '@/hooks/use-auth'
-import { Plus } from 'lucide-react'
+import { Plus, FileText, Loader2 } from 'lucide-react'
+import { TicketReportPDF } from '@/lib/services/ticket-report-pdf'
+import { toast } from 'sonner'
 
 export default function TicketsPage() {
   const router = useRouter()
-  const { user, isClient } = useAuth()
+  const { user, isClient, isAdmin, isLeader, isSupport } = useAuth()
   
   // Si es cliente, usa useMyTickets, sino usa useTickets
   const { data: allTickets, isLoading: loadingAll } = useTickets()
@@ -19,6 +21,28 @@ export default function TicketsPage() {
   
   const tickets = isClient() ? myTickets : allTickets
   const isLoading = isClient() ? loadingMy : loadingAll
+
+  const [generatingPDF, setGeneratingPDF] = useState(false)
+
+  const handleGenerateReport = async () => {
+    if (!tickets || tickets.length === 0) {
+      toast.error('No hay tickets para generar el reporte')
+      return
+    }
+
+    setGeneratingPDF(true)
+    try {
+      await TicketReportPDF.generateReport(tickets, 'Todos los Clientes', true)
+      toast.success('Reporte generado exitosamente')
+    } catch (error) {
+      console.error('Error generando reporte:', error)
+      toast.error('Error al generar el reporte')
+    } finally {
+      setGeneratingPDF(false)
+    }
+  }
+
+  const canGenerateReport = isAdmin() || isLeader() || isSupport()
 
   return (
     <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
@@ -36,13 +60,35 @@ export default function TicketsPage() {
               }
             </p>
           </div>
-          <Button
-            onClick={() => router.push('/dashboard/tickets/nuevo')}
-            className="w-full sm:w-auto"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Crear Ticket
-          </Button>
+          <div className="flex gap-2">
+            {!isClient() && canGenerateReport && (
+              <Button
+                variant="outline"
+                onClick={handleGenerateReport}
+                disabled={generatingPDF || isLoading}
+                className="w-full sm:w-auto"
+              >
+                {generatingPDF ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generando...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Reporte General
+                  </>
+                )}
+              </Button>
+            )}
+            <Button
+              onClick={() => router.push('/dashboard/tickets/nuevo')}
+              className="w-full sm:w-auto"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Crear Ticket
+            </Button>
+          </div>
         </div>
 
         {/* Tabla de Tickets */}
