@@ -49,38 +49,39 @@ const hardwareSchema = z.object({
   type: z.string().min(1, 'El tipo es requerido'),
   brand: z.string().min(1, 'La marca es requerida'),
   model: z.string().min(1, 'El modelo es requerido'),
-  serial_number: z.string().min(1, 'El número de serie es requerido'),
+  serial_number: z.string().optional(),
   status: z.enum(['active', 'maintenance', 'retired']),
   sede: z.string().min(1, 'La sede es requerida'),
   area_encargada: z.string().min(1, 'El área es requerida'),
   persona_responsable: z.string().min(1, 'La persona responsable es requerida'),
-  procesador: z.string().min(1, 'Procesador requerido'),
-  memoria_ram: z.string().min(1, 'Memoria RAM requerida'),
-  disco_duro: z.string().min(1, 'Disco duro requerido'),
+  correo_responsable: z.string().email('Correo inválido').optional().or(z.literal('')),
+  procesador: z.string().optional(),
+  memoria_ram: z.string().optional(),
+  disco_duro: z.string().optional(),
   sistema_operativo: z.object({
-    nombre: z.string().min(1, 'SO requerido'),
+    nombre: z.string().optional(),
     sl: z.boolean(),
     fecha_vencimiento: z.string().optional(),
   }).superRefine((val, ctx) => {
-    if (!val.sl && (!val.fecha_vencimiento || val.fecha_vencimiento.trim() === '')) {
+    if (val.nombre && !val.sl && (!val.fecha_vencimiento || val.fecha_vencimiento.trim() === '')) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Fecha de vencimiento requerida', path: ['fecha_vencimiento'] });
     }
   }),
   ms_office: z.object({
-    nombre: z.string().min(1, 'MS Office requerido'),
+    nombre: z.string().optional(),
     sl: z.boolean(),
     fecha_vencimiento: z.string().optional(),
   }).superRefine((val, ctx) => {
-    if (!val.sl && (!val.fecha_vencimiento || val.fecha_vencimiento.trim() === '')) {
+    if (val.nombre && !val.sl && (!val.fecha_vencimiento || val.fecha_vencimiento.trim() === '')) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Fecha de vencimiento requerida', path: ['fecha_vencimiento'] });
     }
   }),
   antivirus: z.object({
-    nombre: z.string().min(1, 'Antivirus requerido'),
+    nombre: z.string().optional(),
     sl: z.boolean(),
     fecha_vencimiento: z.string().optional(),
   }).superRefine((val, ctx) => {
-    if (!val.sl && (!val.fecha_vencimiento || val.fecha_vencimiento.trim() === '')) {
+    if (val.nombre && !val.sl && (!val.fecha_vencimiento || val.fecha_vencimiento.trim() === '')) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Fecha de vencimiento requerida', path: ['fecha_vencimiento'] });
     }
   }),
@@ -94,6 +95,30 @@ const hardwareSchema = z.object({
   otro_periferico: z.string().optional(),
   observaciones: z.string().optional(),
   client_id: z.string().min(1),
+}).superRefine((val, ctx) => {
+  // Para laptop y desktop, los campos de hardware y software son requeridos
+  const requiresSpecs = val.type === 'laptop' || val.type === 'desktop';
+  
+  if (requiresSpecs) {
+    if (!val.procesador || val.procesador.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Procesador requerido para laptop/desktop', path: ['procesador'] });
+    }
+    if (!val.memoria_ram || val.memoria_ram.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Memoria RAM requerida para laptop/desktop', path: ['memoria_ram'] });
+    }
+    if (!val.disco_duro || val.disco_duro.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Disco duro requerido para laptop/desktop', path: ['disco_duro'] });
+    }
+    if (!val.sistema_operativo?.nombre || val.sistema_operativo.nombre.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'SO requerido para laptop/desktop', path: ['sistema_operativo', 'nombre'] });
+    }
+    if (!val.ms_office?.nombre || val.ms_office.nombre.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'MS Office requerido para laptop/desktop', path: ['ms_office', 'nombre'] });
+    }
+    if (!val.antivirus?.nombre || val.antivirus.nombre.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Antivirus requerido para laptop/desktop', path: ['antivirus', 'nombre'] });
+    }
+  }
 });
 
 type HardwareFormData = z.infer<typeof hardwareSchema>;
@@ -137,6 +162,7 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
       sede: asset?.sede || '',
       area_encargada: asset?.area_encargada || '',
       persona_responsable: asset?.persona_responsable || '',
+      correo_responsable: asset?.correo_responsable || '',
       procesador: asset?.procesador || '',
       memoria_ram: asset?.memoria_ram || '',
       disco_duro: asset?.disco_duro || '',
@@ -364,13 +390,22 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
             </FormItem>
           )} />
         </div>
-        <FormField control={form.control} name="persona_responsable" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Persona Responsable</FormLabel>
-            <FormControl><Input {...field} /></FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
+        <div className="grid grid-cols-2 gap-4">
+          <FormField control={form.control} name="persona_responsable" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Persona Responsable</FormLabel>
+              <FormControl><Input {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="correo_responsable" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Correo del Responsable</FormLabel>
+              <FormControl><Input {...field} type="email" placeholder="correo@ejemplo.com" /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+        </div>
 
         {/* Sección 2: Hardware */}
         <h3 className="text-base font-semibold mb-2">Hardware</h3>

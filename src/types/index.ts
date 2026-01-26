@@ -65,6 +65,7 @@ export interface HardwareAsset {
   sede?: string
   area_encargada?: string
   persona_responsable?: string
+  correo_responsable?: string
   procesador?: string
   memoria_ram?: string
   disco_duro?: string
