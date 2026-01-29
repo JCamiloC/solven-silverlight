@@ -15,13 +15,14 @@ export default function ActaGeneratorModal({ hardwareAssetId, onCreated }: Props
   const [nombre, setNombre] = useState('')
   const [cedula, setCedula] = useState('')
 
-  const create = useCreateActa()
+  const { mutateAsync, status } = useCreateActa()
+  const isLoading = status === 'pending'
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const dataUrl = sigRef.current?.getDataURL()
     try {
-      const res: any = await create.mutateAsync({
+      const res: any = await mutateAsync({
         hardware_asset_id: hardwareAssetId,
         generador_nombre: nombre,
         generador_cedula: cedula,
@@ -57,7 +58,7 @@ export default function ActaGeneratorModal({ hardwareAssetId, onCreated }: Props
       </div>
 
       <div className="pt-2">
-        <Button type="submit" disabled={create.isLoading} className="w-full">Generar link y guardar</Button>
+        <Button type="submit" disabled={isLoading} className="w-full">Generar link y guardar</Button>
       </div>
     </form>
   )

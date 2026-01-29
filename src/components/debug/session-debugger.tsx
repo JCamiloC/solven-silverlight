@@ -110,8 +110,10 @@ export function SessionDebugger() {
     return `${mins}m ${secs}s`
   }
 
-  // Solo mostrar en desarrollo
-  if (process.env.NODE_ENV === 'production') return null
+  // Mostrar solo si la variable pública está presente y es 'true'.
+  // Esto permite ocultar temporalmente el Session Monitor para revisar cambios.
+  const showMonitor = process.env.NEXT_PUBLIC_SHOW_SESSION_MONITOR === 'true'
+  if (!showMonitor || process.env.NODE_ENV === 'production') return null
 
   return (
     <Card className="fixed bottom-4 right-4 w-80 shadow-lg border-2 z-50">

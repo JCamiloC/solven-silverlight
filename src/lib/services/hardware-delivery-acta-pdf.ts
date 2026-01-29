@@ -316,65 +316,124 @@ export class HardwareDeliveryActaPDF {
       const col1X = margin
       const col2X = pageWidth / 2 + 10
       const colWidth = (pageWidth - 2 * margin - 20) / 2
-      const signatureBoxHeight = 40
+      // Aumentamos la altura de la caja de firma y reservamos
+      // un área superior para la imagen y un área inferior para
+      // nombre y cédula, evitando que la imagen los tape.
+      const signatureBoxHeight = 70
 
-      // Columna Izquierda - Quien Entrega
-      doc.setDrawColor(100, 100, 100)
-      doc.setLineWidth(0.5)
-      doc.rect(col1X, yPos, colWidth, signatureBoxHeight)
-      
+      // Calcular áreas internas
+      const imageAreaHeight = signatureBoxHeight - 28 // dejar espacio para texto
+      const textAreaTopOffset = imageAreaHeight + 6
+
+      // Columna Izquierda - Quien Entrega (sin recuadro)
       doc.setFontSize(9)
       doc.setFont('helvetica', 'bold')
       doc.text('FIRMA DE QUIEN ENTREGA', col1X + colWidth / 2, yPos + 6, { align: 'center' })
-      
-      // Línea para firma
-      doc.setDrawColor(150, 150, 150)
-      doc.setLineWidth(0.3)
-      doc.line(col1X + 10, yPos + 25, col1X + colWidth - 10, yPos + 25)
-      
+
       doc.setFontSize(8)
       doc.setFont('helvetica', 'normal')
-      doc.text('Nombre:', col1X + 5, yPos + 30)
-      doc.text('_________________________________', col1X + 5, yPos + 34)
-      doc.text('Cédula:', col1X + 5, yPos + 38)
-      doc.text('_________________________________', col1X + 5, yPos + 42)
+      const nameYLeft = yPos + textAreaTopOffset + 6
+      const nameUnderlineYLeft = nameYLeft + 4
+      const cedulaYLeft = nameUnderlineYLeft + 6
+      const cedulaUnderlineYLeft = cedulaYLeft + 4
 
-      // Columna Derecha - Quien Recibe
-      doc.setDrawColor(100, 100, 100)
-      doc.setLineWidth(0.5)
-      doc.rect(col2X, yPos, colWidth, signatureBoxHeight)
-      
+      // Valores que ya existen en la sección superior
+      const entregaFirmaNombre = entregadoPor?.nombre || currentUserName || ''
+      const entregaFirmaCedula = entregadoPor?.cedula || ''
+
+      doc.text('Nombre:', col1X + 5, nameYLeft)
+      if (entregaFirmaNombre) {
+        // Mostrar el nombre encima de la línea
+        doc.setFont('helvetica', 'normal')
+        doc.text(this.truncateText(entregaFirmaNombre, 30), col1X + 5, nameYLeft + 3)
+      }
+      doc.text('_________________________________', col1X + 5, nameUnderlineYLeft)
+
+      doc.text('Cédula:', col1X + 5, cedulaYLeft)
+      if (entregaFirmaCedula) {
+        doc.setFont('helvetica', 'normal')
+        doc.text(entregaFirmaCedula, col1X + 5, cedulaYLeft + 3)
+      }
+      doc.text('_________________________________', col1X + 5, cedulaUnderlineYLeft)
+
+      // Columna Derecha - Quien Recibe (sin recuadro)
       doc.setFontSize(9)
       doc.setFont('helvetica', 'bold')
       doc.text('FIRMA DE QUIEN RECIBE', col2X + colWidth / 2, yPos + 6, { align: 'center' })
-      
-      // Línea para firma
-      doc.setDrawColor(150, 150, 150)
-      doc.setLineWidth(0.3)
-      doc.line(col2X + 10, yPos + 25, col2X + colWidth - 10, yPos + 25)
-      
+
       doc.setFontSize(8)
       doc.setFont('helvetica', 'normal')
-      doc.text('Nombre:', col2X + 5, yPos + 30)
-      doc.text('_________________________________', col2X + 5, yPos + 34)
-      doc.text('Cédula:', col2X + 5, yPos + 38)
-      doc.text('_________________________________', col2X + 5, yPos + 42)
+      const nameYRight = yPos + textAreaTopOffset + 6
+      const nameUnderlineYRight = nameYRight + 4
+      const cedulaYRight = nameUnderlineYRight + 6
+      const cedulaUnderlineYRight = cedulaYRight + 4
+
+      // Valores para quien recibe (calculados arriba en la función)
+      const recibeFirmaNombre = (data as any).recibidoPor?.nombre || hardware.persona_responsable || ''
+      const recibeFirmaCedula = (data as any).recibidoPor?.cedula || ''
+
+      doc.text('Nombre:', col2X + 5, nameYRight)
+      if (recibeFirmaNombre) {
+        doc.setFont('helvetica', 'normal')
+        doc.text(this.truncateText(recibeFirmaNombre, 30), col2X + 5, nameYRight + 3)
+      }
+      doc.text('_________________________________', col2X + 5, nameUnderlineYRight)
+
+      doc.text('Cédula:', col2X + 5, cedulaYRight)
+      if (recibeFirmaCedula) {
+        doc.setFont('helvetica', 'normal')
+        doc.text(recibeFirmaCedula, col2X + 5, cedulaYRight + 3)
+      }
+      doc.text('_________________________________', col2X + 5, cedulaUnderlineYRight)
 
       // Si se tienen imágenes de firma, intentar incrustarlas dentro de las cajas
       try {
         const genUrl = (data as any).generadorFirmaUrl || null
         const cliUrl = (data as any).clienteFirmaUrl || null
-        const imgWidth = Math.min(120, colWidth - 20)
-        const imgHeight = Math.min(40, signatureBoxHeight - 10)
+
+        // Ajustar anchura máxima de la imagen y altura para mantener ambas del mismo tamaño
+        const imgMaxWidth = Math.min(120, colWidth - 20)
+        const imgMaxHeight = imageAreaHeight - 6
+
+        // Helper: fetch image and return DataURL, adding cache-bust
+        const fetchImageAsDataUrl = async (url: string) => {
+          try {
+            const cacheUrl = url + (url.includes('?') ? '&' : '?') + `t=${Date.now()}`
+            const resp = await fetch(cacheUrl, { cache: 'no-store' })
+            if (!resp.ok) throw new Error('Failed to fetch image')
+            const blob = await resp.blob()
+            return await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader()
+              reader.onloadend = () => resolve(reader.result as string)
+              reader.onerror = reject
+              reader.readAsDataURL(blob)
+            })
+          } catch (err) {
+            console.warn('fetchImageAsDataUrl error', err)
+            return null
+          }
+        }
 
         if (genUrl) {
-          // Colocar imagen centrada en la caja izquierda
-          doc.addImage(genUrl, 'PNG', col1X + (colWidth - imgWidth) / 2, yPos + 4, imgWidth, imgHeight)
+          const dataUrl = await fetchImageAsDataUrl(genUrl)
+          if (dataUrl) {
+            const imgWidth = imgMaxWidth
+            const imgHeight = imgMaxHeight
+            const imgX = col1X + (colWidth - imgWidth) / 2
+            const imgY = yPos + 6
+            doc.addImage(dataUrl, 'PNG', imgX, imgY, imgWidth, imgHeight)
+          }
         }
 
         if (cliUrl) {
-          // Colocar imagen centrada en la caja derecha
-          doc.addImage(cliUrl, 'PNG', col2X + (colWidth - imgWidth) / 2, yPos + 4, imgWidth, imgHeight)
+          const dataUrl = await fetchImageAsDataUrl(cliUrl)
+          if (dataUrl) {
+            const imgWidth = imgMaxWidth
+            const imgHeight = imgMaxHeight
+            const imgX = col2X + (colWidth - imgWidth) / 2
+            const imgY = yPos + 6
+            doc.addImage(dataUrl, 'PNG', imgX, imgY, imgWidth, imgHeight)
+          }
         }
       } catch (e) {
         // Si la imagen no se puede cargar, no bloquear el flujo
@@ -398,7 +457,7 @@ export class HardwareDeliveryActaPDF {
       doc.text(`Generado el: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: es })}`, pageWidth / 2, footerY + 4, { align: 'center' })
 
       // Descargar PDF
-      const filename = `ActaEntrega_${hardware.name?.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd')}.pdf`
+      const filename = `ActaEntrega_${hardware.name?.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`
       doc.save(filename)
     } catch (error) {
       console.error('Error generating delivery acta PDF:', error)
@@ -452,5 +511,14 @@ export class HardwareDeliveryActaPDF {
     } catch {
       return 'No especificado'
     }
+  }
+
+  /**
+   * Helper: Trunca texto largo añadiendo elipsis
+   */
+  private static truncateText(text: string, maxLength: number): string {
+    if (!text) return ''
+    if (text.length <= maxLength) return text
+    return text.substring(0, maxLength - 1) + '…'
   }
 }
