@@ -59,6 +59,8 @@ import { HardwareLifesheetPDF } from '@/lib/services/hardware-lifesheet-pdf'
 import { HardwareDeliveryActaPDF } from '@/lib/services/hardware-delivery-acta-pdf'
 import { toast } from 'sonner'
 import { Progress } from '@/components/ui/progress'
+import ActasService from '@/services/actas'
+import ActaGeneratorModal from '@/components/actas/ActaGeneratorModal'
 
 interface HardwareTableProps {
   data: HardwareAsset[]
@@ -75,6 +77,8 @@ export function HardwareTable({ data, isLoading, clientId }: HardwareTableProps)
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const [pdfProgress, setPdfProgress] = useState(0)
   const [pdfProgressText, setPdfProgressText] = useState('')
+  const [showActaDialogFor, setShowActaDialogFor] = useState<HardwareAsset | null>(null)
+  const [actaLink, setActaLink] = useState<string | null>(null)
   
   const updateMutation = useUpdateHardware()
   const deleteMutation = useDeleteHardware()
@@ -302,43 +306,70 @@ export function HardwareTable({ data, isLoading, clientId }: HardwareTableProps)
         })
       }, 300)
 
-      setPdfProgress(30)
-      const hardware = await hardwareService.getById(asset.id)
+      // Buscar acta existente
+      setPdfProgress(10)
+      const existingActa = await ActasService.getByHardwareAssetId(asset.id)
 
-      if (!hardware) {
-        throw new Error('No se pudo obtener la información del hardware')
+      // Si existe y está completa, generar PDF con las firmas
+      if (existingActa && existingActa.estado_firma === 'completo') {
+        setPdfProgress(30)
+        const hardware = await hardwareService.getById(asset.id)
+
+        if (!hardware) throw new Error('No se pudo obtener la información del hardware')
+
+        setPdfProgressText('Generando documento PDF...')
+        setPdfProgress(70)
+
+        await HardwareDeliveryActaPDF.generateActa({
+          hardware,
+          entregadoPor: {
+            nombre: existingActa.generador_nombre || 'Silverlight Colombia',
+            cargo: 'Técnico de Soporte',
+            cedula: existingActa.generador_cedula || undefined,
+          },
+          recibidoPor: {
+            nombre: existingActa.cliente_nombre || hardware.persona_responsable || 'No especificado',
+            cedula: existingActa.cliente_cedula || undefined,
+          },
+          generadorFirmaUrl: existingActa.generador_firma_url || null,
+          clienteFirmaUrl: existingActa.cliente_firma_url || null,
+        })
+
+        clearInterval(progressInterval)
+        setPdfProgress(100)
+        setPdfProgressText('¡Completado!')
+
+        setTimeout(() => {
+          setGeneratingPDF(false)
+          setPdfProgress(0)
+          toast.success('Acta de Entrega generada', {
+            description: 'El PDF se ha descargado correctamente.',
+          })
+        }, 1000)
+
+        return
       }
 
-      setPdfProgressText('Generando documento PDF...')
-      setPdfProgress(70)
-
-      // Generar el acta con los datos
-      await HardwareDeliveryActaPDF.generateActa({
-        hardware,
-        entregadoPor: {
-          nombre: 'Silverlight Colombia',
-          cargo: 'Técnico de Soporte',
-        },
-      })
-
-      clearInterval(progressInterval)
-      setPdfProgress(100)
-      setPdfProgressText('¡Completado!')
-
-      setTimeout(() => {
+      // Si existe acta pero falta la firma del cliente, mostrar dialog con link
+      if (existingActa && existingActa.estado_firma !== 'completo') {
+        setActaLink(existingActa.link_temporal || null)
+        setShowActaDialogFor(asset)
         setGeneratingPDF(false)
-        setPdfProgress(0)
-        toast.success('Acta de Entrega generada', {
-          description: 'El PDF se ha descargado correctamente.',
-        })
-      }, 1000)
+        clearInterval(progressInterval)
+        return
+      }
+
+      // Si no existe acta, abrir modal para capturar firma del generador
+      setGeneratingPDF(false)
+      setShowActaDialogFor(asset)
+      clearInterval(progressInterval)
 
     } catch (error) {
       console.error('Error generating acta:', error)
       setGeneratingPDF(false)
       setPdfProgress(0)
       toast.error('Error al generar el Acta', {
-        description: 'No se pudo generar el documento.',
+        description: (error as Error)?.message || 'No se pudo generar el documento.',
       })
     }
   }
@@ -456,6 +487,40 @@ export function HardwareTable({ data, isLoading, clientId }: HardwareTableProps)
               onSuccess={() => setEditingAsset(null)}
               onCancel={() => setEditingAsset(null)}
             />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Acta Generator Dialog */}
+      <Dialog open={!!showActaDialogFor} onOpenChange={(open) => !open && setShowActaDialogFor(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Generar Acta de Entrega</DialogTitle>
+            <DialogDescription>
+              Completa los datos y firma para generar el link de firma del cliente.
+            </DialogDescription>
+          </DialogHeader>
+          {showActaDialogFor && (
+            <div>
+              <ActaGeneratorModal
+                hardwareAssetId={showActaDialogFor.id}
+                onCreated={(link) => {
+                  setActaLink(link)
+                  setShowActaDialogFor(null)
+                  toast.success('Link de firma generado')
+                }}
+              />
+
+              {actaLink && (
+                <div className="mt-4">
+                  <p className="text-sm">Link para que el cliente firme:</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <input className="flex-1" value={`${window.location.origin}/actas/${actaLink}`} readOnly />
+                    <Button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/actas/${actaLink}`)}>Copiar</Button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </DialogContent>
       </Dialog>

@@ -14,7 +14,13 @@ interface ActaDeliveryData {
     cargo: string
     cedula?: string
   }
+  recibidoPor?: {
+    nombre?: string
+    cedula?: string
+  }
   currentUserName?: string
+  generadorFirmaUrl?: string | null
+  clienteFirmaUrl?: string | null
 }
 
 export class HardwareDeliveryActaPDF {
@@ -89,19 +95,31 @@ export class HardwareDeliveryActaPDF {
       doc.text(`Nombre: ${entregadoPor.nombre || currentUserName || 'N/A'}`, margin + 5, yPos)
       yPos += 6
       doc.text(`Cargo: ${entregadoPor.cargo || 'Técnico de Soporte'}`, margin + 5, yPos)
-      yPos += 10
+      yPos += 6
+      if (entregadoPor.cedula) {
+        doc.text(`Cédula: ${entregadoPor.cedula}`, margin + 5, yPos)
+        yPos += 10
+      } else {
+        yPos += 4
+      }
 
       // Quien Recibe
       doc.setFont('helvetica', 'bold')
       doc.text('RECIBIDO POR:', margin, yPos)
       yPos += 6
       doc.setFont('helvetica', 'normal')
-      doc.text(`Nombre: ${hardware.persona_responsable || 'No especificado'}`, margin + 5, yPos)
+      const recibidoNombre = (data as any).recibidoPor?.nombre || hardware.persona_responsable || 'No especificado'
+      const recibidoCedula = (data as any).recibidoPor?.cedula || null
+      doc.text(`Nombre: ${recibidoNombre}`, margin + 5, yPos)
       yPos += 6
+      if (recibidoCedula) {
+        doc.text(`Cédula: ${recibidoCedula}`, margin + 5, yPos)
+        yPos += 6
+      }
       doc.text(`Área: ${hardware.area_encargada || 'No especificada'}`, margin + 5, yPos)
       yPos += 6
       doc.text(`Sede: ${hardware.sede || 'No especificada'}`, margin + 5, yPos)
-      yPos += 15
+      yPos += 6
 
       // Línea divisoria
       doc.setDrawColor(200, 200, 200)
@@ -341,6 +359,27 @@ export class HardwareDeliveryActaPDF {
       doc.text('_________________________________', col2X + 5, yPos + 34)
       doc.text('Cédula:', col2X + 5, yPos + 38)
       doc.text('_________________________________', col2X + 5, yPos + 42)
+
+      // Si se tienen imágenes de firma, intentar incrustarlas dentro de las cajas
+      try {
+        const genUrl = (data as any).generadorFirmaUrl || null
+        const cliUrl = (data as any).clienteFirmaUrl || null
+        const imgWidth = Math.min(120, colWidth - 20)
+        const imgHeight = Math.min(40, signatureBoxHeight - 10)
+
+        if (genUrl) {
+          // Colocar imagen centrada en la caja izquierda
+          doc.addImage(genUrl, 'PNG', col1X + (colWidth - imgWidth) / 2, yPos + 4, imgWidth, imgHeight)
+        }
+
+        if (cliUrl) {
+          // Colocar imagen centrada en la caja derecha
+          doc.addImage(cliUrl, 'PNG', col2X + (colWidth - imgWidth) / 2, yPos + 4, imgWidth, imgHeight)
+        }
+      } catch (e) {
+        // Si la imagen no se puede cargar, no bloquear el flujo
+        console.warn('No se pudo incrustar imagen de firma en PDF', e)
+      }
 
       yPos += signatureBoxHeight + 15
 
