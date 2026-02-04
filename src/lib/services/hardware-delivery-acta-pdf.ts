@@ -21,8 +21,14 @@ interface ActaDeliveryData {
     cedula?: string
   }
   currentUserName?: string
-  generadorFirmaUrl?: string | null
-  clienteFirmaUrl?: string | null
+  // Datos de la empresa cliente
+  empresaCliente?: {
+    nombre: string
+    nit: string
+  }
+  // TEMPORALMENTE COMENTADO - Firmas digitales
+  // generadorFirmaUrl?: string | null
+  // clienteFirmaUrl?: string | null
 }
 
 export class HardwareDeliveryActaPDF {
@@ -77,51 +83,35 @@ export class HardwareDeliveryActaPDF {
       yPos += 10
 
       // ==========================================
-      // INFORMACIÓN DE ENTREGA Y RECEPCIÓN
+      // INFORMACIÓN DE ENTREGA (EMPRESA)
       // ==========================================
       doc.setFontSize(13)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(41, 128, 185)
-      doc.text('DATOS DE ENTREGA Y RECEPCIÓN', margin, yPos)
+      doc.text('DATOS DE ENTREGA', margin, yPos)
       yPos += 8
 
       doc.setTextColor(0, 0, 0)
       doc.setFontSize(11)
       doc.setFont('helvetica', 'normal')
 
-      // Quien Entrega
+      // Empresa que Entrega
       doc.setFont('helvetica', 'bold')
       doc.text('ENTREGADO POR:', margin, yPos)
       yPos += 6
       doc.setFont('helvetica', 'normal')
-      doc.text(`Nombre: ${entregadoPor.nombre || currentUserName || 'N/A'}`, margin + 5, yPos)
+      
+      console.log('Datos recibidos en PDF - empresaCliente:', data.empresaCliente)
+      
+      const empresaNombre = data.empresaCliente?.nombre || 'SILVERLIGHT COLOMBIA'
+      const empresaNit = data.empresaCliente?.nit || 'No especificado'
+      
+      console.log('NIT asignado en PDF:', empresaNit)
+      
+      doc.text(`Empresa: ${empresaNombre}`, margin + 5, yPos)
       yPos += 6
-      doc.text(`Cargo: ${entregadoPor.cargo || 'Técnico de Soporte'}`, margin + 5, yPos)
-      yPos += 6
-      if (entregadoPor.cedula) {
-        doc.text(`Cédula: ${entregadoPor.cedula}`, margin + 5, yPos)
-        yPos += 10
-      } else {
-        yPos += 4
-      }
-
-      // Quien Recibe
-      doc.setFont('helvetica', 'bold')
-      doc.text('RECIBIDO POR:', margin, yPos)
-      yPos += 6
-      doc.setFont('helvetica', 'normal')
-      const recibidoNombre = (data as any).recibidoPor?.nombre || hardware.persona_responsable || 'No especificado'
-      const recibidoCedula = (data as any).recibidoPor?.cedula || null
-      doc.text(`Nombre: ${recibidoNombre}`, margin + 5, yPos)
-      yPos += 6
-      if (recibidoCedula) {
-        doc.text(`Cédula: ${recibidoCedula}`, margin + 5, yPos)
-        yPos += 6
-      }
-      doc.text(`Área: ${hardware.area_encargada || 'No especificada'}`, margin + 5, yPos)
-      yPos += 6
-      doc.text(`Sede: ${hardware.sede || 'No especificada'}`, margin + 5, yPos)
-      yPos += 6
+      doc.text(`NIT: ${empresaNit}`, margin + 5, yPos)
+      yPos += 10
 
       // Línea divisoria
       doc.setDrawColor(200, 200, 200)
@@ -327,67 +317,58 @@ export class HardwareDeliveryActaPDF {
       const imageAreaHeight = signatureBoxHeight - 28 // dejar espacio para texto
       const textAreaTopOffset = imageAreaHeight + 6
 
-      // Columna Izquierda - Quien Entrega (sin recuadro)
+      // Columna Izquierda - Quien Entrega (Empresa)
       doc.setFontSize(9)
       doc.setFont('helvetica', 'bold')
       doc.text('FIRMA DE QUIEN ENTREGA', col1X + colWidth / 2, yPos + 6, { align: 'center' })
 
       doc.setFontSize(8)
       doc.setFont('helvetica', 'normal')
-      const nameYLeft = yPos + textAreaTopOffset + 6
+      const nameYLeft = yPos + 20
       const nameUnderlineYLeft = nameYLeft + 4
       const cedulaYLeft = nameUnderlineYLeft + 6
       const cedulaUnderlineYLeft = cedulaYLeft + 4
 
-      // Valores que ya existen en la sección superior
-      const entregaFirmaNombre = entregadoPor?.nombre || currentUserName || ''
-      const entregaFirmaCedula = entregadoPor?.cedula || ''
+      // Mostrar datos de la empresa
+      const empresaNombreFirma = data.empresaCliente?.nombre || 'SILVERLIGHT COLOMBIA'
+      const empresaNitFirma = data.empresaCliente?.nit || 'No especificado'
 
-      doc.text('Nombre:', col1X + 5, nameYLeft)
-      if (entregaFirmaNombre) {
-        // Mostrar el nombre encima de la línea
-        doc.setFont('helvetica', 'normal')
-        doc.text(this.truncateText(entregaFirmaNombre, 30), col1X + 5, nameYLeft + 3)
-      }
+      doc.text('Empresa:', col1X + 5, nameYLeft)
+      doc.setFont('helvetica', 'bold')
+      doc.text(this.truncateText(empresaNombreFirma, 30), col1X + 5, nameYLeft + 3)
+      doc.setFont('helvetica', 'normal')
       doc.text('_________________________________', col1X + 5, nameUnderlineYLeft)
 
-      doc.text('Cédula:', col1X + 5, cedulaYLeft)
-      if (entregaFirmaCedula) {
-        doc.setFont('helvetica', 'normal')
-        doc.text(entregaFirmaCedula, col1X + 5, cedulaYLeft + 3)
-      }
+      doc.text('NIT:', col1X + 5, cedulaYLeft)
+      doc.setFont('helvetica', 'bold')
+      doc.text(empresaNitFirma, col1X + 5, cedulaYLeft + 3)
+      doc.setFont('helvetica', 'normal')
       doc.text('_________________________________', col1X + 5, cedulaUnderlineYLeft)
 
-      // Columna Derecha - Quien Recibe (sin recuadro)
+      // Columna Derecha - Quien Recibe (Espacios en blanco para llenar manualmente)
       doc.setFontSize(9)
       doc.setFont('helvetica', 'bold')
       doc.text('FIRMA DE QUIEN RECIBE', col2X + colWidth / 2, yPos + 6, { align: 'center' })
 
       doc.setFontSize(8)
       doc.setFont('helvetica', 'normal')
-      const nameYRight = yPos + textAreaTopOffset + 6
+      const nameYRight = yPos + 20
       const nameUnderlineYRight = nameYRight + 4
       const cedulaYRight = nameUnderlineYRight + 6
       const cedulaUnderlineYRight = cedulaYRight + 4
 
-      // Valores para quien recibe (calculados arriba en la función)
-      const recibeFirmaNombre = (data as any).recibidoPor?.nombre || hardware.persona_responsable || ''
-      const recibeFirmaCedula = (data as any).recibidoPor?.cedula || ''
-
+      // Dejar espacios en blanco para completar manualmente
       doc.text('Nombre:', col2X + 5, nameYRight)
-      if (recibeFirmaNombre) {
-        doc.setFont('helvetica', 'normal')
-        doc.text(this.truncateText(recibeFirmaNombre, 30), col2X + 5, nameYRight + 3)
-      }
       doc.text('_________________________________', col2X + 5, nameUnderlineYRight)
 
       doc.text('Cédula:', col2X + 5, cedulaYRight)
-      if (recibeFirmaCedula) {
-        doc.setFont('helvetica', 'normal')
-        doc.text(recibeFirmaCedula, col2X + 5, cedulaYRight + 3)
-      }
       doc.text('_________________________________', col2X + 5, cedulaUnderlineYRight)
 
+      // ==========================================
+      // CÓDIGO DE FIRMAS DIGITALES TEMPORALMENTE COMENTADO
+      // ==========================================
+      // TODO: Implementar firmas digitales completas en el futuro
+      /*
       // Si se tienen imágenes de firma, intentar incrustarlas dentro de las cajas
       try {
         const genUrl = (data as any).generadorFirmaUrl || null
@@ -441,6 +422,7 @@ export class HardwareDeliveryActaPDF {
         // Si la imagen no se puede cargar, no bloquear el flujo
         console.warn('No se pudo incrustar imagen de firma en PDF', e)
       }
+      */
 
       yPos += signatureBoxHeight + 15
 

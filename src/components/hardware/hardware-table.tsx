@@ -306,6 +306,11 @@ export function HardwareTable({ data, isLoading, clientId }: HardwareTableProps)
         })
       }, 300)
 
+      // ==========================================
+      // FLUJO DE FIRMAS TEMPORALMENTE COMENTADO
+      // ==========================================
+      // TODO: Reactivar cuando se implemente completamente el sistema de firmas
+      /*
       // Buscar acta existente
       setPdfProgress(10)
       const existingActa = await ActasService.getByHardwareAssetId(asset.id)
@@ -317,11 +322,37 @@ export function HardwareTable({ data, isLoading, clientId }: HardwareTableProps)
 
         if (!hardware) throw new Error('No se pudo obtener la información del hardware')
 
+        setPdfProgressText('Obteniendo información del cliente...')
+        setPdfProgress(50)
+
+        // Obtener información del cliente para mostrar en el PDF
+        let empresaCliente = undefined
+        if (hardware.client_id) {
+          try {
+            const { supabase } = await import('@/lib/supabase/client')
+            const { data: clientData } = await supabase
+              .from('clients')
+              .select('name, nit')
+              .eq('id', hardware.client_id)
+              .single()
+            
+            if (clientData) {
+              empresaCliente = {
+                nombre: clientData.name,
+                nit: clientData.nit || 'No especificado'
+              }
+            }
+          } catch (error) {
+            console.warn('Error obteniendo datos del cliente:', error)
+          }
+        }
+
         setPdfProgressText('Generando documento PDF...')
         setPdfProgress(70)
 
         await HardwareDeliveryActaPDF.generateActa({
           hardware,
+          empresaCliente,
           entregadoPor: {
             nombre: existingActa.generador_nombre || 'Silverlight Colombia',
             cargo: 'Técnico de Soporte',
@@ -331,8 +362,9 @@ export function HardwareTable({ data, isLoading, clientId }: HardwareTableProps)
             nombre: existingActa.cliente_nombre || hardware.persona_responsable || 'No especificado',
             cedula: existingActa.cliente_cedula || undefined,
           },
-          generadorFirmaUrl: existingActa.generador_firma_url || null,
-          clienteFirmaUrl: existingActa.cliente_firma_url || null,
+          // TEMPORALMENTE COMENTADO - Firmas digitales
+          // generadorFirmaUrl: existingActa.generador_firma_url || null,
+          // clienteFirmaUrl: existingActa.cliente_firma_url || null,
         })
 
         clearInterval(progressInterval)
@@ -363,6 +395,72 @@ export function HardwareTable({ data, isLoading, clientId }: HardwareTableProps)
       setGeneratingPDF(false)
       setShowActaDialogFor(asset)
       clearInterval(progressInterval)
+      */
+
+      // ==========================================
+      // GENERACIÓN DIRECTA DE PDF (SIN FIRMAS)
+      // ==========================================
+      setPdfProgress(30)
+      const hardware = await hardwareService.getById(asset.id)
+
+      if (!hardware) throw new Error('No se pudo obtener la información del hardware')
+
+      setPdfProgressText('Obteniendo información del cliente...')
+      setPdfProgress(50)
+
+      // Obtener información del cliente para mostrar en el PDF
+      let empresaCliente = undefined
+      if (hardware.client_id) {
+        try {
+          const { createClient } = await import('@/lib/supabase/client')
+          const supabase = createClient()
+          const { data: clientData, error } = await supabase
+            .from('clients')
+            .select('name, nit')
+            .eq('id', hardware.client_id)
+            .single()
+          
+          console.log('Datos del cliente consultados:', clientData)
+          console.log('Error en consulta:', error)
+          
+          if (clientData) {
+            empresaCliente = {
+              nombre: clientData.name,
+              nit: clientData.nit || 'No especificado'
+            }
+            console.log('empresaCliente asignado:', empresaCliente)
+          }
+        } catch (error) {
+          console.warn('Error obteniendo datos del cliente:', error)
+        }
+      }
+
+      setPdfProgressText('Generando documento PDF...')
+      setPdfProgress(70)
+
+      await HardwareDeliveryActaPDF.generateActa({
+        hardware,
+        empresaCliente,
+        entregadoPor: {
+          nombre: 'Por definir',
+          cargo: 'Técnico de Soporte',
+        },
+        recibidoPor: {
+          nombre: hardware.persona_responsable || undefined,
+        },
+      })
+
+      clearInterval(progressInterval)
+      setPdfProgress(100)
+      setPdfProgressText('¡Completado!')
+
+      setTimeout(() => {
+        setGeneratingPDF(false)
+        setPdfProgress(0)
+        toast.success('Acta de Entrega generada', {
+          description: 'El PDF se ha descargado correctamente.',
+        })
+      }, 1000)
 
     } catch (error) {
       console.error('Error generating acta:', error)

@@ -1,15 +1,347 @@
 'use client'
 
+import { useState } from 'react'
 import { ProtectedRoute } from '@/components/auth/protected-route'
-import { UnderConstruction } from '@/components/ui/under-construction'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+import { FileDown, FileSpreadsheet, Loader2, FileText } from 'lucide-react'
+import { useClients } from '@/hooks/use-clients'
+import { useMaintenanceReport, useExportMaintenancePDF, useExportMaintenanceExcel } from '@/hooks/use-maintenance-reports'
+import { MaintenanceReportFilters } from '@/types'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+
+type ReportType = 'mantenimiento' | null
 
 export default function ReportsPage() {
+  const currentYear = new Date().getFullYear()
+  const currentMonth = new Date().getMonth() + 1
+
+  const [selectedReport, setSelectedReport] = useState<ReportType>(null)
+
+  const [filters, setFilters] = useState<MaintenanceReportFilters>({
+    reportType: 'hardware',
+    clientId: '',
+    year: currentYear,
+    month: currentMonth,
+  })
+
+  const [shouldFetch, setShouldFetch] = useState(false)
+
+  const { data: clients } = useClients()
+  const { data: reportData, isLoading, isFetching } = useMaintenanceReport(filters, shouldFetch)
+  const exportPDF = useExportMaintenancePDF()
+  const exportExcel = useExportMaintenanceExcel()
+
+  const selectedClient = clients?.find(c => c.id === filters.clientId)
+
+  const handleGenerateReport = () => {
+    if (!filters.clientId) return
+    setShouldFetch(true)
+  }
+
+  const handleExportPDF = () => {
+    if (!reportData || !selectedClient) return
+    exportPDF.mutate({
+      rows: reportData,
+      clientName: selectedClient.name,
+      month: filters.month,
+      year: filters.year,
+    })
+  }
+
+  const handleExportExcel = () => {
+    if (!reportData || !selectedClient) return
+    exportExcel.mutate({
+      rows: reportData,
+      clientName: selectedClient.name,
+      month: filters.month,
+      year: filters.year,
+    })
+  }
+
+  const months = [
+    { value: 1, label: 'Enero' },
+    { value: 2, label: 'Febrero' },
+    { value: 3, label: 'Marzo' },
+    { value: 4, label: 'Abril' },
+    { value: 5, label: 'Mayo' },
+    { value: 6, label: 'Junio' },
+    { value: 7, label: 'Julio' },
+    { value: 8, label: 'Agosto' },
+    { value: 9, label: 'Septiembre' },
+    { value: 10, label: 'Octubre' },
+    { value: 11, label: 'Noviembre' },
+    { value: 12, label: 'Diciembre' },
+  ]
+
+  const years = Array.from({ length: 5 }, (_, i) => currentYear - i)
+
   return (
     <ProtectedRoute allowedRoles={['administrador', 'lider_soporte']}>
-      <UnderConstruction 
-        moduleName="Reportes y Análisis"
-        description="Reportes personalizados, dashboards y análisis de datos"
-      />
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Reportes</h2>
+          <p className="text-muted-foreground">
+            Genera reportes personalizados según tus necesidades
+          </p>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Tipo de Reporte</CardTitle>
+            <CardDescription>
+              Selecciona el tipo de reporte que deseas generar
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card 
+                className={`cursor-pointer transition-all hover:shadow-md ${selectedReport === 'mantenimiento' ? 'ring-2 ring-primary' : ''}`}
+                onClick={() => {
+                  setSelectedReport('mantenimiento')
+                  setShouldFetch(false)
+                }}
+              >
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center text-center space-y-2">
+                    <FileText className="h-12 w-12 text-primary" />
+                    <h3 className="font-semibold text-lg">Reporte de Mantenimiento</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Genera reportes de mantenimientos realizados por cliente y período
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="cursor-not-allowed opacity-50">
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center text-center space-y-2">
+                    <FileText className="h-12 w-12 text-muted-foreground" />
+                    <h3 className="font-semibold text-lg">Otros Reportes</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Próximamente disponibles
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </CardContent>
+        </Card>
+
+        {selectedReport === 'mantenimiento' && (
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle>Filtros de Reporte</CardTitle>
+                <CardDescription>
+                  Selecciona el módulo, cliente y período para generar el informe
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label>Módulo</Label>
+                    <Select
+                      value={filters.reportType}
+                      onValueChange={(value: any) => {
+                        setFilters({ ...filters, reportType: value })
+                        setShouldFetch(false)
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hardware">Hardware</SelectItem>
+                        <SelectItem value="software" disabled>Software (Próximamente)</SelectItem>
+                        <SelectItem value="accesos" disabled>Accesos (Próximamente)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Cliente</Label>
+                    <Select
+                      value={filters.clientId}
+                      onValueChange={(value) => {
+                        setFilters({ ...filters, clientId: value })
+                        setShouldFetch(false)
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un cliente" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clients?.map((client) => (
+                          <SelectItem key={client.id} value={client.id}>
+                            {client.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Año</Label>
+                    <Select
+                      value={filters.year.toString()}
+                      onValueChange={(value) => {
+                        setFilters({ ...filters, year: parseInt(value) })
+                        setShouldFetch(false)
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {years.map((year) => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Mes</Label>
+                    <Select
+                      value={filters.month.toString()}
+                      onValueChange={(value) => {
+                        setFilters({ ...filters, month: parseInt(value) })
+                        setShouldFetch(false)
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {months.map((month) => (
+                          <SelectItem key={month.value} value={month.value.toString()}>
+                            {month.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleGenerateReport}
+                    disabled={!filters.clientId || isLoading || isFetching}
+                  >
+                    {(isLoading || isFetching) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Generar Reporte
+                  </Button>
+
+                  {reportData && reportData.length > 0 && (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={handleExportPDF}
+                        disabled={exportPDF.isPending}
+                      >
+                        {exportPDF.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileDown className="mr-2 h-4 w-4" />
+                        )}
+                        Exportar PDF
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        onClick={handleExportExcel}
+                        disabled={exportExcel.isPending}
+                      >
+                        {exportExcel.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileSpreadsheet className="mr-2 h-4 w-4" />
+                        )}
+                        Exportar Excel
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {reportData && reportData.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Resultados del Reporte</CardTitle>
+                  <CardDescription>
+                    {reportData.length} registro(s) encontrado(s) para {selectedClient?.name} - {months.find(m => m.value === filters.month)?.label} {filters.year}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">#</TableHead>
+                          <TableHead>Usuario</TableHead>
+                          <TableHead>Nombre</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Procesador</TableHead>
+                          <TableHead>RAM</TableHead>
+                          <TableHead>Disco</TableHead>
+                          <TableHead>Pantalla</TableHead>
+                          <TableHead>Office</TableHead>
+                          <TableHead>Antivirus</TableHead>
+                          <TableHead>S.O.</TableHead>
+                          <TableHead className="min-w-[200px]">Detalle</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reportData.map((row) => (
+                          <TableRow key={row.rowNumber}>
+                            <TableCell className="font-medium">{row.rowNumber}</TableCell>
+                            <TableCell>{row.usuario}</TableCell>
+                            <TableCell>{row.equipoNombre}</TableCell>
+                            <TableCell>{row.tipo}</TableCell>
+                            <TableCell>{row.procesador}</TableCell>
+                            <TableCell>{row.ram}</TableCell>
+                            <TableCell>{row.disco}</TableCell>
+                            <TableCell>{row.tipoPantalla}</TableCell>
+                            <TableCell>{row.office}</TableCell>
+                            <TableCell>{row.antivirus}</TableCell>
+                            <TableCell>{row.sistemaOperativo}</TableCell>
+                            <TableCell className="max-w-[300px] truncate" title={row.detalleSeguimiento}>
+                              {row.detalleSeguimiento}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {reportData && reportData.length === 0 && shouldFetch && !isLoading && (
+              <Card>
+                <CardContent className="py-10">
+                  <div className="text-center text-muted-foreground">
+                    <p>No se encontraron registros de mantenimiento para este cliente y período.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )}
+      </div>
     </ProtectedRoute>
   )
 }

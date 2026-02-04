@@ -115,6 +115,7 @@ export interface HardwareSeguimiento {
   created_at: string
   updated_at: string
   creator?: Profile
+  hardware?: HardwareAsset
 }
 
 export interface HardwareUpgrade {
@@ -159,6 +160,29 @@ export interface SoftwareLicense {
   status: 'active' | 'expired' | 'cancelled'
   created_at: string
   updated_at: string
+}
+
+export interface MaintenanceReportFilters {
+  reportType: 'hardware' | 'software' | 'accesos'
+  clientId: string
+  year: number
+  month: number
+}
+
+export interface MaintenanceReportRow {
+  rowNumber: number
+  usuario: string
+  equipoNombre: string
+  tipo: string
+  procesador: string
+  ram: string
+  disco: string
+  tipoPantalla: string
+  office: string
+  antivirus: string
+  sistemaOperativo: string
+  detalleSeguimiento: string
+  fechaSeguimiento: string
 }
 
 export interface CustomApplication {
