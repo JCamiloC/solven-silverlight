@@ -3,6 +3,8 @@ import { MaintenanceReportFilters, MaintenanceReportRow } from '@/types'
 import { getSoftwareDisplayName } from '@/lib/utils'
 import { startOfMonth, endOfMonth, format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, BorderStyle } from 'docx'
+import { saveAs } from 'file-saver'
 
 const supabase = createClient()
 
@@ -198,67 +200,394 @@ export class MaintenanceReportService {
   }
 
   /**
-   * Exporta el reporte a Excel
+   * Exporta el reporte a Word (.docx) con formato completo
    */
-  static async exportToExcel(
+  static async exportToWord(
     rows: MaintenanceReportRow[],
     clientName: string,
     month: number,
     year: number
   ): Promise<void> {
     try {
-      const XLSX = await import('xlsx')
-      const { saveAs } = await import('file-saver')
+      const monthName = format(new Date(year, month - 1), 'MMMM', { locale: es })
+      const monthNameCap = monthName.charAt(0).toUpperCase() + monthName.slice(1)
 
-      const monthName = format(new Date(year, month - 1), 'MMMM yyyy', { locale: es })
+      // TODO: Agregar logo cuando el usuario especifique la ruta
+      // const logoPath = '/logos/silverlight-logo.png'
+      // const logoBuffer = await fetch(logoPath).then(r => r.arrayBuffer())
 
-      // Preparar datos
-      const data = rows.map(row => ({
-        '#': row.rowNumber,
-        'Usuario': row.usuario,
-        'Nombre Equipo': row.equipoNombre,
-        'Tipo': row.tipo,
-        'Procesador': row.procesador,
-        'RAM': row.ram,
-        'Disco': row.disco,
-        'Pantalla': row.tipoPantalla,
-        'Office': row.office,
-        'Antivirus': row.antivirus,
-        'Sistema Operativo': row.sistemaOperativo,
-        'Detalle Mantenimiento': row.detalleSeguimiento,
-      }))
+      const doc = new Document({
+        sections: [{
+          properties: {
+            page: {
+              margin: {
+                top: 1440,    // 1 pulgada
+                right: 1440,
+                bottom: 1440,
+                left: 1440,
+              },
+            },
+          },
+          children: [
+            // TÍTULO PRINCIPAL
+            new Paragraph({
+              text: 'MANTENIMIENTO DE INFRAESTRUCTURA',
+              heading: HeadingLevel.HEADING_1,
+              alignment: AlignmentType.CENTER,
+              spacing: {
+                after: 200,
+              },
+            }),
 
-      // Crear workbook
-      const ws = XLSX.utils.json_to_sheet(data)
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Mantenimiento')
+            // FECHA
+            new Paragraph({
+              text: `${monthNameCap} ${year}`,
+              alignment: AlignmentType.CENTER,
+              spacing: {
+                after: 400,
+              },
+            }),
 
-      // Ajustar anchos de columna
-      const colWidths = [
-        { wch: 5 },  // #
-        { wch: 20 }, // Usuario
-        { wch: 25 }, // Nombre
-        { wch: 15 }, // Tipo
-        { wch: 25 }, // Procesador
-        { wch: 15 }, // RAM
-        { wch: 15 }, // Disco
-        { wch: 15 }, // Pantalla
-        { wch: 20 }, // Office
-        { wch: 20 }, // Antivirus
-        { wch: 20 }, // S.O.
-        { wch: 50 }, // Detalle
-      ]
-      ws['!cols'] = colWidths
+            // 1. ANTECEDENTES
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: '1. ANTECEDENTES',
+                  bold: true,
+                  size: 24,
+                }),
+              ],
+              spacing: {
+                before: 200,
+                after: 200,
+              },
+            }),
 
-      // Generar archivo
-      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-      
-      const filename = `Reporte_Mantenimiento_${clientName.replace(/\s+/g, '_')}_${monthName.replace(/\s+/g, '_')}.xlsx`
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `${clientName} `,
+                  bold: true,
+                }),
+                new TextRun({
+                  text: 'posee una cantidad importante de terminales dentro de sus equipos de cómputo a las cuales hace varios meses no se les realiza una jornada mantenimiento, por lo tanto, se decidió ejecutar una sesión de mantenimientos preventivos en los cuales intervenimos las maquinas en diferentes modalidades, donde cubrimos aspectos como parámetros de limpieza física, revisión de antivirus, desinstalación de componentes no permitidos, instalación y corrección de actualizaciones, optimización de sistemas operativos y eliminación de archivos temporales que pudiesen afectar la experiencia de trabajo de los colaboradores, garantizando así el correcto funcionamiento y prolongar la vida útil de los dispositivos.',
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: {
+                after: 400,
+              },
+            }),
+
+            // 2. PROCEDIMIENTO
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: '2. PROCEDIMIENTO',
+                  bold: true,
+                  size: 24,
+                }),
+              ],
+              spacing: {
+                before: 200,
+                after: 200,
+              },
+            }),
+
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: 'Desde SILVERLIGHT COLOMBIA planteamos el diseño de un plan estratégico de trabajo con un cronograma que se cumplió según lo acordado, el cual nos permitió identificar varias oportunidades de mejora con base en los problemas existentes y con el fin de dar oportuna solución uno a uno, empezando con la ejecución de tareas tales como:',
+                }),
+              ],
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: {
+                after: 200,
+              },
+            }),
+
+            // Viñeta 1: Limpieza de equipos
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: 'Limpieza de equipos: ',
+                  bold: true,
+                }),
+                new TextRun({
+                  text: 'Este procedimiento permite, a nivel interno, que el polvo acumulado por mucho tiempo dentro de la CPU sea evacuado, además de realizar un cambio de solución térmica y limpieza en board y componentes lógicos, lo cual ayuda a que los ventiladores de la maquina trabajen mucho mejor y su temperatura de trabajo se mantenga en índices óptimos, dándole una vida útil más amplia al equipo. Adicionalmente, a nivel externo, se efectúa la limpieza de las pantallas, teclados y mouse de cada estación para descontaminar el área de trabajo de cada usuario.',
+                }),
+              ],
+              bullet: {
+                level: 0,
+              },
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: {
+                after: 200,
+              },
+            }),
+
+            // Viñeta 2: Ciberseguridad
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: 'Ciberseguridad: ',
+                  bold: true,
+                }),
+                new TextRun({
+                  text: 'Se procede con la ejecución del sistema antivirus, haciendo que el programa efectúe un análisis de cada máquina y verifique, si hay alguna amenaza, esta sea detectada y eliminada, además de hacer ajustes en los estándares de seguridad de la información según la operación lo requiera.',
+                }),
+              ],
+              bullet: {
+                level: 0,
+              },
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: {
+                after: 200,
+              },
+            }),
+
+            // Viñeta 3: Optimización
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: 'Optimización del sistema operativo: ',
+                  bold: true,
+                }),
+                new TextRun({
+                  text: 'Se procede a realizar un mantenimiento del software que consta de la eliminación de archivos temporales y residuales producto de actualizaciones, navegadores e incluso el mismo procesamiento de datos, hasta la eliminación de programas no utilizados y configuración/actualización en los diferentes programas para acelerar rendimiento del ordenador y verificar la estabilidad y fiabilidad del equipo.',
+                }),
+              ],
+              bullet: {
+                level: 0,
+              },
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: {
+                after: 200,
+              },
+            }),
+
+            // Viñeta 4: Licenciamientos
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: 'Licenciamientos: ',
+                  bold: true,
+                }),
+                new TextRun({
+                  text: 'Posteriormente se revisan las licencias de antivirus en todos los equipos y se ejecutan análisis de virus; Por último se revisan las actualizaciones de Windows y su respectivo licenciamiento.',
+                }),
+              ],
+              bullet: {
+                level: 0,
+              },
+              alignment: AlignmentType.JUSTIFIED,
+              spacing: {
+                after: 400,
+              },
+            }),
+
+            // TABLA DE DATOS
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: '3. DETALLE DE MANTENIMIENTOS REALIZADOS',
+                  bold: true,
+                  size: 24,
+                }),
+              ],
+              spacing: {
+                before: 200,
+                after: 200,
+              },
+            }),
+
+            new Table({
+              width: {
+                size: 100,
+                type: WidthType.PERCENTAGE,
+              },
+              rows: [
+                // Header
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph({ text: '#', alignment: AlignmentType.CENTER })],
+                      shading: { fill: '2980b9' },
+                      width: { size: 5, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: 'Usuario', alignment: AlignmentType.CENTER })],
+                      shading: { fill: '2980b9' },
+                      width: { size: 12, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: 'Nombre', alignment: AlignmentType.CENTER })],
+                      shading: { fill: '2980b9' },
+                      width: { size: 12, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: 'Tipo', alignment: AlignmentType.CENTER })],
+                      shading: { fill: '2980b9' },
+                      width: { size: 8, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: 'Procesador', alignment: AlignmentType.CENTER })],
+                      shading: { fill: '2980b9' },
+                      width: { size: 15, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: 'RAM', alignment: AlignmentType.CENTER })],
+                      shading: { fill: '2980b9' },
+                      width: { size: 8, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: 'Disco', alignment: AlignmentType.CENTER })],
+                      shading: { fill: '2980b9' },
+                      width: { size: 8, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: 'Pantalla', alignment: AlignmentType.CENTER })],
+                      shading: { fill: '2980b9' },
+                      width: { size: 8, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: 'Office', alignment: AlignmentType.CENTER })],
+                      shading: { fill: '2980b9' },
+                      width: { size: 8, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: 'Antivirus', alignment: AlignmentType.CENTER })],
+                      shading: { fill: '2980b9' },
+                      width: { size: 8, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: 'S.O.', alignment: AlignmentType.CENTER })],
+                      shading: { fill: '2980b9' },
+                      width: { size: 8, type: WidthType.PERCENTAGE },
+                    }),
+                  ],
+                }),
+                // Data rows
+                ...rows.map((row, index) => new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph({ text: row.rowNumber.toString(), alignment: AlignmentType.CENTER })],
+                      shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: row.usuario })],
+                      shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: row.equipoNombre })],
+                      shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: row.tipo })],
+                      shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: row.procesador })],
+                      shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: row.ram })],
+                      shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: row.disco })],
+                      shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: row.tipoPantalla })],
+                      shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: row.office })],
+                      shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: row.antivirus })],
+                      shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: row.sistemaOperativo })],
+                      shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
+                    }),
+                  ],
+                })),
+              ],
+            }),
+
+            // DETALLE DE SEGUIMIENTOS (Segunda tabla)
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: '4. OBSERVACIONES DETALLADAS',
+                  bold: true,
+                  size: 24,
+                }),
+              ],
+              spacing: {
+                before: 400,
+                after: 200,
+              },
+            }),
+
+            new Table({
+              width: {
+                size: 100,
+                type: WidthType.PERCENTAGE,
+              },
+              rows: [
+                new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph({ text: 'Equipo', alignment: AlignmentType.CENTER })],
+                      shading: { fill: '2980b9' },
+                      width: { size: 30, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: 'Detalle del Mantenimiento', alignment: AlignmentType.CENTER })],
+                      shading: { fill: '2980b9' },
+                      width: { size: 50, type: WidthType.PERCENTAGE },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: 'Fecha', alignment: AlignmentType.CENTER })],
+                      shading: { fill: '2980b9' },
+                      width: { size: 20, type: WidthType.PERCENTAGE },
+                    }),
+                  ],
+                }),
+                ...rows.map((row, index) => new TableRow({
+                  children: [
+                    new TableCell({
+                      children: [new Paragraph({ text: row.equipoNombre })],
+                      shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: row.detalleSeguimiento, alignment: AlignmentType.JUSTIFIED })],
+                      shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
+                    }),
+                    new TableCell({
+                      children: [new Paragraph({ text: row.fechaSeguimiento })],
+                      shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
+                    }),
+                  ],
+                })),
+              ],
+            }),
+          ],
+        }],
+      })
+
+      // Generar el archivo
+      const blob = await Packer.toBlob(doc)
+      const filename = `Reporte_Mantenimiento_${clientName.replace(/\s+/g, '_')}_${monthNameCap}_${year}.docx`
       saveAs(blob, filename)
     } catch (error) {
-      console.error('Error exporting to Excel:', error)
-      throw new Error('Error al exportar a Excel')
+      console.error('Error exporting to Word:', error)
+      throw new Error('Error al exportar a Word')
     }
   }
 }

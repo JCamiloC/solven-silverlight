@@ -6,9 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { FileDown, FileSpreadsheet, Loader2, FileText } from 'lucide-react'
+import { Loader2, FileText } from 'lucide-react'
 import { useClients } from '@/hooks/use-clients'
-import { useMaintenanceReport, useExportMaintenancePDF, useExportMaintenanceExcel } from '@/hooks/use-maintenance-reports'
+import { useMaintenanceReport, useExportMaintenanceWord } from '@/hooks/use-maintenance-reports'
 import { MaintenanceReportFilters } from '@/types'
 import {
   Table,
@@ -38,8 +38,7 @@ export default function ReportsPage() {
 
   const { data: clients } = useClients()
   const { data: reportData, isLoading, isFetching } = useMaintenanceReport(filters, shouldFetch)
-  const exportPDF = useExportMaintenancePDF()
-  const exportExcel = useExportMaintenanceExcel()
+  const exportWord = useExportMaintenanceWord()
 
   const selectedClient = clients?.find(c => c.id === filters.clientId)
 
@@ -48,19 +47,9 @@ export default function ReportsPage() {
     setShouldFetch(true)
   }
 
-  const handleExportPDF = () => {
+  const handleExportWord = () => {
     if (!reportData || !selectedClient) return
-    exportPDF.mutate({
-      rows: reportData,
-      clientName: selectedClient.name,
-      month: filters.month,
-      year: filters.year,
-    })
-  }
-
-  const handleExportExcel = () => {
-    if (!reportData || !selectedClient) return
-    exportExcel.mutate({
+    exportWord.mutate({
       rows: reportData,
       clientName: selectedClient.name,
       month: filters.month,
@@ -245,33 +234,18 @@ export default function ReportsPage() {
                   </Button>
 
                   {reportData && reportData.length > 0 && (
-                    <>
-                      <Button
-                        variant="outline"
-                        onClick={handleExportPDF}
-                        disabled={exportPDF.isPending}
-                      >
-                        {exportPDF.isPending ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <FileDown className="mr-2 h-4 w-4" />
-                        )}
-                        Exportar PDF
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        onClick={handleExportExcel}
-                        disabled={exportExcel.isPending}
-                      >
-                        {exportExcel.isPending ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <FileSpreadsheet className="mr-2 h-4 w-4" />
-                        )}
-                        Exportar Excel
-                      </Button>
-                    </>
+                    <Button
+                      variant="outline"
+                      onClick={handleExportWord}
+                      disabled={exportWord.isPending}
+                    >
+                      {exportWord.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileText className="mr-2 h-4 w-4" />
+                      )}
+                      Exportar Word
+                    </Button>
                   )}
                 </div>
               </CardContent>

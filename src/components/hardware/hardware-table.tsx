@@ -420,15 +420,11 @@ export function HardwareTable({ data, isLoading, clientId }: HardwareTableProps)
             .eq('id', hardware.client_id)
             .single()
           
-          console.log('Datos del cliente consultados:', clientData)
-          console.log('Error en consulta:', error)
-          
           if (clientData) {
             empresaCliente = {
               nombre: clientData.name,
               nit: clientData.nit || 'No especificado'
             }
-            console.log('empresaCliente asignado:', empresaCliente)
           }
         } catch (error) {
           console.warn('Error obteniendo datos del cliente:', error)

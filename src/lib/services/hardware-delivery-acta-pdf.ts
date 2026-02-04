@@ -101,12 +101,8 @@ export class HardwareDeliveryActaPDF {
       yPos += 6
       doc.setFont('helvetica', 'normal')
       
-      console.log('Datos recibidos en PDF - empresaCliente:', data.empresaCliente)
-      
       const empresaNombre = data.empresaCliente?.nombre || 'SILVERLIGHT COLOMBIA'
       const empresaNit = data.empresaCliente?.nit || 'No especificado'
-      
-      console.log('NIT asignado en PDF:', empresaNit)
       
       doc.text(`Empresa: ${empresaNombre}`, margin + 5, yPos)
       yPos += 6

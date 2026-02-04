@@ -54,9 +54,9 @@ export function useExportMaintenancePDF() {
 }
 
 /**
- * Hook para exportar reporte a Excel
+ * Hook para exportar reporte a Word
  */
-export function useExportMaintenanceExcel() {
+export function useExportMaintenanceWord() {
   return useMutation({
     mutationFn: async ({ 
       rows, 
@@ -69,13 +69,13 @@ export function useExportMaintenanceExcel() {
       month: number
       year: number
     }) => {
-      return MaintenanceReportService.exportToExcel(rows, clientName, month, year)
+      return MaintenanceReportService.exportToWord(rows, clientName, month, year)
     },
     onSuccess: () => {
-      toast.success('Reporte Excel generado exitosamente')
+      toast.success('Reporte Word generado exitosamente')
     },
     onError: (error) => {
-      toast.error('Error al exportar Excel: ' + (error as Error).message)
+      toast.error('Error al exportar Word: ' + (error as Error).message)
     },
   })
 }
