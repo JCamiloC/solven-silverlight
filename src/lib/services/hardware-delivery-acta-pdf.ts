@@ -151,7 +151,7 @@ export class HardwareDeliveryActaPDF {
         ['Disco Duro:', hardware.disco_duro || 'No especificado'],
         ['Sistema Operativo:', this.formatSoftwareField(hardware.sistema_operativo)],
         ['Estado:', this.translateStatus(hardware.status)],
-        ['Ubicación:', hardware.location || 'No especificada'],
+        ['Ubicación:', hardware.sede || hardware.location || 'No especificada'],
       ]
 
       // Dibujar recuadro para detalles
