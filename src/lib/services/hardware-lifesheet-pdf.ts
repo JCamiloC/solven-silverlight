@@ -9,6 +9,7 @@
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { HardwareAsset, HardwareUpgrade } from '@/types'
+import { getSoftwareDisplayName } from '@/lib/utils'
 
 interface FollowUp {
   id: string
@@ -133,7 +134,7 @@ export class HardwareLifesheetPDF {
         { label: 'Procesador', value: hardware.procesador || 'No especificado', hasUpgrade: this.hasUpgrade(upgrades, 'procesador') },
         { label: 'Memoria RAM', value: hardware.memoria_ram || 'No especificada', hasUpgrade: this.hasUpgrade(upgrades, 'memoria_ram') },
         { label: 'Disco Duro', value: hardware.disco_duro || 'No especificado', hasUpgrade: this.hasUpgrade(upgrades, 'disco_duro') },
-        { label: 'Sistema Operativo', value: this.formatSoftwareField(hardware.sistema_operativo), hasUpgrade: false },
+        { label: 'Sistema Operativo', value: getSoftwareDisplayName(hardware.sistema_operativo), hasUpgrade: false },
         { label: 'Modelo', value: hardware.model || 'No especificado', hasUpgrade: false },
         { label: 'Número de Serie', value: hardware.serial_number || 'No especificado', hasUpgrade: false },
       ]
@@ -372,38 +373,4 @@ export class HardwareLifesheetPDF {
     return translations[status] || status
   }
 
-  /**
-   * Helper: Formatea campos de software que pueden ser string JSON u objeto
-   */
-  private static formatSoftwareField(field: any): string {
-    if (!field) return 'No especificado'
-    
-    try {
-      // Si es un string, intentar parsearlo como JSON
-      if (typeof field === 'string') {
-        try {
-          const parsed = JSON.parse(field)
-          // Si tiene nombre, usarlo
-          if (parsed.nombre) {
-            return parsed.nombre
-          }
-          return field
-        } catch {
-          // Si no es JSON, retornar el string tal cual
-          return field
-        }
-      }
-      
-      // Si ya es un objeto
-      if (typeof field === 'object' && field !== null) {
-        if (field.nombre) return field.nombre
-        if (field.name) return field.name
-        if (field.version) return field.version
-      }
-      
-      return String(field)
-    } catch {
-      return 'No especificado'
-    }
-  }
 }

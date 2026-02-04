@@ -5,7 +5,9 @@
 
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+
 import { HardwareAsset } from '@/types'
+import { getSoftwareDisplayName } from '@/lib/utils'
 
 interface ActaDeliveryData {
   hardware: HardwareAsset
@@ -149,7 +151,7 @@ export class HardwareDeliveryActaPDF {
         ['Procesador:', hardware.procesador || 'No especificado'],
         ['Memoria RAM:', hardware.memoria_ram || 'No especificada'],
         ['Disco Duro:', hardware.disco_duro || 'No especificado'],
-        ['Sistema Operativo:', this.formatSoftwareField(hardware.sistema_operativo)],
+        ['Sistema Operativo:', getSoftwareDisplayName(hardware.sistema_operativo)],
         ['Estado:', this.translateStatus(hardware.status)],
         ['Ubicación:', hardware.sede || hardware.location || 'No especificada'],
       ]
@@ -222,10 +224,10 @@ export class HardwareDeliveryActaPDF {
 
       const softwareList = []
       if (hardware.ms_office) {
-        softwareList.push(`Microsoft Office: ${this.formatSoftwareField(hardware.ms_office)}`)
+        softwareList.push(`Microsoft Office: ${getSoftwareDisplayName(hardware.ms_office)}`)
       }
       if (hardware.antivirus) {
-        softwareList.push(`Antivirus: ${this.formatSoftwareField(hardware.antivirus)}`)
+        softwareList.push(`Antivirus: ${getSoftwareDisplayName(hardware.antivirus)}`)
       }
       if (hardware.software_extra && hardware.software_extra.length > 0) {
         hardware.software_extra.forEach(sw => {
@@ -476,41 +478,6 @@ export class HardwareDeliveryActaPDF {
       'inactive': 'Inactivo',
     }
     return translations[status] || status
-  }
-
-  /**
-   * Helper: Formatea campos de software que pueden ser string JSON u objeto
-   */
-  private static formatSoftwareField(field: any): string {
-    if (!field) return 'No especificado'
-    
-    try {
-      // Si es un string, intentar parsearlo como JSON
-      if (typeof field === 'string') {
-        try {
-          const parsed = JSON.parse(field)
-          // Si tiene nombre, usarlo
-          if (parsed.nombre) {
-            return parsed.nombre
-          }
-          return field
-        } catch {
-          // Si no es JSON, retornar el string tal cual
-          return field
-        }
-      }
-      
-      // Si ya es un objeto
-      if (typeof field === 'object' && field !== null) {
-        if (field.nombre) return field.nombre
-        if (field.name) return field.name
-        if (field.version) return field.version
-      }
-      
-      return String(field)
-    } catch {
-      return 'No especificado'
-    }
   }
 
   /**
