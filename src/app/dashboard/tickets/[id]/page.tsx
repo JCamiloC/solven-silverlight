@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
 // import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { 
@@ -62,6 +63,8 @@ export default function TicketDetailPage() {
   const [editingComment, setEditingComment] = useState<string | null>(null)
   const [editCommentText, setEditCommentText] = useState('')
   const [generatingPDF, setGeneratingPDF] = useState(false)
+  const [tiempoRespuesta, setTiempoRespuesta] = useState('')
+  const [tiempoSolucion, setTiempoSolucion] = useState('')
   
   const { user, profile } = useAuth()
   const { data: ticket, isLoading: ticketLoading } = useTicket(ticketId)
@@ -79,6 +82,44 @@ export default function TicketDetailPage() {
   const createCommentMutation = useCreateTicketComment()
   const updateCommentMutation = useUpdateTicketComment()
   const deleteCommentMutation = useDeleteTicketComment()
+
+  // Inicializar tiempos cuando el ticket carga
+  useEffect(() => {
+    if (ticket) {
+      setTiempoRespuesta(ticket.tiempo_respuesta || '')
+      setTiempoSolucion(ticket.tiempo_solucion || '')
+    }
+  }, [ticket])
+
+  const handleUpdateTiempoRespuesta = () => {
+    if (!ticket) return
+    updateTicketMutation.mutate({
+      id: ticketId,
+      data: { tiempo_respuesta: tiempoRespuesta || null }
+    }, {
+      onSuccess: () => {
+        toast.success('Tiempo de respuesta actualizado')
+      },
+      onError: () => {
+        toast.error('Error al actualizar tiempo de respuesta')
+      }
+    })
+  }
+
+  const handleUpdateTiempoSolucion = () => {
+    if (!ticket) return
+    updateTicketMutation.mutate({
+      id: ticketId,
+      data: { tiempo_solucion: tiempoSolucion || null }
+    }, {
+      onSuccess: () => {
+        toast.success('Tiempo de solución actualizado')
+      },
+      onError: () => {
+        toast.error('Error al actualizar tiempo de solución')
+      }
+    })
+  }
 
   // Función para generar PDF del ticket
   const handleGeneratePDF = async () => {
@@ -646,6 +687,39 @@ export default function TicketDetailPage() {
                   </div>
                 </div>
               )}
+              
+              {/* Tiempos de Respuesta y Solución */}
+              <div className="flex items-start space-x-2">
+                <Clock className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium mb-1">Tiempo de Respuesta</p>
+                  <Input
+                    type="text"
+                    placeholder="Ej: 2 horas, 30 minutos"
+                    value={tiempoRespuesta}
+                    onChange={(e) => setTiempoRespuesta(e.target.value)}
+                    onBlur={handleUpdateTiempoRespuesta}
+                    className="h-8 text-sm"
+                    disabled={profile?.user_type === 'cliente'}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-2">
+                <Clock className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium mb-1">Tiempo de Solución</p>
+                  <Input
+                    type="text"
+                    placeholder="Ej: 1 día, 5 horas"
+                    value={tiempoSolucion}
+                    onChange={(e) => setTiempoSolucion(e.target.value)}
+                    onBlur={handleUpdateTiempoSolucion}
+                    className="h-8 text-sm"
+                    disabled={profile?.user_type === 'cliente'}
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

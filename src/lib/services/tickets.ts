@@ -13,6 +13,8 @@ export interface Ticket {
   created_by: string
   usuario_afectado?: string
   resolved_at?: string
+  tiempo_respuesta?: string
+  tiempo_solucion?: string
   created_at: string
   updated_at: string
   // Campos de archivos y relaciones
@@ -58,6 +60,8 @@ export interface TicketUpdate {
   assigned_to?: string
   usuario_afectado?: string
   resolved_at?: string
+  tiempo_respuesta?: string
+  tiempo_solucion?: string
   updated_at?: string
   contact_email?: string
   attachment_url?: string

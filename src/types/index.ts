@@ -279,6 +279,8 @@ export interface Ticket {
   created_by: string
   usuario_afectado?: string
   resolved_at?: string
+  tiempo_respuesta?: string
+  tiempo_solucion?: string
   created_at: string
   updated_at: string
 }
