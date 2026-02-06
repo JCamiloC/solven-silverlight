@@ -95,7 +95,7 @@ export default function TicketDetailPage() {
     if (!ticket) return
     updateTicketMutation.mutate({
       id: ticketId,
-      data: { tiempo_respuesta: tiempoRespuesta || null }
+      data: { tiempo_respuesta: tiempoRespuesta || undefined }
     }, {
       onSuccess: () => {
         toast.success('Tiempo de respuesta actualizado')
@@ -110,7 +110,7 @@ export default function TicketDetailPage() {
     if (!ticket) return
     updateTicketMutation.mutate({
       id: ticketId,
-      data: { tiempo_solucion: tiempoSolucion || null }
+      data: { tiempo_solucion: tiempoSolucion || undefined }
     }, {
       onSuccess: () => {
         toast.success('Tiempo de solución actualizado')
@@ -700,7 +700,7 @@ export default function TicketDetailPage() {
                     onChange={(e) => setTiempoRespuesta(e.target.value)}
                     onBlur={handleUpdateTiempoRespuesta}
                     className="h-8 text-sm"
-                    disabled={profile?.user_type === 'cliente'}
+                    disabled={profile?.role === 'cliente'}
                   />
                 </div>
               </div>
@@ -716,7 +716,7 @@ export default function TicketDetailPage() {
                     onChange={(e) => setTiempoSolucion(e.target.value)}
                     onBlur={handleUpdateTiempoSolucion}
                     className="h-8 text-sm"
-                    disabled={profile?.user_type === 'cliente'}
+                    disabled={profile?.role === 'cliente'}
                   />
                 </div>
               </div>
