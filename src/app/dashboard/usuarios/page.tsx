@@ -46,6 +46,8 @@ export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
   const [showPassword, setShowPassword] = useState(false)
+  const [selectedRole, setSelectedRole] = useState<User['role']>('cliente')
+  const [selectedClientId, setSelectedClientId] = useState<string>('')
 
   const { user: currentUser, hasRole, loading } = useAuth()
   const { data: users = [], isLoading: usersLoading } = useUsers()
@@ -169,6 +171,8 @@ export default function UsersPage() {
   const handleAdd = () => {
     if (!canCreateUsers) return
     setSelectedUser(null)
+    setSelectedRole('cliente')
+    setSelectedClientId('')
     setIsDialogOpen(true)
   }
 
@@ -201,6 +205,8 @@ export default function UsersPage() {
   const handleEdit = (user: User) => {
     if (!canEditUsers) return
     setSelectedUser(user)
+    setSelectedRole(user.role)
+    setSelectedClientId(user.client_id || '')
     setIsDialogOpen(true)
   }
 
@@ -227,10 +233,12 @@ export default function UsersPage() {
       last_name: formData.get('last_name') as string,
       email: formData.get('email') as string,
       phone: formData.get('phone') as string,
-      role: formData.get('role') as User['role'],
+      role: selectedRole,
       password: formData.get('password') as string,
-      client_id: formData.get('client_id') as string,
+      client_id: selectedClientId,
     }
+
+    console.log('[Usuarios Debug] userData antes de enviar:', userData)
 
     if (selectedUser) {
       // Actualizar usuario existente (sin password)
@@ -242,6 +250,8 @@ export default function UsersPage() {
         onSuccess: () => {
           setIsDialogOpen(false)
           setSelectedUser(null)
+          setSelectedRole('cliente')
+          setSelectedClientId('')
         }
       })
     } else {
@@ -249,6 +259,8 @@ export default function UsersPage() {
       createUserMutation.mutate(userData as any, {
         onSuccess: () => {
           setIsDialogOpen(false)
+          setSelectedRole('cliente')
+          setSelectedClientId('')
         }
       })
     }
@@ -478,7 +490,10 @@ export default function UsersPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="role">Rol *</Label>
-                <Select name="role" defaultValue={selectedUser?.role || 'cliente'}>
+                <Select 
+                  value={selectedRole} 
+                  onValueChange={(value) => setSelectedRole(value as User['role'])}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar rol" />
                   </SelectTrigger>
@@ -504,8 +519,8 @@ export default function UsersPage() {
             <div className="space-y-2">
               <Label htmlFor="client_id">Cliente (Empresa) *</Label>
               <Select 
-                name="client_id" 
-                defaultValue={selectedUser?.client_id || ''}
+                value={selectedClientId} 
+                onValueChange={setSelectedClientId}
                 required
               >
                 <SelectTrigger>
@@ -531,6 +546,8 @@ export default function UsersPage() {
                 onClick={() => {
                   setIsDialogOpen(false)
                   setSelectedUser(null)
+                  setSelectedRole('cliente')
+                  setSelectedClientId('')
                 }}
               >
                 Cancelar

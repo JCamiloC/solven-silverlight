@@ -142,6 +142,7 @@ export class UsersService {
             last_name: user.last_name,
             role: user.role,
             phone: user.phone,
+            client_id: user.client_id, // ⬅️ FALTABA ESTO
           })
         })
 

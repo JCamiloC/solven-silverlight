@@ -113,7 +113,13 @@ const allNavigationItems: NavigationItem[] = [
     name: 'Tickets',
     href: '/dashboard/tickets',
     icon: Ticket,
-    roles: ['administrador', 'lider_soporte', 'agente_soporte', 'cliente'],
+    roles: ['administrador', 'lider_soporte', 'agente_soporte'],
+  },
+  {
+    name: 'Mi Empresa',
+    href: '/dashboard/clientes', // Se ajustará dinámicamente para clientes
+    icon: Building2,
+    roles: ['cliente'],
   },
 ]
 
@@ -123,9 +129,15 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
   const { isCollapsed, isHovered, setIsHovered } = useSidebar()
 
   // Filter navigation items based on user role
-  const navigation = allNavigationItems.filter(item => 
-    profile?.role && item.roles.includes(profile.role)
-  )
+  const navigation = allNavigationItems
+    .filter(item => profile?.role && item.roles.includes(profile.role))
+    .map(item => {
+      // Para clientes, ajustar el href de "Mi Empresa" con su client_id
+      if (item.roles.includes('cliente') && profile?.client_id) {
+        return { ...item, href: `/dashboard/clientes/${profile.client_id}` }
+      }
+      return item
+    })
 
   const handleLogout = async () => {
     try {

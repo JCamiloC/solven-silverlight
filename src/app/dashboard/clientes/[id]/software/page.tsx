@@ -5,6 +5,7 @@ import { SoftwareLicenseTable, SoftwareLicenseStats, SoftwareLicenseForm } from 
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { useCustomApplicationsByClient } from '@/hooks/use-custom-applications';
 import { useClient } from '@/hooks/use-clients';
+import { useClientPermissions } from '@/hooks/use-client-permissions';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowLeft, Package, Key } from 'lucide-react';
@@ -30,6 +31,7 @@ export default function ClienteSoftwarePage() {
   const [editingLicenseId, setEditingLicenseId] = useState<string | null>(null);
   const { data: applications, isLoading, error } = useCustomApplicationsByClient(clientId);
   const { data: client, isLoading: isLoadingClient } = useClient(clientId);
+  const { canCreate } = useClientPermissions();
 
   const editingApp = editingAppId 
     ? applications?.find(app => app.id === editingAppId)
@@ -57,7 +59,7 @@ export default function ClienteSoftwarePage() {
 
   if (error) {
     return (
-      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte']}>
+      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
         <div className="container mx-auto py-6">
           <div className="text-center">
             <h2 className="text-lg font-semibold text-destructive">Error al cargar los datos</h2>
@@ -72,7 +74,7 @@ export default function ClienteSoftwarePage() {
 
   if (isLoadingClient) {
     return (
-      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte']}>
+      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
         <div className="flex items-center justify-center min-h-[400px]">
           <Loading size="lg" text="Cargando información del cliente..." />
         </div>
@@ -81,7 +83,7 @@ export default function ClienteSoftwarePage() {
   }
 
   return (
-    <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte']}>
+    <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
       <div className="container mx-auto py-6 space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-4 mb-6">
@@ -117,19 +119,21 @@ export default function ClienteSoftwarePage() {
               </TabsTrigger>
             </TabsList>
 
-            <Button
-              onClick={() => {
-                if (activeTab === 'applications') {
-                  setShowAppDialog(true);
-                } else {
-                  setShowLicenseDialog(true);
-                }
-              }}
-              className="w-full sm:w-auto"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              {activeTab === 'applications' ? 'Nueva Aplicación' : 'Nueva Licencia'}
-            </Button>
+            {canCreate && (
+              <Button
+                onClick={() => {
+                  if (activeTab === 'applications') {
+                    setShowAppDialog(true);
+                  } else {
+                    setShowLicenseDialog(true);
+                  }
+                }}
+                className="w-full sm:w-auto"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                {activeTab === 'applications' ? 'Nueva Aplicación' : 'Nueva Licencia'}
+              </Button>
+            )}
           </div>
 
           {/* Applications Tab */}
@@ -139,7 +143,7 @@ export default function ClienteSoftwarePage() {
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Aplicaciones Personalizadas</h2>
               </div>
-              <CustomAppTable clientId={clientId} onEdit={handleEditApp} />
+              <CustomAppTable clientId={clientId} onEdit={handleEditApp} readOnly={!canCreate} />
             </div>
           </TabsContent>
 
@@ -150,7 +154,7 @@ export default function ClienteSoftwarePage() {
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Licencias Comerciales</h2>
               </div>
-              <SoftwareLicenseTable clientId={clientId} onEdit={handleEditLicense} />
+              <SoftwareLicenseTable clientId={clientId} onEdit={handleEditLicense} readOnly={!canCreate} />
             </div>
           </TabsContent>
         </Tabs>

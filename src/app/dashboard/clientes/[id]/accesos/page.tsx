@@ -17,6 +17,7 @@ import { SecureRoute, SecurityProvider } from '@/components/security/security-pr
 import { TwoFactorRequiredNotice } from '@/components/security/2fa-required-notice'
 import { useAuth } from '@/hooks/use-auth'
 import { useClient } from '@/hooks/use-clients'
+import { useClientPermissions } from '@/hooks/use-client-permissions'
 import { Loading } from '@/components/ui/loading'
 import { 
   useAccessCredentialsByClient,
@@ -40,7 +41,7 @@ export default function ClienteAccesosPage() {
   const has2FA = profile?.totp_enabled === true
 
   return (
-    <ProtectedRoute allowedRoles={['administrador', 'lider_soporte']}>
+    <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'cliente']}>
       {!has2FA ? (
         <TwoFactorRequiredNotice />
       ) : (
@@ -58,6 +59,7 @@ function ClienteAccesosContent() {
   const { id } = useParams()
   const router = useRouter()
   const clientId = typeof id === 'string' ? id : ''
+  const { canCreate, canEdit, canDelete, readOnly } = useClientPermissions()
   
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -210,13 +212,14 @@ function ClienteAccesosContent() {
             Gestión segura de credenciales y accesos del cliente
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="w-full sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva Credencial
-            </Button>
-          </DialogTrigger>
+        {canCreate && (
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full sm:w-auto">
+                <Plus className="mr-2 h-4 w-4" />
+                Nueva Credencial
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Agregar Nueva Credencial</DialogTitle>
@@ -231,6 +234,7 @@ function ClienteAccesosContent() {
             />
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       {/* Security Notice */}
@@ -352,7 +356,7 @@ function ClienteAccesosContent() {
                     <TableHead>URL</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Último Acceso</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    {!readOnly && <TableHead className="text-right">Acciones</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -449,44 +453,46 @@ function ClienteAccesosContent() {
                           }
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEditingCredential(credential)
-                              setIsEditDialogOpen(true)
-                            }}
-                          >
-                            Editar
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" className="text-destructive">
-                                Eliminar
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Esta acción no se puede deshacer. La credencial "{credential.system_name}" será eliminada permanentemente.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(credential.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                >
+                      {!readOnly && (
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingCredential(credential)
+                                setIsEditDialogOpen(true)
+                              }}
+                            >
+                              Editar
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="text-destructive">
                                   Eliminar
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Esta acción no se puede deshacer. La credencial "{credential.system_name}" será eliminada permanentemente.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDelete(credential.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Eliminar
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>

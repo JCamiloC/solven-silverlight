@@ -67,9 +67,10 @@ const statusConfig = {
 interface CustomAppTableProps {
   clientId?: string
   onEdit?: (id: string) => void
+  readOnly?: boolean // Hide actions for clients
 }
 
-export function CustomAppTable({ clientId, onEdit }: CustomAppTableProps) {
+export function CustomAppTable({ clientId, onEdit, readOnly = false }: CustomAppTableProps) {
   const router = useRouter()
   const { data: applications, isLoading } = useCustomApplications()
   const deleteApp = useDeleteCustomApplication()
@@ -152,7 +153,7 @@ export function CustomAppTable({ clientId, onEdit }: CustomAppTableProps) {
               <TableHead>URLs</TableHead>
               <TableHead>Dominio</TableHead>
               <TableHead>Hosting</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
+              {!readOnly && <TableHead className="text-right">Acciones</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -239,8 +240,9 @@ export function CustomAppTable({ clientId, onEdit }: CustomAppTableProps) {
                         <span className="text-sm text-muted-foreground">N/A</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
+                    {!readOnly && (
+                      <TableCell className="text-right">
+                        <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon">
                             <MoreHorizontal className="h-4 w-4" />
@@ -287,13 +289,14 @@ export function CustomAppTable({ clientId, onEdit }: CustomAppTableProps) {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
+                    )}
                   </TableRow>
                 )
               })
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={clientId ? 6 : 7}
+                  colSpan={clientId ? (readOnly ? 5 : 6) : (readOnly ? 6 : 7)}
                   className="h-24 text-center"
                 >
                   No se encontraron aplicaciones

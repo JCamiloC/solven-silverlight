@@ -66,9 +66,10 @@ interface HardwareTableProps {
   data: HardwareAsset[]
   isLoading?: boolean
   clientId?: string  // Added for navigation
+  readOnly?: boolean // Hide actions for clients
 }
 
-export function HardwareTable({ data, isLoading, clientId }: HardwareTableProps) {
+export function HardwareTable({ data, isLoading, clientId, readOnly = false }: HardwareTableProps) {
   const router = useRouter()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -151,7 +152,11 @@ export function HardwareTable({ data, isLoading, clientId }: HardwareTableProps)
         return <FollowupCount hardwareId={asset.id} />
       },
     },
-    {
+  ]
+
+  // Only add actions column if not in readOnly mode
+  if (!readOnly) {
+    columns.push({
       id: 'actions',
       cell: ({ row }) => {
         const asset = row.original
@@ -198,8 +203,8 @@ export function HardwareTable({ data, isLoading, clientId }: HardwareTableProps)
           </DropdownMenu>
         )
       },
-    },
-  ]
+    })
+  }
 
   const table = useReactTable({
     data,

@@ -4,6 +4,7 @@ import { HardwareTable, HardwareStats, HardwareForm } from '@/components/hardwar
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { useHardwareAssetsByClient } from '@/hooks/use-hardware';
 import { useClient } from '@/hooks/use-clients';
+import { useClientPermissions } from '@/hooks/use-client-permissions';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowLeft, BarChart3 } from 'lucide-react';
@@ -24,10 +25,11 @@ export default function ClienteHardwarePage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { data: assets, isLoading, error } = useHardwareAssetsByClient(clientId);
   const { data: client, isLoading: isLoadingClient } = useClient(clientId);
+  const { canCreate, readOnly } = useClientPermissions();
 
   if (error) {
     return (
-      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte']}>
+      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
         <div className="container mx-auto py-6">
           <div className="text-center">
             <h2 className="text-lg font-semibold text-destructive">Error al cargar los datos</h2>
@@ -42,7 +44,7 @@ export default function ClienteHardwarePage() {
 
   if (isLoadingClient) {
     return (
-      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte']}>
+      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
         <div className="flex items-center justify-center min-h-[400px]">
           <Loading size="lg" text="Cargando información del cliente..." />
         </div>
@@ -51,7 +53,7 @@ export default function ClienteHardwarePage() {
   }
 
   return (
-    <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte']}>
+    <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
       <div className="container mx-auto py-6 space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-4 mb-6">
           <Button
@@ -70,21 +72,24 @@ export default function ClienteHardwarePage() {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Button 
-              variant="outline" 
-              className="w-full sm:w-auto"
-              onClick={() => router.push(`/dashboard/clientes/${clientId}/hardware/reporte`)}
-            >
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Ver Reporte
-            </Button>
-            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-              <DialogTrigger asChild>
-                <Button className="w-full sm:w-auto">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Agregar Hardware
-                </Button>
-              </DialogTrigger>
+            {!readOnly && (
+              <Button 
+                variant="outline" 
+                className="w-full sm:w-auto"
+                onClick={() => router.push(`/dashboard/clientes/${clientId}/hardware/reporte`)}
+              >
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Ver Reporte
+              </Button>
+            )}
+            {canCreate && (
+              <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+                <DialogTrigger asChild>
+                  <Button className="w-full sm:w-auto">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Agregar Hardware
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Agregar Nuevo Hardware</DialogTitle>
@@ -100,6 +105,7 @@ export default function ClienteHardwarePage() {
                 />
               </DialogContent>
             </Dialog>
+            )}
           </div>
         </div>
         <HardwareStats clientId={clientId} />
@@ -111,6 +117,7 @@ export default function ClienteHardwarePage() {
             data={assets || []} 
             isLoading={isLoading}
             clientId={clientId}
+            readOnly={readOnly}
           />
         </div>
       </div>

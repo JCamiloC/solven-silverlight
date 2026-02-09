@@ -91,6 +91,17 @@ export default function TicketDetailPage() {
     }
   }, [ticket])
 
+  // Validar que clientes solo vean sus propios tickets
+  useEffect(() => {
+    if (ticket && profile?.role === 'cliente') {
+      // Verificar que el ticket pertenece al cliente
+      if (ticket.client_id !== profile.client_id) {
+        toast.error('No tienes permiso para ver este ticket')
+        router.push('/dashboard/tickets')
+      }
+    }
+  }, [ticket, profile, router])
+
   const handleUpdateTiempoRespuesta = () => {
     if (!ticket) return
     updateTicketMutation.mutate({

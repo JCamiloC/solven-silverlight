@@ -1,6 +1,7 @@
 'use client'
 
-import { createContext, useContext, useState, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { useAuth } from '@/hooks/use-auth'
 
 interface SidebarContextType {
   isCollapsed: boolean
@@ -12,8 +13,17 @@ interface SidebarContextType {
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined)
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
+  const { profile } = useAuth()
+  // Iniciar colapsado por defecto si es cliente
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
+
+  // Colapsar automáticamente para clientes al cargar
+  useEffect(() => {
+    if (profile?.role === 'cliente') {
+      setIsCollapsed(true)
+    }
+  }, [profile?.role])
 
   const toggleSidebar = () => {
     setIsCollapsed(!isCollapsed)

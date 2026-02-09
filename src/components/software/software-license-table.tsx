@@ -70,9 +70,10 @@ const licenseTypeConfig = {
 interface SoftwareLicenseTableProps {
   clientId?: string
   onEdit?: (id: string) => void
+  readOnly?: boolean // Hide actions for clients
 }
 
-export function SoftwareLicenseTable({ clientId, onEdit }: SoftwareLicenseTableProps) {
+export function SoftwareLicenseTable({ clientId, onEdit, readOnly = false }: SoftwareLicenseTableProps) {
   const router = useRouter()
   const { data: allLicenses, isLoading: loadingAll } = useSoftwareLicenses()
   const { data: clientLicenses, isLoading: loadingClient } = useSoftwareByClient(clientId || '')
@@ -158,7 +159,7 @@ export function SoftwareLicenseTable({ clientId, onEdit }: SoftwareLicenseTableP
               <TableHead>Puestos</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Vencimiento</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
+              {!readOnly && <TableHead className="text-right">Acciones</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -209,8 +210,9 @@ export function SoftwareLicenseTable({ clientId, onEdit }: SoftwareLicenseTableP
                         <span className="text-sm text-muted-foreground">Sin vencimiento</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
+                    {!readOnly && (
+                      <TableCell className="text-right">
+                        <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon">
                             <MoreHorizontal className="h-4 w-4" />
@@ -237,13 +239,14 @@ export function SoftwareLicenseTable({ clientId, onEdit }: SoftwareLicenseTableP
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
+                    )}
                   </TableRow>
                 )
               })
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={clientId ? 8 : 9}
+                  colSpan={clientId ? (readOnly ? 7 : 8) : (readOnly ? 8 : 9)}
                   className="h-24 text-center"
                 >
                   No se encontraron licencias

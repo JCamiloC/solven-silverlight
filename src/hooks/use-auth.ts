@@ -237,9 +237,19 @@ export function useAuth() {
   }, [getProfile, router, supabase.auth])
 
   const signOut = async () => {
-    profileCache = {}
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
+    try {
+      profileCache = {}
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+      
+      // Redirigir explícitamente al login
+      router.push('/auth/login')
+    } catch (error) {
+      console.error('[useAuth] Error in signOut:', error)
+      // Intentar redirigir de todas formas
+      router.push('/auth/login')
+      throw error
+    }
   }
 
   const refresh = async () => {

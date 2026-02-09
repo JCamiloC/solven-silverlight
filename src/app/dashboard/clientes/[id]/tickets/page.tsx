@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ProtectedRoute } from '@/components/auth/protected-route'
+import { useClientPermissions } from '@/hooks/use-client-permissions'
 import { Button } from '@/components/ui/button'
 import { TicketTable } from '@/components/tickets'
 import { useClientTickets } from '@/hooks/use-tickets'
@@ -16,6 +17,7 @@ export default function ClienteTicketsPage() {
   const params = useParams()
   const router = useRouter()
   const clientId = params.id as string
+  const { readOnly } = useClientPermissions()
 
   const { data: client, isLoading: loadingClient } = useClient(clientId)
   const { data: tickets, isLoading: loadingTickets } = useClientTickets(clientId)
@@ -47,7 +49,7 @@ export default function ClienteTicketsPage() {
 
   if (loadingClient) {
     return (
-      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte']}>
+      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
         <div className="container mx-auto py-6">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
@@ -62,7 +64,7 @@ export default function ClienteTicketsPage() {
 
   if (!client) {
     return (
-      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte']}>
+      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
         <div className="container mx-auto py-6">
           <Card>
             <CardContent className="pt-6">
@@ -84,7 +86,7 @@ export default function ClienteTicketsPage() {
   }
 
   return (
-    <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte']}>
+    <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
       <div className="container mx-auto py-6 space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
@@ -104,24 +106,26 @@ export default function ClienteTicketsPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleGenerateReport}
-              disabled={generatingPDF || loadingTickets}
-              className="w-full sm:w-auto"
-            >
-              {generatingPDF ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generando...
-                </>
-              ) : (
-                <>
-                  <FileText className="mr-2 h-4 w-4" />
-                  Generar Reporte
-                </>
-              )}
-            </Button>
+            {!readOnly && (
+              <Button
+                variant="outline"
+                onClick={handleGenerateReport}
+                disabled={generatingPDF || loadingTickets}
+                className="w-full sm:w-auto"
+              >
+                {generatingPDF ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generando...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Generar Reporte
+                  </>
+                )}
+              </Button>
+            )}
             <Button
               onClick={() => router.push(`/dashboard/clientes/${clientId}/tickets/nuevo`)}
               className="w-full sm:w-auto"

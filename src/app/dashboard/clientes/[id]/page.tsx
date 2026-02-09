@@ -37,7 +37,9 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { LoadingLink } from '@/components/ui/loading-link'
+import { InfoField } from '@/components/ui/info-field'
 import { useClient, useUpdateClient } from '@/hooks/use-clients'
+import { useClientPermissions } from '@/hooks/use-client-permissions'
 import { useQuery } from '@tanstack/react-query'
 import { clientService } from '@/services/clients'
 import { toast } from 'sonner'
@@ -72,6 +74,9 @@ export default function ClienteDetailPage() {
   const router = useRouter()
   const params = useParams()
   const clientId = params.id as string
+  
+  // Hook de permisos para clientes (valida acceso automáticamente)
+  const { isClientUser, readOnly, canEdit } = useClientPermissions()
   
   const { data: client, isLoading, error } = useClient(clientId)
   const updateClient = useUpdateClient()
@@ -117,7 +122,7 @@ export default function ClienteDetailPage() {
 
   if (isLoading) {
     return (
-      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte']}>
+      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
         <div className="flex items-center justify-center min-h-[400px]">
           <Loading size="lg" text="Cargando cliente..." />
         </div>
@@ -127,7 +132,7 @@ export default function ClienteDetailPage() {
 
   if (error || !client) {
     return (
-      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte']}>
+      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
         <div className="container mx-auto py-6">
           <div className="text-center">
             <h2 className="text-lg font-semibold text-destructive">Error al cargar el cliente</h2>
@@ -137,10 +142,10 @@ export default function ClienteDetailPage() {
             <Button 
               variant="outline" 
               className="mt-4"
-              onClick={() => router.push('/dashboard/clientes')}
+              onClick={() => router.push(isClientUser ? `/dashboard/clientes/${clientId}` : '/dashboard/clientes')}
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Volver a Clientes
+              Volver
             </Button>
           </div>
         </div>
@@ -180,38 +185,66 @@ export default function ClienteDetailPage() {
   ]
 
   return (
-    <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte']}>
+    <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
       <div className="container mx-auto py-6 space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.push('/dashboard/clientes')}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+            {!isClientUser && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push('/dashboard/clientes')}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{client.name}</h1>
               <p className="text-sm sm:text-base text-muted-foreground">
-                Gestión de recursos del cliente
+                {isClientUser ? 'Información de mi empresa' : 'Gestión de recursos del cliente'}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Datos Básicos Editables */}
+        {/* Datos Básicos - Vista Condicional */}
         <Card>
           <CardHeader>
             <CardTitle>Datos Básicos</CardTitle>
             <CardDescription>
-              Información del cliente. Puedes editar estos datos y guardar los cambios.
+              {isClientUser 
+                ? 'Información de tu empresa. Si necesitas actualizar estos datos, contacta a soporte.'
+                : 'Información del cliente. Puedes editar estos datos y guardar los cambios.'
+              }
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {isClientUser ? (
+              /* Vista de solo lectura para clientes */
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <InfoField label="Nombre de la Empresa" value={client.name} />
+                  <InfoField label="Email" value={client.email} />
+                  <InfoField label="NIT" value={client.nit} />
+                  <InfoField label="Mantenimientos al año" value={client.mantenimientos_al_anio} />
+                  <InfoField label="Teléfono" value={client.phone} />
+                  <InfoField label="Persona de Contacto" value={client.contact_person} />
+                  <div className="md:col-span-2">
+                    <InfoField 
+                      label="Tipo de Servicio" 
+                      value={getClientTypeLabel(client.client_type as ClientType)} 
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <InfoField label="Dirección" value={client.address} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Formulario editable para staff (sin cambios) */
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -353,21 +386,23 @@ export default function ClienteDetailPage() {
                 </div>
               </form>
             </Form>
+            )}
           </CardContent>
         </Card>
 
-        {/* Usuarios Asociados */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Usuarios Asociados
-            </CardTitle>
-            <CardDescription>
-              Usuarios asignados a esta empresa cliente
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        {/* Usuarios Asociados - Solo para staff */}
+        {!isClientUser && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Usuarios Asociados
+              </CardTitle>
+              <CardDescription>
+                Usuarios asignados a esta empresa cliente
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
             {isLoadingUsers ? (
               <div className="flex items-center justify-center py-8">
                 <Loading size="sm" text="Cargando usuarios..." />
@@ -445,10 +480,13 @@ export default function ClienteDetailPage() {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Botones de Navegación */}
         <div>
-          <h2 className="text-xl font-semibold mb-4">Recursos del Cliente</h2>
+          <h2 className="text-xl font-semibold mb-4">
+            {isClientUser ? 'Mis Recursos' : 'Recursos del Cliente'}
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {navigationButtons.map((button) => {
               const Icon = button.icon

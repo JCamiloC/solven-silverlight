@@ -36,8 +36,23 @@ function LoginForm() {
     setError('')
 
     try {
-      await authService.signIn(email, password)
-      router.push('/dashboard')
+      const { user } = await authService.signIn(email, password)
+      
+      // Obtener el perfil del usuario para determinar redirección
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, client_id')
+        .eq('user_id', user.id)
+        .single()
+      
+      // Redirigir según rol
+      if (profile?.role === 'cliente' && profile.client_id) {
+        router.push(`/dashboard/clientes/${profile.client_id}`)
+      } else {
+        router.push('/dashboard')
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al iniciar sesión'
       setError(errorMessage)

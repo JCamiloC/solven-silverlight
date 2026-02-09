@@ -39,9 +39,15 @@ export function ProtectedRoute({
     if (allowedRoles.length > 0 && !hasRole(allowedRoles)) {
       // Redirect based on user role
       if (profile?.role === 'cliente') {
-        router.push('/dashboard/tickets') // Clients can only access tickets
+        // Clientes van a su página de empresa si tienen client_id asignado
+        if (profile.client_id) {
+          router.push(`/dashboard/clientes/${profile.client_id}`)
+        } else {
+          // Si no tiene client_id, ir a tickets por seguridad
+          router.push('/dashboard/tickets')
+        }
       } else {
-        router.push('/dashboard') // Others go to main dashboard
+        router.push('/dashboard') // Staff va al dashboard principal
       }
       return
     }
