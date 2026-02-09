@@ -25,6 +25,7 @@ export interface UserInsert {
   password?: string
   phone?: string
   role: UserRole
+  client_id?: string
   avatar_url?: string
 }
 
