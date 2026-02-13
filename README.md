@@ -3,7 +3,7 @@
 
 Sistema integral desarrollado específicamente para Silverlight Colombia, que reemplaza PC Health con tecnologías modernas y diseño siguiendo principios ISO 27001.
 
-## 🚀 Características
+## 🚀 Características.
 
 ### Funcionalidades Principales
 - **Dashboard Moderno**: Interfaz responsiva con diseño profesional
