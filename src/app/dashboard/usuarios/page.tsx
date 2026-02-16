@@ -38,6 +38,7 @@ import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/u
 import { useClients } from '@/hooks/use-clients'
 import { useInviteUser, usePendingUsers } from '@/hooks/use-user-invitations'
 import { User, UserInsert, UserUpdate } from '@/lib/services/users'
+import { ProtectedRoute } from '@/components/auth/protected-route'
 
 export default function UsersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -302,14 +303,15 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gestión de Usuarios</h1>
-          <p className="text-muted-foreground">
-            Administra usuarios, roles y permisos del sistema
-          </p>
-        </div>
+    <ProtectedRoute allowedRoles={['administrador']}>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Gestión de Usuarios</h1>
+            <p className="text-muted-foreground">
+              Administra usuarios, roles y permisos del sistema
+            </p>
+          </div>
         {canCreateUsers && (
           <div className="flex gap-2">
             <Button variant="outline" onClick={handleInviteClick}>
@@ -649,6 +651,7 @@ export default function UsersPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </ProtectedRoute>
   )
 }

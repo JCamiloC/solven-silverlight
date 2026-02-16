@@ -5,17 +5,19 @@ import { UserProfile } from '@/components/security/user-profile'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { User, Shield } from 'lucide-react'
+import { ProtectedRoute } from '@/components/auth/protected-route'
 
 export default function ConfiguracionPage() {
   return (
-    <div className="container max-w-4xl py-6 space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Configuración</h1>
-        <p className="text-muted-foreground mt-2">
-          Gestiona tu perfil personal y configuraciones de seguridad
-        </p>
-      </div>
+    <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
+      <div className="container max-w-4xl py-6 space-y-8">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold">Configuración</h1>
+          <p className="text-muted-foreground mt-2">
+            Gestiona tu perfil personal y configuraciones de seguridad
+          </p>
+        </div>
 
       {/* Perfil de Usuario */}
       <Card>
@@ -50,6 +52,7 @@ export default function ConfiguracionPage() {
           <SecuritySettings />
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </ProtectedRoute>
   )
 }
