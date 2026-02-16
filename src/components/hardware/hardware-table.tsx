@@ -312,10 +312,8 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       }, 300)
 
       // ==========================================
-      // FLUJO DE FIRMAS TEMPORALMENTE COMENTADO
+      // FLUJO DE FIRMAS DIGITALES
       // ==========================================
-      // TODO: Reactivar cuando se implemente completamente el sistema de firmas
-      /*
       // Buscar acta existente
       setPdfProgress(10)
       const existingActa = await ActasService.getByHardwareAssetId(asset.id)
@@ -334,7 +332,8 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
         let empresaCliente = undefined
         if (hardware.client_id) {
           try {
-            const { supabase } = await import('@/lib/supabase/client')
+            const { createClient } = await import('@/lib/supabase/client')
+            const supabase = createClient()
             const { data: clientData } = await supabase
               .from('clients')
               .select('name, nit')
@@ -367,9 +366,8 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
             nombre: existingActa.cliente_nombre || hardware.persona_responsable || 'No especificado',
             cedula: existingActa.cliente_cedula || undefined,
           },
-          // TEMPORALMENTE COMENTADO - Firmas digitales
-          // generadorFirmaUrl: existingActa.generador_firma_url || null,
-          // clienteFirmaUrl: existingActa.cliente_firma_url || null,
+          generadorFirmaUrl: existingActa.generador_firma_url || null,
+          clienteFirmaUrl: existingActa.cliente_firma_url || null,
         })
 
         clearInterval(progressInterval)
@@ -400,10 +398,12 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       setGeneratingPDF(false)
       setShowActaDialogFor(asset)
       clearInterval(progressInterval)
-      */
 
+      return
+
+      /*
       // ==========================================
-      // GENERACIÓN DIRECTA DE PDF (SIN FIRMAS)
+      // GENERACIÓN DIRECTA DE PDF (SIN FIRMAS) - DESHABILITADO
       // ==========================================
       setPdfProgress(30)
       const hardware = await hardwareService.getById(asset.id)
@@ -462,6 +462,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
           description: 'El PDF se ha descargado correctamente.',
         })
       }, 1000)
+      */
 
     } catch (error) {
       console.error('Error generating acta:', error)

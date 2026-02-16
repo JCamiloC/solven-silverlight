@@ -26,9 +26,9 @@ interface ActaDeliveryData {
     nombre: string
     nit: string
   }
-  // TEMPORALMENTE COMENTADO - Firmas digitales
-  // generadorFirmaUrl?: string | null
-  // clienteFirmaUrl?: string | null
+  // URLs de firmas digitales
+  generadorFirmaUrl?: string | null
+  clienteFirmaUrl?: string | null
 }
 
 export class HardwareDeliveryActaPDF {
@@ -361,10 +361,8 @@ export class HardwareDeliveryActaPDF {
       doc.text('_________________________________', col2X + 5, cedulaUnderlineYRight)
 
       // ==========================================
-      // CÓDIGO DE FIRMAS DIGITALES TEMPORALMENTE COMENTADO
+      // FIRMAS DIGITALES
       // ==========================================
-      // TODO: Implementar firmas digitales completas en el futuro
-      /*
       // Si se tienen imágenes de firma, intentar incrustarlas dentro de las cajas
       try {
         const genUrl = (data as any).generadorFirmaUrl || null
@@ -418,7 +416,6 @@ export class HardwareDeliveryActaPDF {
         // Si la imagen no se puede cargar, no bloquear el flujo
         console.warn('No se pudo incrustar imagen de firma en PDF', e)
       }
-      */
 
       yPos += signatureBoxHeight + 15
 
