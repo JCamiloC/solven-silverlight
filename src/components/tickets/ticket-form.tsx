@@ -33,6 +33,7 @@ import { useCreateTicket, useUpdateTicket } from '@/hooks/use-tickets'
 import { useAuth } from '@/hooks/use-auth'
 import { useHardwareAssetsByClient } from '@/hooks/use-hardware'
 import { useSoftwareByClient } from '@/hooks/use-software'
+import { useCustomApplicationsByClient } from '@/hooks/use-custom-applications'
 import { useAccessCredentialsByClient } from '@/hooks/use-access-credentials'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2, AlertCircle, Upload, X } from 'lucide-react'
@@ -60,6 +61,7 @@ const ticketFormSchema = z.object({
   // Campos relacionados (solo uno puede estar lleno según categoría)
   hardware_id: z.string().optional(),
   software_id: z.string().optional(),
+  software_source: z.enum(['license', 'custom_app']).optional(),
   access_credential_id: z.string().optional(),
 })
 
@@ -137,6 +139,7 @@ export function TicketForm({
       assigned_to: undefined,
       hardware_id: undefined,
       software_id: undefined,
+      software_source: undefined,
       access_credential_id: undefined,
     },
   })
@@ -148,7 +151,19 @@ export function TicketForm({
   // Obtener datos según categoría y cliente
   const { data: hardwareList, isLoading: loadingHardware } = useHardwareAssetsByClient(selectedClientId || '')
   const { data: softwareList, isLoading: loadingSoftware } = useSoftwareByClient(selectedClientId || '')
+  const { data: customApplicationsList, isLoading: loadingCustomApplications } = useCustomApplicationsByClient(selectedClientId || '')
   const { data: accessList, isLoading: loadingAccess } = useAccessCredentialsByClient(selectedClientId || '')
+
+  const softwareOptions = [
+    ...(softwareList?.map((sw) => ({
+      value: `license:${sw.id}`,
+      label: `${sw.name} ${sw.version} - ${sw.license_type}`,
+    })) || []),
+    ...(customApplicationsList?.map((app) => ({
+      value: `custom_app:${app.id}`,
+      label: `${app.name} - Aplicativo`,
+    })) || []),
+  ]
   
   // Función para manejar selección de archivo
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -276,6 +291,7 @@ export function TicketForm({
           // Campos relacionados según categoría
           hardware_id: data.category === 'hardware' && data.hardware_id !== 'other' ? data.hardware_id : undefined,
           software_id: data.category === 'software' && data.software_id !== 'other' ? data.software_id : undefined,
+          software_source: data.category === 'software' && data.software_id !== 'other' ? data.software_source : undefined,
           access_credential_id: data.category === 'access' && data.access_credential_id !== 'other' ? data.access_credential_id : undefined,
           // Datos del archivo adjunto
           attachment_url: attachmentData.url,
@@ -636,17 +652,37 @@ export function TicketForm({
                     <FormLabel>Software</FormLabel>
                     <FormControl>
                       <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={loadingSoftware}
+                        onValueChange={(value) => {
+                          if (value === 'other') {
+                            field.onChange('other')
+                            form.setValue('software_source', undefined)
+                            return
+                          }
+
+                          const [source, id] = value.split(':')
+                          if (!id || (source !== 'license' && source !== 'custom_app')) {
+                            return
+                          }
+
+                          field.onChange(id)
+                          form.setValue('software_source', source as 'license' | 'custom_app')
+                        }}
+                        value={
+                          field.value === 'other'
+                            ? 'other'
+                            : field.value && form.watch('software_source')
+                              ? `${form.watch('software_source')}:${field.value}`
+                              : undefined
+                        }
+                        disabled={loadingSoftware || loadingCustomApplications}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder={loadingSoftware ? "Cargando..." : "Seleccione una licencia"} />
+                          <SelectValue placeholder={(loadingSoftware || loadingCustomApplications) ? "Cargando..." : "Seleccione software o aplicativo"} />
                         </SelectTrigger>
                         <SelectContent>
-                          {softwareList?.map((sw) => (
-                            <SelectItem key={sw.id} value={sw.id}>
-                              {sw.name} {sw.version} - {sw.license_type}
+                          {softwareOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
                             </SelectItem>
                           ))}
                           <SelectItem value="other">Otro (no está en la lista)</SelectItem>

@@ -48,6 +48,7 @@ import { useAssignableUsers } from '@/hooks/use-users'
 import { useClients } from '@/hooks/use-clients'
 import { useHardwareAsset } from '@/hooks/use-hardware'
 import { useSoftwareLicense } from '@/hooks/use-software'
+import { useCustomApplication } from '@/hooks/use-custom-applications'
 import { useAccessCredential } from '@/hooks/use-access-credentials'
 import { TicketCommentInsert } from '@/lib/services/ticket-comments'
 import { TicketDetailPDF } from '@/lib/services/ticket-detail-pdf'
@@ -71,10 +72,13 @@ export default function TicketDetailPage() {
   const { data: comments = [], isLoading: commentsLoading } = useTicketComments(ticketId)
   const { data: assignableUsers = [] } = useAssignableUsers()
   const { data: clients = [] } = useClients()
+  const isCustomApplication = ticket?.software_source === 'custom_app'
+  const relatedSoftwareId = ticket?.software_id || ''
   
   // Obtener datos relacionados según categoría
   const { data: relatedHardware } = useHardwareAsset(ticket?.hardware_id || '')
-  const { data: relatedSoftware } = useSoftwareLicense(ticket?.software_id || '')
+  const { data: relatedSoftware } = useSoftwareLicense(isCustomApplication ? '' : relatedSoftwareId)
+  const { data: relatedCustomApplication } = useCustomApplication(isCustomApplication ? relatedSoftwareId : '')
   const { data: relatedAccess } = useAccessCredential(ticket?.access_credential_id || '')
   
   const updateTicketMutation = useUpdateTicket()
@@ -629,14 +633,22 @@ export default function TicketDetailPage() {
                 </div>
               )}
               
-              {ticket.category === 'software' && relatedSoftware && (
+              {ticket.category === 'software' && (relatedSoftware || relatedCustomApplication) && (
                 <div className="flex items-start space-x-2">
                   <Package className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">Software</p>
-                    <p className="text-sm text-muted-foreground truncate">{relatedSoftware.name}</p>
-                    {relatedSoftware.license_key && (
-                      <p className="text-xs text-muted-foreground font-mono truncate">{relatedSoftware.license_key}</p>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {ticket.software_source === 'custom_app'
+                        ? relatedCustomApplication?.name
+                        : relatedSoftware?.name}
+                    </p>
+                    {ticket.software_source === 'custom_app' ? (
+                      <p className="text-xs text-muted-foreground truncate">Aplicativo</p>
+                    ) : (
+                      relatedSoftware?.license_key && (
+                        <p className="text-xs text-muted-foreground font-mono truncate">{relatedSoftware.license_key}</p>
+                      )
                     )}
                   </div>
                 </div>

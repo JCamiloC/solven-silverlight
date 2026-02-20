@@ -275,6 +275,7 @@ export interface Ticket {
   priority: 'low' | 'medium' | 'high' | 'critical'
   status: 'open' | 'in_progress' | 'pendiente_confirmacion' | 'resolved' | 'closed'
   category: 'hardware' | 'software' | 'network' | 'access' | 'other'
+  software_source?: 'license' | 'custom_app'
   assigned_to?: string
   created_by: string
   usuario_afectado?: string

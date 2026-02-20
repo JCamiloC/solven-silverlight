@@ -24,6 +24,7 @@ export interface Ticket {
   attachment_size?: number
   hardware_id?: string
   software_id?: string
+  software_source?: 'license' | 'custom_app'
   access_credential_id?: string
   // Campos de notificaciones
   has_update?: boolean
@@ -48,6 +49,7 @@ export interface TicketInsert {
   attachment_size?: number
   hardware_id?: string
   software_id?: string
+  software_source?: 'license' | 'custom_app'
   access_credential_id?: string
 }
 
@@ -69,6 +71,7 @@ export interface TicketUpdate {
   attachment_size?: number
   hardware_id?: string
   software_id?: string
+  software_source?: 'license' | 'custom_app'
   access_credential_id?: string
   has_update?: boolean
   last_update_by?: string
