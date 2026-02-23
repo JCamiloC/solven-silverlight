@@ -17,6 +17,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Table,
   TableBody,
   TableCell,
@@ -154,8 +161,8 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
     },
   ]
 
-  // Only add actions column if not in readOnly mode
-  if (!readOnly) {
+  // Show actions also in readOnly client view, but hide edit/delete there
+  if (!readOnly || !!clientId) {
     columns.push({
       id: 'actions',
       cell: ({ row }) => {
@@ -171,10 +178,12 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
             </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setEditingAsset(asset)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Editar
-              </DropdownMenuItem>
+              {!readOnly && (
+                <DropdownMenuItem onClick={() => setEditingAsset(asset)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Editar
+                </DropdownMenuItem>
+              )}
               {clientId && (
                 <DropdownMenuItem 
                   onClick={() => router.push(`/dashboard/clientes/${clientId}/hardware/${asset.id}/seguimientos`)}
@@ -191,14 +200,18 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
                 <Download className="mr-2 h-4 w-4" />
                 Descargar Acta
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                className="text-destructive"
-                onClick={() => handleDelete(asset)}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Eliminar
-              </DropdownMenuItem>
+              {!readOnly && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    className="text-destructive"
+                    onClick={() => handleDelete(asset)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Eliminar
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )
@@ -221,7 +234,16 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       columnFilters,
       globalFilter,
     },
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
   })
+
+  const typeFilterValue = (table.getColumn('type')?.getFilterValue() as string) || 'all'
+  const statusFilterValue = (table.getColumn('status')?.getFilterValue() as string) || 'all'
+  const typeOptions = Array.from(new Set((data || []).map((asset) => asset.type).filter(Boolean))).sort()
 
   function FollowupCount({ hardwareId }: { hardwareId: string }) {
     const { data, isLoading } = useGetFollowUps(hardwareId)
@@ -489,8 +511,8 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center py-4">
-        <div className="relative w-full sm:max-w-sm">
+      <div className="flex flex-col gap-3 py-4 md:flex-row md:items-center">
+        <div className="relative w-full md:max-w-sm">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar hardware..."
@@ -498,6 +520,39 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
             onChange={(event) => setGlobalFilter(String(event.target.value))}
             className="pl-8"
           />
+        </div>
+        <div className="flex w-full flex-col gap-3 sm:flex-row md:ml-auto md:w-auto">
+          <Select
+            value={typeFilterValue}
+            onValueChange={(value) => table.getColumn('type')?.setFilterValue(value === 'all' ? undefined : value)}
+          >
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Filtrar por tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los tipos</SelectItem>
+              {typeOptions.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={statusFilterValue}
+            onValueChange={(value) => table.getColumn('status')?.setFilterValue(value === 'all' ? undefined : value)}
+          >
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue placeholder="Filtrar por estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="active">Activo</SelectItem>
+              <SelectItem value="maintenance">Mantenimiento</SelectItem>
+              <SelectItem value="retired">Retirado</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
       
@@ -548,8 +603,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       
       <div className="flex items-center justify-end space-x-2 py-4">
         <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} de{' '}
-          {table.getFilteredRowModel().rows.length} fila(s) seleccionadas.
+          Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount()} · {table.getFilteredRowModel().rows.length} resultado(s)
         </div>
         <div className="space-x-2">
           <Button
