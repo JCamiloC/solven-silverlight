@@ -66,7 +66,7 @@ Sistema completo para la generación de actas de entrega de hardware con firmas 
 1. Validar token y recuperar acta
 2. Convertir firma a JPEG con compresión (calidad 90%)
 3. Subir firma a Storage: `actas/public/{acta_id}/cliente.jpg`
-4. Actualizar registro:
+4. Actualizar registro::
    ```typescript
    {
      cliente_nombre: string,
