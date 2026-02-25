@@ -70,9 +70,8 @@ export class TicketReportPDF {
       const metrics = [
         { label: 'Total Tickets', value: stats.total, color: [52, 152, 219] },
         { label: 'Abiertos', value: stats.open, color: [231, 76, 60] },
-        { label: 'En Progreso', value: stats.inProgress, color: [241, 196, 15] },
-        { label: 'Resueltos', value: stats.resolved, color: [46, 204, 113] },
-        { label: 'Cerrados', value: stats.closed, color: [149, 165, 166] },
+        { label: 'Pend. Confirm.', value: stats.pendingConfirmation, color: [241, 196, 15] },
+        { label: 'Solucionados', value: stats.solved, color: [46, 204, 113] },
         { label: 'Críticos', value: stats.critical, color: [192, 57, 43] },
       ]
 
@@ -262,10 +261,15 @@ export class TicketReportPDF {
   private static calculateStats(tickets: TicketWithRelations[]) {
     return {
       total: tickets.length,
-      open: tickets.filter(t => t.status === 'open').length,
-      inProgress: tickets.filter(t => t.status === 'in_progress').length,
-      resolved: tickets.filter(t => t.status === 'resolved').length,
-      closed: tickets.filter(t => t.status === 'closed').length,
+      open: tickets.filter(t => {
+        const status = t.status as string
+        return status === 'open' || status === 'in_progress'
+      }).length,
+      pendingConfirmation: tickets.filter(t => t.status === 'pendiente_confirmacion').length,
+      solved: tickets.filter(t => {
+        const status = t.status as string
+        return status === 'solucionado' || status === 'resolved' || status === 'closed'
+      }).length,
       critical: tickets.filter(t => t.priority === 'critical').length,
       lowPriority: tickets.filter(t => t.priority === 'low').length,
       mediumPriority: tickets.filter(t => t.priority === 'medium').length,
@@ -303,10 +307,11 @@ export class TicketReportPDF {
   private static getStatusLabel(status: string): string {
     const labels: Record<string, string> = {
       open: 'Abierto',
-      in_progress: 'En Progreso',
+      in_progress: 'Abierto',
       pendiente_confirmacion: 'Pdte. Confirm.',
-      resolved: 'Resuelto',
-      closed: 'Cerrado',
+      solucionado: 'Solucionado',
+      resolved: 'Solucionado',
+      closed: 'Solucionado',
     }
     return labels[status] || status
   }

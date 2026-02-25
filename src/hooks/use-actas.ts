@@ -37,7 +37,22 @@ export function useSignActa() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: (data: any) => ActasService.signByClient(data),
+    mutationFn: async (data: any) => {
+      const response = await fetch('/api/actas/sign-public', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(payload?.error || 'No se pudo firmar el acta')
+      }
+
+      return payload
+    },
     onSuccess: () => {
       toast.success('Acta firmada por cliente')
       qc.invalidateQueries({ queryKey: QUERY_KEYS.actas })

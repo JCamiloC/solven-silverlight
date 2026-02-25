@@ -23,6 +23,10 @@ export interface ClientUpdate {
   nit?: string
   mantenimientos_al_anio?: number
   client_type?: 'on_demand_software' | 'on_demand_hardware' | 'on_demand_ambos' | 'contrato_software' | 'contrato_hardware' | 'contrato_ambos' | 'no_aplica'
+  acta_generador_nombre?: string
+  acta_generador_cedula?: string
+  acta_generador_firma_url?: string
+  acta_generador_actualizado_en?: string
 }
 
 export class ClientService {

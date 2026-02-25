@@ -5,6 +5,7 @@
 
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { jsPDF } from 'jspdf'
 
 import { HardwareAsset } from '@/types'
 import { getSoftwareDisplayName } from '@/lib/utils'
@@ -37,7 +38,6 @@ export class HardwareDeliveryActaPDF {
    */
   static async generateActa(data: ActaDeliveryData): Promise<void> {
     try {
-      const { default: jsPDF } = await import('jspdf')
       const doc = new jsPDF()
 
       const { hardware, entregadoPor, currentUserName } = data
@@ -160,7 +160,8 @@ export class HardwareDeliveryActaPDF {
         doc.setFont('helvetica', 'normal')
         
         // Truncar texto si es muy largo
-        const valueText = value.length > 50 ? value.substring(0, 50) + '...' : value
+        const safeValue = String(value ?? 'N/A')
+        const valueText = safeValue.length > 50 ? safeValue.substring(0, 50) + '...' : safeValue
         doc.text(valueText, margin + col1Width, yPos)
         
         yPos += rowHeight
@@ -304,14 +305,10 @@ export class HardwareDeliveryActaPDF {
       const col1X = margin
       const col2X = pageWidth / 2 + 10
       const colWidth = (pageWidth - 2 * margin - 20) / 2
-      // Aumentamos la altura de la caja de firma y reservamos
-      // un área superior para la imagen y un área inferior para
-      // nombre y cédula, evitando que la imagen los tape.
-      const signatureBoxHeight = 70
-
-      // Calcular áreas internas
-      const imageAreaHeight = signatureBoxHeight - 28 // dejar espacio para texto
-      const textAreaTopOffset = imageAreaHeight + 6
+      const signatureBoxHeight = 90
+      const imageTopY = yPos + 10
+      const imageAreaHeight = 34
+      const textTopY = imageTopY + imageAreaHeight + 10
 
       // Columna Izquierda - Quien Entrega (Empresa)
       doc.setFontSize(9)
@@ -320,44 +317,52 @@ export class HardwareDeliveryActaPDF {
 
       doc.setFontSize(8)
       doc.setFont('helvetica', 'normal')
-      const nameYLeft = yPos + 20
+      const nameYLeft = textTopY
       const nameUnderlineYLeft = nameYLeft + 4
       const cedulaYLeft = nameUnderlineYLeft + 6
       const cedulaUnderlineYLeft = cedulaYLeft + 4
 
-      // Mostrar datos de la empresa
-      const empresaNombreFirma = data.empresaCliente?.nombre || 'SILVERLIGHT COLOMBIA'
-      const empresaNitFirma = data.empresaCliente?.nit || 'No especificado'
+      // Mostrar datos de quien entrega
+      const entregaNombre = data.entregadoPor?.nombre || 'No especificado'
+      const entregaCedula = data.entregadoPor?.cedula || 'No especificada'
 
-      doc.text('Empresa:', col1X + 5, nameYLeft)
+      doc.text('Nombre:', col1X + 5, nameYLeft)
       doc.setFont('helvetica', 'bold')
-      doc.text(this.truncateText(empresaNombreFirma, 30), col1X + 5, nameYLeft + 3)
+      doc.text(this.truncateText(entregaNombre, 30), col1X + 5, nameYLeft + 3)
       doc.setFont('helvetica', 'normal')
       doc.text('_________________________________', col1X + 5, nameUnderlineYLeft)
 
-      doc.text('NIT:', col1X + 5, cedulaYLeft)
+      doc.text('Cédula:', col1X + 5, cedulaYLeft)
       doc.setFont('helvetica', 'bold')
-      doc.text(empresaNitFirma, col1X + 5, cedulaYLeft + 3)
+      doc.text(this.truncateText(entregaCedula, 30), col1X + 5, cedulaYLeft + 3)
       doc.setFont('helvetica', 'normal')
       doc.text('_________________________________', col1X + 5, cedulaUnderlineYLeft)
 
-      // Columna Derecha - Quien Recibe (Espacios en blanco para llenar manualmente)
+      // Columna Derecha - Quien Recibe
       doc.setFontSize(9)
       doc.setFont('helvetica', 'bold')
       doc.text('FIRMA DE QUIEN RECIBE', col2X + colWidth / 2, yPos + 6, { align: 'center' })
 
       doc.setFontSize(8)
       doc.setFont('helvetica', 'normal')
-      const nameYRight = yPos + 20
+      const nameYRight = textTopY
       const nameUnderlineYRight = nameYRight + 4
       const cedulaYRight = nameUnderlineYRight + 6
       const cedulaUnderlineYRight = cedulaYRight + 4
 
-      // Dejar espacios en blanco para completar manualmente
+      const recibeNombre = data.recibidoPor?.nombre || 'No especificado'
+      const recibeCedula = data.recibidoPor?.cedula || 'No especificada'
+
       doc.text('Nombre:', col2X + 5, nameYRight)
+      doc.setFont('helvetica', 'bold')
+      doc.text(this.truncateText(recibeNombre, 30), col2X + 5, nameYRight + 3)
+      doc.setFont('helvetica', 'normal')
       doc.text('_________________________________', col2X + 5, nameUnderlineYRight)
 
       doc.text('Cédula:', col2X + 5, cedulaYRight)
+      doc.setFont('helvetica', 'bold')
+      doc.text(this.truncateText(recibeCedula, 30), col2X + 5, cedulaYRight + 3)
+      doc.setFont('helvetica', 'normal')
       doc.text('_________________________________', col2X + 5, cedulaUnderlineYRight)
 
       // ==========================================
@@ -370,7 +375,7 @@ export class HardwareDeliveryActaPDF {
 
         // Ajustar anchura máxima de la imagen y altura para mantener ambas del mismo tamaño
         const imgMaxWidth = Math.min(120, colWidth - 20)
-        const imgMaxHeight = imageAreaHeight - 6
+        const imgMaxHeight = imageAreaHeight
 
         // Helper: fetch image and return DataURL, adding cache-bust
         const fetchImageAsDataUrl = async (url: string) => {
@@ -391,14 +396,19 @@ export class HardwareDeliveryActaPDF {
           }
         }
 
+        const getImageFormat = (dataUrl: string): 'PNG' | 'JPEG' => {
+          const lower = dataUrl.toLowerCase()
+          return lower.startsWith('data:image/png') ? 'PNG' : 'JPEG'
+        }
+
         if (genUrl) {
           const dataUrl = await fetchImageAsDataUrl(genUrl)
           if (dataUrl) {
             const imgWidth = imgMaxWidth
             const imgHeight = imgMaxHeight
             const imgX = col1X + (colWidth - imgWidth) / 2
-            const imgY = yPos + 6
-            doc.addImage(dataUrl, 'PNG', imgX, imgY, imgWidth, imgHeight)
+            const imgY = imageTopY
+            doc.addImage(dataUrl, getImageFormat(dataUrl), imgX, imgY, imgWidth, imgHeight)
           }
         }
 
@@ -408,8 +418,8 @@ export class HardwareDeliveryActaPDF {
             const imgWidth = imgMaxWidth
             const imgHeight = imgMaxHeight
             const imgX = col2X + (colWidth - imgWidth) / 2
-            const imgY = yPos + 6
-            doc.addImage(dataUrl, 'PNG', imgX, imgY, imgWidth, imgHeight)
+            const imgY = imageTopY
+            doc.addImage(dataUrl, getImageFormat(dataUrl), imgX, imgY, imgWidth, imgHeight)
           }
         }
       } catch (e) {
@@ -438,7 +448,9 @@ export class HardwareDeliveryActaPDF {
       doc.save(filename)
     } catch (error) {
       console.error('Error generating delivery acta PDF:', error)
-      throw new Error('Failed to generate delivery acta PDF')
+      throw new Error(
+        `Failed to generate delivery acta PDF: ${error instanceof Error ? error.message : 'unknown error'}`
+      )
     }
   }
 

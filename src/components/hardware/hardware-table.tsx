@@ -67,7 +67,6 @@ import { HardwareDeliveryActaPDF } from '@/lib/services/hardware-delivery-acta-p
 import { toast } from 'sonner'
 import { Progress } from '@/components/ui/progress'
 import ActasService from '@/services/actas'
-import ActaGeneratorModal from '@/components/actas/ActaGeneratorModal'
 
 interface HardwareTableProps {
   data: HardwareAsset[]
@@ -85,8 +84,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const [pdfProgress, setPdfProgress] = useState(0)
   const [pdfProgressText, setPdfProgressText] = useState('')
-  const [showActaDialogFor, setShowActaDialogFor] = useState<HardwareAsset | null>(null)
-  const [actaLink, setActaLink] = useState<string | null>(null)
+  const [pdfType, setPdfType] = useState<'lifesheet' | 'acta'>('lifesheet')
   
   const updateMutation = useUpdateHardware()
   const deleteMutation = useDeleteHardware()
@@ -261,6 +259,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
 
   const generateLifesheet = async (asset: HardwareAsset) => {
     try {
+      setPdfType('lifesheet')
       setGeneratingPDF(true)
       setPdfProgress(0)
       setPdfProgressText('Iniciando generación...')
@@ -321,6 +320,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
 
   const downloadActa = async (asset: HardwareAsset) => {
     try {
+      setPdfType('acta')
       setGeneratingPDF(true)
       setPdfProgress(0)
       setPdfProgressText('Generando Acta de Entrega...')
@@ -333,46 +333,56 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
         })
       }, 300)
 
-      // ==========================================
-      // FLUJO DE FIRMAS DIGITALES
-      // ==========================================
+      setPdfProgress(20)
+      const hardware = await hardwareService.getById(asset.id)
+
+      if (!hardware) throw new Error('No se pudo obtener la información del hardware')
+
       // Buscar acta existente
-      setPdfProgress(10)
+      setPdfProgress(35)
       const existingActa = await ActasService.getByHardwareAssetId(asset.id)
+
+      setPdfProgressText('Obteniendo información del cliente...')
+      setPdfProgress(45)
+
+      let empresaCliente = undefined
+      let firmaEmpresa: { nombre?: string; cedula?: string; firmaUrl?: string } = {}
+      if (hardware.client_id) {
+        try {
+          const { createClient } = await import('@/lib/supabase/client')
+          const supabase = createClient()
+          const { data: clientData } = await supabase
+            .from('clients')
+            .select('name, nit, acta_generador_nombre, acta_generador_cedula, acta_generador_firma_url')
+            .eq('id', hardware.client_id)
+            .single()
+
+          if (clientData) {
+            empresaCliente = {
+              nombre: clientData.name,
+              nit: clientData.nit || 'No especificado',
+            }
+            firmaEmpresa = {
+              nombre: clientData.acta_generador_nombre || undefined,
+              cedula: clientData.acta_generador_cedula || undefined,
+              firmaUrl: clientData.acta_generador_firma_url || undefined,
+            }
+          }
+        } catch (error) {
+          console.warn('Error obteniendo datos del cliente:', error)
+        }
+      }
+
+      const firmaEmpresaCompleta = Boolean(
+        firmaEmpresa.nombre && firmaEmpresa.cedula && firmaEmpresa.firmaUrl
+      )
+
+      if (!firmaEmpresaCompleta) {
+        throw new Error('Debes registrar primero la firma de la empresa en Datos Básicos del cliente')
+      }
 
       // Si existe y está completa, generar PDF con las firmas
       if (existingActa && existingActa.estado_firma === 'completo') {
-        setPdfProgress(30)
-        const hardware = await hardwareService.getById(asset.id)
-
-        if (!hardware) throw new Error('No se pudo obtener la información del hardware')
-
-        setPdfProgressText('Obteniendo información del cliente...')
-        setPdfProgress(50)
-
-        // Obtener información del cliente para mostrar en el PDF
-        let empresaCliente = undefined
-        if (hardware.client_id) {
-          try {
-            const { createClient } = await import('@/lib/supabase/client')
-            const supabase = createClient()
-            const { data: clientData } = await supabase
-              .from('clients')
-              .select('name, nit')
-              .eq('id', hardware.client_id)
-              .single()
-            
-            if (clientData) {
-              empresaCliente = {
-                nombre: clientData.name,
-                nit: clientData.nit || 'No especificado'
-              }
-            }
-          } catch (error) {
-            console.warn('Error obteniendo datos del cliente:', error)
-          }
-        }
-
         setPdfProgressText('Generando documento PDF...')
         setPdfProgress(70)
 
@@ -407,19 +417,71 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
         return
       }
 
-      // Si existe acta pero falta la firma del cliente, mostrar dialog con link
-      if (existingActa && existingActa.estado_firma !== 'completo') {
-        setActaLink(existingActa.link_temporal || null)
-        setShowActaDialogFor(asset)
+      if (!hardware.correo_responsable) {
+        throw new Error('El equipo no tiene correo del responsable para enviar el link de firma')
+      }
+
+      const confirmSend = window.confirm(
+        '¿Está seguro de enviar por correo el link de firma a quien recibe el hardware?'
+      )
+
+      if (!confirmSend) {
         setGeneratingPDF(false)
         clearInterval(progressInterval)
+        setPdfProgress(0)
         return
       }
 
-      // Si no existe acta, abrir modal para capturar firma del generador
-      setGeneratingPDF(false)
-      setShowActaDialogFor(asset)
+      let acta = existingActa
+      if (!acta) {
+        setPdfProgressText('Creando acta para firma del receptor...')
+        setPdfProgress(60)
+        acta = await ActasService.createActa({
+          hardware_asset_id: asset.id,
+          generador_nombre: firmaEmpresa.nombre,
+          generador_cedula: firmaEmpresa.cedula,
+          generador_firma_url: firmaEmpresa.firmaUrl,
+        })
+      }
+
+      if (!acta?.link_temporal) {
+        throw new Error('No se pudo generar el link público de firma')
+      }
+
+      const signingUrl = `${window.location.origin}/actas/${acta.link_temporal}`
+      setPdfProgressText('Enviando link de firma por correo...')
+      setPdfProgress(80)
+
+      const mailRes = await fetch('/api/actas/send-link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: hardware.correo_responsable,
+          signingUrl,
+          hardwareName: hardware.name,
+          clientName: empresaCliente?.nombre,
+          recipientName: hardware.persona_responsable || undefined,
+        }),
+      })
+
+      if (!mailRes.ok) {
+        const data = await mailRes.json().catch(() => ({}))
+        throw new Error(data?.error || 'No se pudo enviar el correo con el link de firma')
+      }
+
       clearInterval(progressInterval)
+      setPdfProgress(100)
+      setPdfProgressText('¡Link enviado!')
+
+      setTimeout(() => {
+        setGeneratingPDF(false)
+        setPdfProgress(0)
+        toast.success('Link de firma enviado por correo', {
+          description: 'Cuando el receptor firme, podrás descargar el acta.',
+        })
+      }, 700)
 
       return
 
@@ -645,47 +707,13 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
         </DialogContent>
       </Dialog>
 
-      {/* Acta Generator Dialog */}
-      <Dialog open={!!showActaDialogFor} onOpenChange={(open) => !open && setShowActaDialogFor(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Generar Acta de Entrega</DialogTitle>
-            <DialogDescription>
-              Completa los datos y firma para generar el link de firma del cliente.
-            </DialogDescription>
-          </DialogHeader>
-          {showActaDialogFor && (
-            <div>
-              <ActaGeneratorModal
-                hardwareAssetId={showActaDialogFor.id}
-                onCreated={(link) => {
-                  setActaLink(link)
-                  setShowActaDialogFor(null)
-                  toast.success('Link de firma generado')
-                }}
-              />
-
-              {actaLink && (
-                <div className="mt-4">
-                  <p className="text-sm">Link para que el cliente firme:</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <input className="flex-1" value={`${window.location.origin}/actas/${actaLink}`} readOnly />
-                    <Button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/actas/${actaLink}`)}>Copiar</Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
       {/* PDF Generation Progress Dialog */}
       <Dialog open={generatingPDF} onOpenChange={() => {}}>
         <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              Generando Hoja de Vida
+              {pdfType === 'acta' ? 'Generando Acta' : 'Generando Hoja de Vida'}
             </DialogTitle>
             <DialogDescription>
               Por favor espera mientras se genera el documento PDF...

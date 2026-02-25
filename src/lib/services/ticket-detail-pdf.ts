@@ -306,10 +306,11 @@ export class TicketDetailPDF {
   private static getStatusLabel(status: string): string {
     const labels: Record<string, string> = {
       open: 'Abierto',
-      in_progress: 'En Progreso',
+      in_progress: 'Abierto',
       pendiente_confirmacion: 'Pendiente Confirmación',
-      resolved: 'Resuelto',
-      closed: 'Cerrado',
+      solucionado: 'Solucionado',
+      resolved: 'Solucionado',
+      closed: 'Solucionado',
     }
     return labels[status] || status
   }

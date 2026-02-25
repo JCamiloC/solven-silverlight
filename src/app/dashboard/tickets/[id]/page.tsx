@@ -158,10 +158,11 @@ export default function TicketDetailPage() {
   const getStatusBadge = (status: string) => {
     const variants = {
       open: { variant: 'destructive' as const, icon: AlertTriangle, label: 'Abierto' },
-      in_progress: { variant: 'default' as const, icon: Clock, label: 'En Progreso' },
+      in_progress: { variant: 'destructive' as const, icon: AlertTriangle, label: 'Abierto' },
       pendiente_confirmacion: { variant: 'secondary' as const, icon: Clock, label: 'Pendiente Confirmación' },
-      resolved: { variant: 'outline' as const, icon: CheckCircle, label: 'Resuelto' },
-      closed: { variant: 'secondary' as const, icon: XCircle, label: 'Cerrado' },
+      solucionado: { variant: 'outline' as const, icon: CheckCircle, label: 'Solucionado' },
+      resolved: { variant: 'outline' as const, icon: CheckCircle, label: 'Solucionado' },
+      closed: { variant: 'outline' as const, icon: CheckCircle, label: 'Solucionado' },
     }
     
     const config = variants[status as keyof typeof variants] || variants.open
@@ -539,10 +540,8 @@ export default function TicketDetailPage() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="open">Abierto</SelectItem>
-                                <SelectItem value="in_progress">En Progreso</SelectItem>
                                 <SelectItem value="pendiente_confirmacion">Pendiente Confirmación</SelectItem>
-                                <SelectItem value="resolved">Resuelto</SelectItem>
-                                <SelectItem value="closed">Cerrado</SelectItem>
+                                <SelectItem value="solucionado">Solucionado</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>

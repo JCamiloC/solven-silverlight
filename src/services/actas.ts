@@ -42,7 +42,11 @@ async function dataUrlToJpegBlob(dataUrl: string, quality = 0.9) {
 }
 
 export const ActasService = {
-  async createActa({ hardware_asset_id, generador_nombre, generador_cedula, generador_firma_dataurl }: any) {
+  async createActa({ hardware_asset_id, generador_nombre, generador_cedula, generador_firma_dataurl, generador_firma_url }: any) {
+    const token = (globalThis?.crypto && (globalThis.crypto as any).randomUUID)
+      ? (globalThis.crypto as any).randomUUID()
+      : Math.random().toString(36).slice(2)
+
     // Crear registro sin urls
     const { data, error } = await supabase
       .from('hardware_actas')
@@ -51,6 +55,8 @@ export const ActasService = {
           hardware_asset_id,
           generador_nombre,
           generador_cedula,
+          generador_firma_url: generador_firma_url || null,
+          link_temporal: token,
           estado_firma: 'falta_cliente',
         },
       ])
@@ -74,13 +80,9 @@ export const ActasService = {
       const publicUrl = supabase.storage.from('actas').getPublicUrl(path).data?.publicUrl || null
 
       // actualizar registro
-      const token = (globalThis?.crypto && (globalThis.crypto as any).randomUUID)
-        ? (globalThis.crypto as any).randomUUID()
-        : Math.random().toString(36).slice(2)
-
       const { error: updateError } = await supabase
         .from('hardware_actas')
-        .update({ generador_firma_url: publicUrl, link_temporal: token, actualizado_en: new Date().toISOString() })
+        .update({ generador_firma_url: publicUrl, actualizado_en: new Date().toISOString() })
         .eq('id', acta.id)
 
       if (updateError) throw new Error(updateError.message)
@@ -88,7 +90,7 @@ export const ActasService = {
       return { ...acta, generador_firma_url: publicUrl, link_temporal: token }
     }
 
-    return acta
+    return { ...acta, link_temporal: token, generador_firma_url: generador_firma_url || acta.generador_firma_url }
   },
 
   async getByToken(token: string) {

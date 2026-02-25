@@ -20,9 +20,11 @@ export function RecentTickets() {
   const getStatusBadge = (status: string) => {
     const variants = {
       open: { variant: 'destructive' as const, icon: AlertTriangle, label: 'Abierto' },
-      in_progress: { variant: 'default' as const, icon: Clock, label: 'En Progreso' },
-      resolved: { variant: 'secondary' as const, icon: CheckCircle, label: 'Resuelto' },
-      closed: { variant: 'outline' as const, icon: CheckCircle, label: 'Cerrado' },
+      in_progress: { variant: 'destructive' as const, icon: AlertTriangle, label: 'Abierto' },
+      pendiente_confirmacion: { variant: 'default' as const, icon: Clock, label: 'Pendiente Confirmación' },
+      solucionado: { variant: 'secondary' as const, icon: CheckCircle, label: 'Solucionado' },
+      resolved: { variant: 'secondary' as const, icon: CheckCircle, label: 'Solucionado' },
+      closed: { variant: 'secondary' as const, icon: CheckCircle, label: 'Solucionado' },
     }
     
     const config = variants[status as keyof typeof variants] || variants.open

@@ -37,18 +37,20 @@ interface TicketTableProps {
 
 const statusLabels = {
   open: 'Abierto',
-  in_progress: 'En Progreso',
+  in_progress: 'Abierto',
   pendiente_confirmacion: 'Pendiente Confirmación',
-  resolved: 'Resuelto',
-  closed: 'Cerrado',
+  solucionado: 'Solucionado',
+  resolved: 'Solucionado',
+  closed: 'Solucionado',
 }
 
 const statusColors = {
   open: 'bg-blue-500',
-  in_progress: 'bg-yellow-500',
+  in_progress: 'bg-blue-500',
   pendiente_confirmacion: 'bg-orange-500',
+  solucionado: 'bg-green-500',
   resolved: 'bg-green-500',
-  closed: 'bg-gray-500',
+  closed: 'bg-green-500',
 }
 
 const priorityLabels = {

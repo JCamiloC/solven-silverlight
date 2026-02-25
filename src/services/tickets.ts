@@ -90,18 +90,18 @@ export class TicketService {
     const { data: inProgress } = await supabase
       .from('tickets')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'in_progress')
+      .in('status', ['open', 'in_progress'])
 
-    const { data: resolved } = await supabase
+    const { data: solved } = await supabase
       .from('tickets')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'resolved')
+      .in('status', ['solucionado', 'resolved', 'closed'])
 
     return {
       total: total?.length || 0,
       open: open?.length || 0,
       inProgress: inProgress?.length || 0,
-      resolved: resolved?.length || 0,
+      solved: solved?.length || 0,
     }
   }
 

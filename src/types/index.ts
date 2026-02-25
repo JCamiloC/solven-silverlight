@@ -44,6 +44,10 @@ export interface Client {
   nit?: string
   mantenimientos_al_anio?: number
   client_type?: ClientType
+  acta_generador_nombre?: string
+  acta_generador_cedula?: string
+  acta_generador_firma_url?: string
+  acta_generador_actualizado_en?: string
   created_at: string
   updated_at: string
 }
@@ -142,6 +146,23 @@ export interface HardwareUpgrade {
     last_name: string
     email: string
   }
+}
+
+export type ClientMaintenanceStatus = 'pendiente' | 'realizado' | 'reprogramado' | 'omitido'
+
+export interface ClientMaintenanceSchedule {
+  id: string
+  client_id: string
+  year: number
+  slot_number: number
+  expected_date: string
+  status: ClientMaintenanceStatus
+  completed_at?: string | null
+  completed_by?: string | null
+  notes?: string | null
+  related_ticket_id?: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface SoftwareLicense {
@@ -273,7 +294,7 @@ export interface Ticket {
   title: string
   description: string
   priority: 'low' | 'medium' | 'high' | 'critical'
-  status: 'open' | 'in_progress' | 'pendiente_confirmacion' | 'resolved' | 'closed'
+  status: 'open' | 'pendiente_confirmacion' | 'solucionado'
   category: 'hardware' | 'software' | 'network' | 'access' | 'other'
   software_source?: 'license' | 'custom_app'
   assigned_to?: string

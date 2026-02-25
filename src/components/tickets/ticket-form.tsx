@@ -54,7 +54,7 @@ const ticketFormSchema = z.object({
     .max(100, 'El nombre no puede exceder 100 caracteres'),
   category: z.enum(['hardware', 'software', 'network', 'access', 'other']),
   priority: z.enum(['low', 'medium', 'high', 'critical']),
-  status: z.enum(['open', 'in_progress', 'pendiente_confirmacion', 'resolved', 'closed']).optional(),
+  status: z.enum(['open', 'pendiente_confirmacion', 'solucionado']).optional(),
   assigned_to: z.string().optional(),
   created_at: z.string().optional(), // Campo de fecha de creación personalizada
   created_at_time: z.string().optional(), // Campo de hora opcional
@@ -93,10 +93,8 @@ const priorityLabels = {
 
 const statusLabels = {
   open: 'Abierto',
-  in_progress: 'En Revisión',
   pendiente_confirmacion: 'Pendiente Confirmación',
-  resolved: 'Resuelto',
-  closed: 'Cerrado',
+  solucionado: 'Solucionado',
 }
 
 export function TicketForm({ 
@@ -256,8 +254,8 @@ export function TicketForm({
         // Solo permitir cambiar estado si tiene permisos
         if (canChangeStatus && data.status) {
           updates.status = data.status
-          // Si se marca como cerrado, agregar timestamp
-          if (data.status === 'closed') {
+          // Si se marca como solucionado, agregar timestamp
+          if (data.status === 'solucionado') {
             updates.resolved_at = new Date().toISOString()
           }
         }

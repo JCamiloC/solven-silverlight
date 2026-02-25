@@ -12,6 +12,7 @@ import {
   Key, 
   Ticket, 
   Code,
+  CalendarClock,
   Save,
   ArrowLeft
 } from 'lucide-react'
@@ -48,6 +49,7 @@ import { Users, Mail, Phone } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { ClientType } from '@/types'
 import { getClientTypeLabel, getClientTypeBadgeVariant } from '@/lib/utils/user-type-labels'
+import ClientCompanySignatureModal from '@/components/actas/ClientCompanySignatureModal'
 
 const clientSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -78,7 +80,7 @@ export default function ClienteDetailPage() {
   // Hook de permisos para clientes (valida acceso automáticamente)
   const { isClientUser, readOnly, canEdit } = useClientPermissions()
   
-  const { data: client, isLoading, error } = useClient(clientId)
+  const { data: client, isLoading, error, refetch: refetchClient } = useClient(clientId)
   const updateClient = useUpdateClient()
   
   // Obtener usuarios del cliente
@@ -182,6 +184,13 @@ export default function ClienteDetailPage() {
       href: `/dashboard/clientes/${clientId}/tickets`,
       color: 'bg-red-500 hover:bg-red-600',
     },
+    {
+      title: 'Mantenimientos',
+      description: 'Planificar y controlar mantenimientos',
+      icon: CalendarClock,
+      href: `/dashboard/clientes/${clientId}/mantenimientos`,
+      color: 'bg-amber-500 hover:bg-amber-600',
+    },
   ]
 
   return (
@@ -211,7 +220,20 @@ export default function ClienteDetailPage() {
         {/* Datos Básicos - Vista Condicional */}
         <Card>
           <CardHeader>
-            <CardTitle>Datos Básicos</CardTitle>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle>Datos Básicos</CardTitle>
+              {!isClientUser && (
+                <ClientCompanySignatureModal
+                  clientId={clientId}
+                  initialName={client.acta_generador_nombre}
+                  initialCedula={client.acta_generador_cedula}
+                  initialSignatureUrl={client.acta_generador_firma_url}
+                  onSaved={() => {
+                    refetchClient()
+                  }}
+                />
+              )}
+            </div>
             <CardDescription>
               {isClientUser 
                 ? 'Información de tu empresa. Si necesitas actualizar estos datos, contacta a soporte.'
