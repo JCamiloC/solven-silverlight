@@ -14,7 +14,9 @@ export class TicketReportPDF {
   static async generateReport(
     tickets: TicketWithRelations[],
     clientName: string,
-    isGeneralReport: boolean = false
+    isGeneralReport: boolean = false,
+    reportPeriodSlug?: string,
+    reportPeriodLabel?: string
   ): Promise<void> {
     try {
       // Importar jsPDF
@@ -48,7 +50,8 @@ export class TicketReportPDF {
       
       doc.setFontSize(14)
       doc.setFont('helvetica', 'normal')
-      const title = isGeneralReport ? 'Reporte General' : clientName
+      const titleBase = isGeneralReport ? 'Reporte General' : clientName
+      const title = reportPeriodLabel ? `${titleBase} - ${reportPeriodLabel}` : titleBase
       doc.text(title, 105, 28, { align: 'center' })
 
       doc.setFontSize(10)
@@ -244,9 +247,10 @@ export class TicketReportPDF {
       }
 
       // Guardar PDF
+      const periodSegment = reportPeriodSlug ? `-${reportPeriodSlug}` : ''
       const fileName = isGeneralReport 
-        ? `reporte-general-tickets-${format(new Date(), 'yyyy-MM-dd')}.pdf`
-        : `reporte-tickets-${clientName.replace(/\s+/g, '-').toLowerCase()}-${format(new Date(), 'yyyy-MM-dd')}.pdf`
+        ? `reporte-general-tickets${periodSegment}-${format(new Date(), 'yyyy-MM-dd')}.pdf`
+        : `reporte-tickets-${clientName.replace(/\s+/g, '-').toLowerCase()}${periodSegment}-${format(new Date(), 'yyyy-MM-dd')}.pdf`
       
       doc.save(fileName)
     } catch (error) {

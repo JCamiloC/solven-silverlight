@@ -1,5 +1,5 @@
 "use client"
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Table,
@@ -33,6 +33,12 @@ interface TicketTableProps {
   isLoading?: boolean
   showClientColumn?: boolean
   emptyMessage?: string
+  onFilteredTicketsChange?: (filteredTickets: TicketWithRelations[]) => void
+  onFiltersChange?: (filters: {
+    selectedClient: string
+    startDate: string
+    endDate: string
+  }) => void
 }
 
 const statusLabels = {
@@ -80,6 +86,8 @@ export function TicketTable({
   isLoading = false,
   showClientColumn = true,
   emptyMessage = 'No hay tickets registrados',
+  onFilteredTicketsChange,
+  onFiltersChange,
 }: TicketTableProps) {
   const router = useRouter()
   const { data: clients = [] } = useClients()
@@ -115,6 +123,18 @@ export function TicketTable({
 
     return filtered
   }, [tickets, selectedClient, startDate, endDate])
+
+  useEffect(() => {
+    onFilteredTicketsChange?.(filteredTickets)
+  }, [filteredTickets, onFilteredTicketsChange])
+
+  useEffect(() => {
+    onFiltersChange?.({
+      selectedClient,
+      startDate,
+      endDate,
+    })
+  }, [selectedClient, startDate, endDate, onFiltersChange])
 
   // Paginaci\u00f3n
   const totalPages = Math.ceil(filteredTickets.length / itemsPerPage)
