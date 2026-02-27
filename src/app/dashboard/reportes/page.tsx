@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Loader2, FileText } from 'lucide-react'
 import { useClients } from '@/hooks/use-clients'
 import { useMaintenanceReport, useExportMaintenanceWord } from '@/hooks/use-maintenance-reports'
@@ -22,16 +23,18 @@ import {
 type ReportType = 'mantenimiento' | null
 
 export default function ReportsPage() {
-  const currentYear = new Date().getFullYear()
-  const currentMonth = new Date().getMonth() + 1
+  const currentDate = new Date()
+  const pad = (value: number) => value.toString().padStart(2, '0')
+  const defaultEndDate = `${currentDate.getFullYear()}-${pad(currentDate.getMonth() + 1)}-${pad(currentDate.getDate())}`
+  const defaultStartDate = `${currentDate.getFullYear()}-${pad(currentDate.getMonth() + 1)}-01`
 
   const [selectedReport, setSelectedReport] = useState<ReportType>(null)
 
   const [filters, setFilters] = useState<MaintenanceReportFilters>({
     reportType: 'hardware',
     clientId: '',
-    year: currentYear,
-    month: currentMonth,
+    startDate: defaultStartDate,
+    endDate: defaultEndDate,
   })
 
   const [shouldFetch, setShouldFetch] = useState(false)
@@ -52,27 +55,10 @@ export default function ReportsPage() {
     exportWord.mutate({
       rows: reportData,
       clientName: selectedClient.name,
-      month: filters.month,
-      year: filters.year,
+      startDate: filters.startDate,
+      endDate: filters.endDate,
     })
   }
-
-  const months = [
-    { value: 1, label: 'Enero' },
-    { value: 2, label: 'Febrero' },
-    { value: 3, label: 'Marzo' },
-    { value: 4, label: 'Abril' },
-    { value: 5, label: 'Mayo' },
-    { value: 6, label: 'Junio' },
-    { value: 7, label: 'Julio' },
-    { value: 8, label: 'Agosto' },
-    { value: 9, label: 'Septiembre' },
-    { value: 10, label: 'Octubre' },
-    { value: 11, label: 'Noviembre' },
-    { value: 12, label: 'Diciembre' },
-  ]
-
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - i)
 
   return (
     <ProtectedRoute allowedRoles={['administrador', 'lider_soporte']}>
@@ -132,7 +118,7 @@ export default function ReportsPage() {
               <CardHeader>
                 <CardTitle>Filtros de Reporte</CardTitle>
                 <CardDescription>
-                  Selecciona el módulo, cliente y período para generar el informe
+                  Selecciona el módulo, cliente y rango de fechas para generar el informe
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -180,54 +166,36 @@ export default function ReportsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Año</Label>
-                    <Select
-                      value={filters.year.toString()}
-                      onValueChange={(value) => {
-                        setFilters({ ...filters, year: parseInt(value) })
+                    <Label>Fecha inicio</Label>
+                    <Input
+                      type="date"
+                      value={filters.startDate ?? ''}
+                      max={filters.endDate ?? ''}
+                      onChange={(e) => {
+                        setFilters({ ...filters, startDate: e.target.value })
                         setShouldFetch(false)
                       }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {years.map((year) => (
-                          <SelectItem key={year} value={year.toString()}>
-                            {year}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Mes</Label>
-                    <Select
-                      value={filters.month.toString()}
-                      onValueChange={(value) => {
-                        setFilters({ ...filters, month: parseInt(value) })
+                    <Label>Fecha fin</Label>
+                    <Input
+                      type="date"
+                      value={filters.endDate ?? ''}
+                      min={filters.startDate ?? ''}
+                      onChange={(e) => {
+                        setFilters({ ...filters, endDate: e.target.value })
                         setShouldFetch(false)
                       }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {months.map((month) => (
-                          <SelectItem key={month.value} value={month.value.toString()}>
-                            {month.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
                   </div>
                 </div>
 
                 <div className="flex gap-2">
                   <Button
                     onClick={handleGenerateReport}
-                    disabled={!filters.clientId || isLoading || isFetching}
+                    disabled={!filters.clientId || !filters.startDate || !filters.endDate || isLoading || isFetching}
                   >
                     {(isLoading || isFetching) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Generar Reporte
@@ -256,7 +224,7 @@ export default function ReportsPage() {
                 <CardHeader>
                   <CardTitle>Resultados del Reporte</CardTitle>
                   <CardDescription>
-                    {reportData.length} registro(s) encontrado(s) para {selectedClient?.name} - {months.find(m => m.value === filters.month)?.label} {filters.year}
+                    {reportData.length} registro(s) encontrado(s) para {selectedClient?.name} entre {filters.startDate} y {filters.endDate}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -308,7 +276,7 @@ export default function ReportsPage() {
               <Card>
                 <CardContent className="py-10">
                   <div className="text-center text-muted-foreground">
-                    <p>No se encontraron registros de mantenimiento para este cliente y período.</p>
+                    <p>No se encontraron registros de mantenimiento para este cliente en el rango de fechas seleccionado.</p>
                   </div>
                 </CardContent>
               </Card>

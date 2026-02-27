@@ -21,7 +21,7 @@ export function useMaintenanceReport(filters: MaintenanceReportFilters, enabled:
       // Aquí se pueden agregar otros tipos de reportes (software, accesos)
       return []
     },
-    enabled: enabled && !!filters.clientId && !!filters.year && !!filters.month,
+    enabled: enabled && !!filters.clientId && !!filters.startDate && !!filters.endDate,
     staleTime: 2 * 60 * 1000, // 2 minutos
   })
 }
@@ -34,15 +34,15 @@ export function useExportMaintenancePDF() {
     mutationFn: async ({ 
       rows, 
       clientName, 
-      month, 
-      year 
+      startDate,
+      endDate
     }: { 
       rows: any[]
       clientName: string
-      month: number
-      year: number
+      startDate: string
+      endDate: string
     }) => {
-      return MaintenanceReportService.generateMaintenancePDF(rows, clientName, month, year)
+      return MaintenanceReportService.generateMaintenancePDF(rows, clientName, startDate, endDate)
     },
     onSuccess: () => {
       toast.success('Reporte PDF generado exitosamente')
@@ -61,15 +61,15 @@ export function useExportMaintenanceWord() {
     mutationFn: async ({ 
       rows, 
       clientName, 
-      month, 
-      year 
+      startDate,
+      endDate
     }: { 
       rows: any[]
       clientName: string
-      month: number
-      year: number
+      startDate: string
+      endDate: string
     }) => {
-      return MaintenanceReportService.exportToWord(rows, clientName, month, year)
+      return MaintenanceReportService.exportToWord(rows, clientName, startDate, endDate)
     },
     onSuccess: () => {
       toast.success('Reporte Word generado exitosamente')

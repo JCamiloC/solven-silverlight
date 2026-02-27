@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { MaintenanceReportFilters, MaintenanceReportRow } from '@/types'
 import { getSoftwareDisplayName } from '@/lib/utils'
-import { startOfMonth, endOfMonth, format } from 'date-fns'
+import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, BorderStyle } from 'docx'
 import { saveAs } from 'file-saver'
@@ -9,6 +9,46 @@ import { saveAs } from 'file-saver'
 const supabase = createClient()
 
 export class MaintenanceReportService {
+  private static parseDateInput(value: string): { isoDate: string; day: string; month: string; year: string; timestamp: number } {
+    if (!value || typeof value !== 'string') {
+      throw new Error('Rango de fechas inválido')
+    }
+
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim())
+    if (!match) {
+      throw new Error('Formato de fecha inválido en el filtro del reporte')
+    }
+
+    const [, year, month, day] = match
+    const yearNum = Number(year)
+    const monthNum = Number(month)
+    const dayNum = Number(day)
+
+    const utcDate = new Date(Date.UTC(yearNum, monthNum - 1, dayNum))
+    const validDate =
+      utcDate.getUTCFullYear() === yearNum &&
+      utcDate.getUTCMonth() + 1 === monthNum &&
+      utcDate.getUTCDate() === dayNum
+
+    if (!validDate) {
+      throw new Error('Formato de fecha inválido en el filtro del reporte')
+    }
+
+    return {
+      isoDate: `${year}-${month}-${day}`,
+      day,
+      month,
+      year,
+      timestamp: utcDate.getTime(),
+    }
+  }
+
+  private static buildPeriodLabel(startDate: string, endDate: string): string {
+    const start = this.parseDateInput(startDate)
+    const end = this.parseDateInput(endDate)
+    return `${start.day}/${start.month}/${start.year} - ${end.day}/${end.month}/${end.year}`
+  }
+
   /**
    * Obtiene el reporte de mantenimiento de hardware para un cliente y mes específico
    */
@@ -16,11 +56,17 @@ export class MaintenanceReportService {
     filters: MaintenanceReportFilters
   ): Promise<MaintenanceReportRow[]> {
     try {
-      const { clientId, year, month } = filters
+      const { clientId, startDate, endDate } = filters
 
-      // Calcular rango de fechas del mes
-      const startDate = startOfMonth(new Date(year, month - 1))
-      const endDate = endOfMonth(new Date(year, month - 1))
+      const start = this.parseDateInput(startDate)
+      const end = this.parseDateInput(endDate)
+
+      if (start.timestamp > end.timestamp) {
+        throw new Error('La fecha de inicio no puede ser mayor que la fecha de fin')
+      }
+
+      const startDateISO = `${start.isoDate}T00:00:00.000Z`
+      const endDateISO = `${end.isoDate}T23:59:59.999Z`
 
       // Obtener seguimientos del mes con información de hardware
       const { data: seguimientos, error } = await supabase
@@ -47,8 +93,8 @@ export class MaintenanceReportService {
             client_id
           )
         `)
-        .gte('fecha_registro', startDate.toISOString())
-        .lte('fecha_registro', endDate.toISOString())
+        .gte('fecha_registro', startDateISO)
+        .lte('fecha_registro', endDateISO)
         .order('fecha_registro', { ascending: true })
 
       if (error) throw error
@@ -85,8 +131,8 @@ export class MaintenanceReportService {
   static async generateMaintenancePDF(
     rows: MaintenanceReportRow[],
     clientName: string,
-    month: number,
-    year: number
+    startDate: string,
+    endDate: string
   ): Promise<void> {
     try {
       const { default: jsPDF } = await import('jspdf')
@@ -103,9 +149,9 @@ export class MaintenanceReportService {
 
       doc.setFontSize(12)
       doc.setFont('helvetica', 'normal')
-      const monthName = format(new Date(year, month - 1), 'MMMM yyyy', { locale: es })
+      const periodLabel = this.buildPeriodLabel(startDate, endDate)
       doc.text(`Cliente: ${clientName}`, margin, 25)
-      doc.text(`Período: ${monthName}`, margin, 31)
+      doc.text(`Período: ${periodLabel}`, margin, 31)
 
       // Preparar datos para la tabla
       const tableData = rows.map(row => [
@@ -191,7 +237,7 @@ export class MaintenanceReportService {
       }
 
       // Descargar PDF
-      const filename = `Reporte_Mantenimiento_${clientName.replace(/\s+/g, '_')}_${monthName.replace(/\s+/g, '_')}.pdf`
+      const filename = `Reporte_Mantenimiento_${clientName.replace(/\s+/g, '_')}_${startDate}_a_${endDate}.pdf`
       doc.save(filename)
     } catch (error) {
       console.error('Error generating maintenance PDF:', error)
@@ -205,12 +251,11 @@ export class MaintenanceReportService {
   static async exportToWord(
     rows: MaintenanceReportRow[],
     clientName: string,
-    month: number,
-    year: number
+    startDate: string,
+    endDate: string
   ): Promise<void> {
     try {
-      const monthName = format(new Date(year, month - 1), 'MMMM', { locale: es })
-      const monthNameCap = monthName.charAt(0).toUpperCase() + monthName.slice(1)
+      const periodLabel = this.buildPeriodLabel(startDate, endDate)
 
       // TODO: Agregar logo cuando el usuario especifique la ruta
       // const logoPath = '/logos/silverlight-logo.png'
@@ -241,7 +286,7 @@ export class MaintenanceReportService {
 
             // FECHA
             new Paragraph({
-              text: `${monthNameCap} ${year}`,
+              text: periodLabel,
               alignment: AlignmentType.CENTER,
               spacing: {
                 after: 400,
@@ -583,7 +628,7 @@ export class MaintenanceReportService {
 
       // Generar el archivo
       const blob = await Packer.toBlob(doc)
-      const filename = `Reporte_Mantenimiento_${clientName.replace(/\s+/g, '_')}_${monthNameCap}_${year}.docx`
+      const filename = `Reporte_Mantenimiento_${clientName.replace(/\s+/g, '_')}_${startDate}_a_${endDate}.docx`
       saveAs(blob, filename)
     } catch (error) {
       console.error('Error exporting to Word:', error)

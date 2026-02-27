@@ -186,8 +186,8 @@ export interface SoftwareLicense {
 export interface MaintenanceReportFilters {
   reportType: 'hardware' | 'software' | 'accesos'
   clientId: string
-  year: number
-  month: number
+  startDate: string
+  endDate: string
 }
 
 export interface MaintenanceReportRow {
