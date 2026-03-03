@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -13,6 +13,7 @@ type Props = {
   initialName?: string
   initialCedula?: string
   initialSignatureUrl?: string
+  initialSignatureUpdatedAt?: string
   onSaved?: () => void
 }
 
@@ -21,16 +22,87 @@ export default function ClientCompanySignatureModal({
   initialName,
   initialCedula,
   initialSignatureUrl,
+  initialSignatureUpdatedAt,
   onSaved,
 }: Props) {
   const sigRef = useRef<SignaturePadHandle | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const [open, setOpen] = useState(false)
   const [nombre, setNombre] = useState(initialName || '')
   const [cedula, setCedula] = useState(initialCedula || '')
   const [uploading, setUploading] = useState(false)
+  const [uploadedSignatureDataUrl, setUploadedSignatureDataUrl] = useState<string | null>(null)
 
   const hasRegisteredSignature = Boolean(initialSignatureUrl)
+
+  const getSignaturePreviewUrl = (url?: string) => {
+    if (!url) return null
+    const separator = url.includes('?') ? '&' : '?'
+    const version = initialSignatureUpdatedAt || Date.now().toString()
+    return `${url}${separator}v=${encodeURIComponent(version)}`
+  }
+
+  useEffect(() => {
+    if (!open) return
+
+    setNombre(initialName || '')
+    setCedula(initialCedula || '')
+    setUploadedSignatureDataUrl(getSignaturePreviewUrl(initialSignatureUrl))
+    sigRef.current?.clear()
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }, [open, initialName, initialCedula, initialSignatureUrl, initialSignatureUpdatedAt])
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('El archivo debe ser una imagen válida')
+      event.target.value = ''
+      return
+    }
+
+    const maxSizeInBytes = 4 * 1024 * 1024
+    if (file.size > maxSizeInBytes) {
+      toast.error('La imagen no debe superar 4MB')
+      event.target.value = ''
+      return
+    }
+
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            resolve(reader.result)
+            return
+          }
+          reject(new Error('No se pudo leer la imagen'))
+        }
+        reader.onerror = () => reject(new Error('No se pudo leer la imagen'))
+        reader.readAsDataURL(file)
+      })
+
+      setUploadedSignatureDataUrl(dataUrl)
+      sigRef.current?.clear()
+      toast.success('Imagen de firma cargada')
+    } catch (error) {
+      toast.error('No se pudo procesar la imagen', {
+        description: error instanceof Error ? error.message : 'Error desconocido',
+      })
+    }
+  }
+
+  const clearUploadedImage = () => {
+    setUploadedSignatureDataUrl(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -40,7 +112,11 @@ export default function ClientCompanySignatureModal({
       return
     }
 
-    const dataUrl = sigRef.current?.getDataURL()
+    const drawnDataUrl = sigRef.current?.getDataURL()
+    const uploadedDataUrl = uploadedSignatureDataUrl?.startsWith('data:image/')
+      ? uploadedSignatureDataUrl
+      : null
+    const signatureDataUrl = uploadedDataUrl || drawnDataUrl
 
     try {
       setUploading(true)
@@ -54,7 +130,7 @@ export default function ClientCompanySignatureModal({
           clientId,
           nombre: nombre.trim(),
           cedula: cedula.trim(),
-          signatureDataUrl: dataUrl,
+          signatureDataUrl,
         }),
       })
 
@@ -64,6 +140,8 @@ export default function ClientCompanySignatureModal({
       }
 
       toast.success('Firma de la empresa registrada')
+      clearUploadedImage()
+      sigRef.current?.clear()
       setOpen(false)
       onSaved?.()
     } catch (error) {
@@ -102,19 +180,43 @@ export default function ClientCompanySignatureModal({
             </div>
           </div>
 
-          {initialSignatureUrl && (
-            <div className="space-y-2">
-              <Label>Firma actual</Label>
-              <img src={initialSignatureUrl} alt="Firma actual" className="max-h-28 border rounded-md bg-white p-2" />
-            </div>
-          )}
-
           <div className="space-y-2">
             <Label>Nueva firma {initialSignatureUrl ? '(opcional si solo editas datos)' : ''}</Label>
+            <div className="space-y-2 rounded-md border p-3">
+              <Label className="text-sm">Subir imagen de firma</Label>
+              <Input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                onChange={handleFileUpload}
+              />
+
+              {uploadedSignatureDataUrl && (
+                <div className="space-y-2">
+                  <img
+                    src={uploadedSignatureDataUrl}
+                    alt="Vista previa de firma cargada"
+                    className="max-h-28 border rounded-md bg-white p-2"
+                  />
+                  <Button type="button" variant="outline" onClick={clearUploadedImage}>
+                    Quitar imagen
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <Label className="text-sm">O dibujar firma manualmente</Label>
             <div className="border rounded-md p-2 bg-white">
               <SignaturePad ref={sigRef} width={700} height={220} />
             </div>
-            <Button type="button" variant="outline" onClick={() => sigRef.current?.clear()}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                sigRef.current?.clear()
+                clearUploadedImage()
+              }}
+            >
               Limpiar firma
             </Button>
           </div>

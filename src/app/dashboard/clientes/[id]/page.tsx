@@ -228,6 +228,7 @@ export default function ClienteDetailPage() {
                   initialName={client.acta_generador_nombre}
                   initialCedula={client.acta_generador_cedula}
                   initialSignatureUrl={client.acta_generador_firma_url}
+                  initialSignatureUpdatedAt={client.acta_generador_actualizado_en}
                   onSaved={() => {
                     refetchClient()
                   }}

@@ -16,7 +16,13 @@ function dataUrlToBuffer(dataUrl: string): { buffer: Buffer; mime: string; ext: 
   const mime = match[1]
   const base64 = match[2]
   const buffer = Buffer.from(base64, 'base64')
-  const ext = mime.includes('png') ? 'png' : mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : 'bin'
+  const extByMime: Record<string, string> = {
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/webp': 'webp',
+  }
+  const ext = extByMime[mime] || 'png'
 
   return { buffer, mime, ext }
 }
