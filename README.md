@@ -5,7 +5,7 @@ Sistema integral desarrollado específicamente para Silverlight Colombia, que re
 
 ## 🚀 Características.
 
-### Funcionalidades Principales
+### Funcionalidades Principales..
 - **Dashboard Moderno**: Interfaz responsiva con diseño profesional
 - **Gestión de Hardware**: CRUD completo para inventario de equipos
 - **Gestión de Software**: Seguimiento de licencias y renovaciones
