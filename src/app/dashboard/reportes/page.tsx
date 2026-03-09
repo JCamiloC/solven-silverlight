@@ -244,6 +244,7 @@ export default function ReportsPage() {
                           <TableHead>Antivirus</TableHead>
                           <TableHead>S.O.</TableHead>
                           <TableHead className="min-w-[200px]">Detalle</TableHead>
+                          <TableHead className="min-w-[220px]">Acción recomendada</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -262,6 +263,9 @@ export default function ReportsPage() {
                             <TableCell>{row.sistemaOperativo}</TableCell>
                             <TableCell className="max-w-[300px] truncate" title={row.detalleSeguimiento}>
                               {row.detalleSeguimiento}
+                            </TableCell>
+                            <TableCell className="max-w-[320px] truncate" title={row.accionRecomendada}>
+                              {row.accionRecomendada}
                             </TableCell>
                           </TableRow>
                         ))}

@@ -54,6 +54,7 @@ import {
   Trash2,
   FileText,
   Download,
+  Mail,
   Loader2
 } from 'lucide-react'
 import { HardwareAsset } from '@/types'
@@ -67,6 +68,7 @@ import { HardwareDeliveryActaPDF } from '@/lib/services/hardware-delivery-acta-p
 import { toast } from 'sonner'
 import { Progress } from '@/components/ui/progress'
 import ActasService from '@/services/actas'
+import { useAuth } from '@/hooks/use-auth'
 
 interface HardwareTableProps {
   data: HardwareAsset[]
@@ -77,6 +79,7 @@ interface HardwareTableProps {
 
 export function HardwareTable({ data, isLoading, clientId, readOnly = false }: HardwareTableProps) {
   const router = useRouter()
+  const { user, profile } = useAuth()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -198,6 +201,10 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
                 <Download className="mr-2 h-4 w-4" />
                 Descargar Acta
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => sendActaByEmail(asset)}>
+                <Mail className="mr-2 h-4 w-4" />
+                Enviar Acta
+              </DropdownMenuItem>
               {!readOnly && (
                 <>
                   <DropdownMenuSeparator />
@@ -291,10 +298,15 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       setPdfProgress(60)
       const followUps = await hardwareService.getFollowUps(asset.id)
 
-      // Paso 4: Generar PDF
+      // Paso 4: Obtener tickets asociados
+      setPdfProgressText('Cargando tickets asociados...')
+      setPdfProgress(75)
+      const tickets = await hardwareService.getAssociatedTickets(asset.id)
+
+      // Paso 5: Generar PDF
       setPdfProgressText('Generando documento PDF...')
-      setPdfProgress(80)
-      await HardwareLifesheetPDF.generateLifesheet(hardware, upgrades, followUps)
+      setPdfProgress(90)
+      await HardwareLifesheetPDF.generateLifesheet(hardware, upgrades, followUps, tickets)
 
       clearInterval(progressInterval)
       setPdfProgress(100)
@@ -315,6 +327,183 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       toast.error('Error al generar la Hoja de Vida', {
         description: 'No se pudo generar el documento PDF.',
       })
+    }
+  }
+
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const result = reader.result
+        if (typeof result !== 'string') {
+          reject(new Error('No se pudo serializar el PDF'))
+          return
+        }
+
+        const base64 = result.split(',')[1]
+        if (!base64) {
+          reject(new Error('No se pudo serializar el PDF'))
+          return
+        }
+
+        resolve(base64)
+      }
+      reader.onerror = () => reject(new Error('No se pudo serializar el PDF'))
+      reader.readAsDataURL(blob)
+    })
+  }
+
+  const sendActaByEmail = async (asset: HardwareAsset) => {
+    let progressInterval: ReturnType<typeof setInterval> | null = null
+
+    try {
+      const senderEmail = (user?.email || profile?.email || '').trim()
+      if (!senderEmail) {
+        throw new Error('No se pudo identificar tu correo de usuario para el envío')
+      }
+
+      setPdfType('acta')
+      setGeneratingPDF(true)
+      setPdfProgress(0)
+      setPdfProgressText('Preparando acta para envío...')
+
+      progressInterval = setInterval(() => {
+        setPdfProgress((prev) => {
+          if (prev >= 90) return prev
+          return prev + Math.random() * 10
+        })
+      }, 350)
+
+      setPdfProgress(20)
+      const hardware = await hardwareService.getById(asset.id)
+      if (!hardware) throw new Error('No se pudo obtener la información del hardware')
+
+      if (!hardware.correo_responsable) {
+        throw new Error('El equipo no tiene correo del responsable configurado')
+      }
+
+      setPdfProgressText('Buscando acta firmada...')
+      setPdfProgress(35)
+      const existingActa = await ActasService.getByHardwareAssetId(asset.id)
+
+      if (!existingActa || existingActa.estado_firma !== 'completo') {
+        throw new Error('El acta aún no está firmada por el receptor. Primero completa la firma para poder enviarla.')
+      }
+
+      setPdfProgressText('Obteniendo información del cliente...')
+      setPdfProgress(50)
+
+      let empresaCliente = undefined
+      if (hardware.client_id) {
+        try {
+          const { createClient } = await import('@/lib/supabase/client')
+          const supabase = createClient()
+          const { data: clientData } = await supabase
+            .from('clients')
+            .select('name, nit')
+            .eq('id', hardware.client_id)
+            .single()
+
+          if (clientData) {
+            empresaCliente = {
+              nombre: clientData.name,
+              nit: clientData.nit || 'No especificado',
+            }
+          }
+        } catch (error) {
+          console.warn('Error obteniendo datos del cliente:', error)
+        }
+      }
+
+      const mainRecipient = hardware.correo_responsable.trim().toLowerCase()
+      const senderNormalized = senderEmail.toLowerCase()
+      const bccRecipients = senderNormalized !== mainRecipient ? [senderNormalized] : []
+
+      const confirmMessage = [
+        '¿Deseas enviar el acta por correo?',
+        '',
+        `Para: ${mainRecipient}`,
+        `CCO: ${bccRecipients.length ? bccRecipients.join(', ') : 'Sin copia adicional'}`,
+      ].join('\n')
+
+      const confirmSend = window.confirm(confirmMessage)
+
+      if (!confirmSend) {
+        setGeneratingPDF(false)
+        setPdfProgress(0)
+        return
+      }
+
+      setPdfProgressText('Generando PDF del acta...')
+      setPdfProgress(65)
+
+      const pdfBlob = await HardwareDeliveryActaPDF.generateActaBlob({
+        hardware,
+        empresaCliente,
+        entregadoPor: {
+          nombre: existingActa.generador_nombre || 'Silverlight Colombia',
+          cargo: 'Técnico de Soporte',
+          cedula: existingActa.generador_cedula || undefined,
+        },
+        recibidoPor: {
+          nombre: existingActa.cliente_nombre || hardware.persona_responsable || 'No especificado',
+          cedula: existingActa.cliente_cedula || undefined,
+        },
+        generadorFirmaUrl: existingActa.generador_firma_url || null,
+        clienteFirmaUrl: existingActa.cliente_firma_url || null,
+      })
+
+      const pdfBase64 = await blobToBase64(pdfBlob)
+
+      setPdfProgressText('Enviando acta por correo...')
+      setPdfProgress(85)
+
+      const fileName = `ActaEntrega_${(hardware.name || 'Equipo').replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`
+
+      const mailRes = await fetch('/api/actas/send-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: [mainRecipient],
+          bcc: bccRecipients,
+          pdfBase64,
+          fileName,
+          hardwareName: hardware.name,
+          clientName: empresaCliente?.nombre,
+          recipientName: hardware.persona_responsable || undefined,
+        }),
+      })
+
+      if (!mailRes.ok) {
+        const payload = await mailRes.json().catch(() => ({}))
+        throw new Error(payload?.error || 'No se pudo enviar el acta por correo')
+      }
+
+      setPdfProgress(100)
+      setPdfProgressText('¡Acta enviada!')
+
+      setTimeout(() => {
+        setGeneratingPDF(false)
+        setPdfProgress(0)
+        toast.success('Acta enviada por correo', {
+          description: bccRecipients.length
+            ? `Se envió al responsable y te llegó copia oculta a ${senderEmail}.`
+            : 'Se envió correctamente al responsable.',
+        })
+      }, 700)
+    } catch (error) {
+      console.error('Error sending acta by email:', error)
+      setGeneratingPDF(false)
+      setPdfProgress(0)
+      toast.error('Error al enviar el Acta', {
+        description: (error as Error)?.message || 'No se pudo enviar el correo.',
+      })
+    } finally {
+      if (progressInterval) {
+        clearInterval(progressInterval)
+      }
     }
   }
 

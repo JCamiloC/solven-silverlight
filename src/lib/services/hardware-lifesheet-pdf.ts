@@ -23,6 +23,16 @@ interface FollowUp {
   }
 }
 
+interface AssociatedTicket {
+  id: string
+  ticket_number?: string
+  title: string
+  status: string
+  priority: string
+  category: string
+  created_at: string
+}
+
 export class HardwareLifesheetPDF {
   /**
    * Genera la hoja de vida completa del hardware en PDF
@@ -30,7 +40,8 @@ export class HardwareLifesheetPDF {
   static async generateLifesheet(
     hardware: HardwareAsset,
     upgrades: HardwareUpgrade[],
-    followUps: FollowUp[]
+    followUps: FollowUp[],
+    tickets: AssociatedTicket[] = []
   ): Promise<void> {
     try {
       const { default: jsPDF } = await import('jspdf')
@@ -293,6 +304,66 @@ export class HardwareLifesheetPDF {
       }
 
       // ==========================================
+      // SECCIÓN 4: TICKETS ASOCIADOS
+      // ==========================================
+      checkNewPage(40)
+
+      doc.setFontSize(16)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(41, 128, 185)
+      doc.text('TICKETS ASOCIADOS', margin, yPos)
+      yPos += 10
+
+      doc.setDrawColor(41, 128, 185)
+      doc.setLineWidth(0.5)
+      doc.line(margin, yPos, 190, yPos)
+      yPos += 8
+
+      doc.setTextColor(0, 0, 0)
+      doc.setFontSize(10)
+
+      if (tickets.length === 0) {
+        doc.setFont('helvetica', 'italic')
+        doc.text('No hay tickets asociados a este equipo.', margin, yPos)
+        yPos += 10
+      } else {
+        tickets.forEach((ticket, index) => {
+          checkNewPage(30)
+
+          if (index % 2 === 0) {
+            doc.setFillColor(250, 250, 250)
+            doc.rect(margin, yPos - 4, maxWidth, 24, 'F')
+          }
+
+          doc.setFont('helvetica', 'bold')
+          doc.text(
+            `${index + 1}. Ticket ${ticket.ticket_number || ticket.id.slice(0, 8)}`,
+            margin + 2,
+            yPos
+          )
+
+          doc.setFont('helvetica', 'normal')
+          doc.setTextColor(100, 100, 100)
+          doc.text(
+            `${this.translateTicketStatus(ticket.status)} · ${this.translatePriority(ticket.priority)} · ${this.translateCategory(ticket.category)} · ${format(new Date(ticket.created_at), 'dd/MM/yyyy', { locale: es })}`,
+            margin + 2,
+            yPos + 5
+          )
+          doc.setTextColor(0, 0, 0)
+          yPos += 10
+
+          const ticketTitleLines = doc.splitTextToSize(ticket.title || 'Sin título', maxWidth - 10)
+          ticketTitleLines.forEach((line: string) => {
+            checkNewPage(6)
+            doc.text(line, margin + 4, yPos)
+            yPos += 5
+          })
+
+          yPos += 5
+        })
+      }
+
+      // ==========================================
       // FOOTER: SILVERLIGHT COLOMBIA
       // ==========================================
       const totalPages = (doc as any).internal.getNumberOfPages()
@@ -371,6 +442,39 @@ export class HardwareLifesheetPDF {
       'inactive': 'Inactivo',
     }
     return translations[status] || status
+  }
+
+  private static translateTicketStatus(status: string): string {
+    const translations: Record<string, string> = {
+      'open': 'Abierto',
+      'pendiente_confirmacion': 'Pendiente de Confirmación',
+      'solucionado': 'Solucionado',
+      'in_progress': 'En Progreso',
+      'resolved': 'Resuelto',
+      'closed': 'Cerrado',
+    }
+    return translations[status] || status
+  }
+
+  private static translatePriority(priority: string): string {
+    const translations: Record<string, string> = {
+      'critical': 'Crítica',
+      'high': 'Alta',
+      'medium': 'Media',
+      'low': 'Baja',
+    }
+    return translations[priority] || priority
+  }
+
+  private static translateCategory(category: string): string {
+    const translations: Record<string, string> = {
+      'hardware': 'Hardware',
+      'software': 'Software',
+      'network': 'Red',
+      'access': 'Accesos',
+      'other': 'Otro',
+    }
+    return translations[category] || category
   }
 
 }

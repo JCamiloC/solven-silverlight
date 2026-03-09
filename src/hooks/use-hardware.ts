@@ -33,6 +33,7 @@ export function useCreateFollowUp() {
       payload: { 
         tipo: string
         detalle: string
+        accion_recomendada?: string
         actividades?: string[]
         foto_url?: string
         fecha_registro?: string

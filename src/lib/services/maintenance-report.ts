@@ -76,6 +76,7 @@ export class MaintenanceReportService {
           hardware_id,
           tipo,
           detalle,
+          accion_recomendada,
           actividades,
           fecha_registro,
           hardware:hardware_assets!hardware_seguimientos_hardware_id_fkey (
@@ -117,6 +118,7 @@ export class MaintenanceReportService {
         antivirus: getSoftwareDisplayName(seg.hardware?.antivirus),
         sistemaOperativo: getSoftwareDisplayName(seg.hardware?.sistema_operativo),
         detalleSeguimiento: seg.detalle || '',
+        accionRecomendada: seg.accion_recomendada || 'Sin acción recomendada',
         fechaSeguimiento: seg.fecha_registro,
       }))
     } catch (error) {
@@ -588,7 +590,7 @@ export class MaintenanceReportService {
                 new TableRow({
                   children: [
                     new TableCell({
-                      children: [new Paragraph({ text: 'Equipo', alignment: AlignmentType.CENTER })],
+                      children: [new Paragraph({ text: 'Usuario asignado', alignment: AlignmentType.CENTER })],
                       shading: { fill: '2980b9' },
                       width: { size: 30, type: WidthType.PERCENTAGE },
                     }),
@@ -598,7 +600,7 @@ export class MaintenanceReportService {
                       width: { size: 50, type: WidthType.PERCENTAGE },
                     }),
                     new TableCell({
-                      children: [new Paragraph({ text: 'Fecha', alignment: AlignmentType.CENTER })],
+                      children: [new Paragraph({ text: 'Acción recomendada', alignment: AlignmentType.CENTER })],
                       shading: { fill: '2980b9' },
                       width: { size: 20, type: WidthType.PERCENTAGE },
                     }),
@@ -607,7 +609,7 @@ export class MaintenanceReportService {
                 ...rows.map((row, index) => new TableRow({
                   children: [
                     new TableCell({
-                      children: [new Paragraph({ text: row.equipoNombre })],
+                      children: [new Paragraph({ text: row.usuario })],
                       shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
                     }),
                     new TableCell({
@@ -615,7 +617,7 @@ export class MaintenanceReportService {
                       shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
                     }),
                     new TableCell({
-                      children: [new Paragraph({ text: row.fechaSeguimiento })],
+                      children: [new Paragraph({ text: row.accionRecomendada || 'Sin acción recomendada' })],
                       shading: { fill: index % 2 === 0 ? 'ecf0f1' : 'ffffff' },
                     }),
                   ],

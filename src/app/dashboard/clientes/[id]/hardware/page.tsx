@@ -7,7 +7,7 @@ import { useClient } from '@/hooks/use-clients';
 import { useClientPermissions } from '@/hooks/use-client-permissions';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowLeft, BarChart3 } from 'lucide-react';
+import { Plus, ArrowLeft, BarChart3, MapPin } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -72,6 +72,14 @@ export default function ClienteHardwarePage() {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => router.push(`/dashboard/clientes/${clientId}/visitas`)}
+            >
+              <MapPin className="mr-2 h-4 w-4" />
+              Visitas
+            </Button>
             {!readOnly && (
               <Button 
                 variant="outline" 

@@ -3,6 +3,16 @@ import { HardwareAsset, HardwareUpgrade } from '@/types';
 
 const supabase = createClient();
 
+export interface HardwareAssociatedTicket {
+  id: string
+  ticket_number?: string
+  title: string
+  status: string
+  priority: string
+  category: string
+  created_at: string
+}
+
 export class HardwareService {
     async getStatsByClient(clientId: string) {
       const { count: total } = await supabase
@@ -169,11 +179,23 @@ export class HardwareService {
     return data || [];
   }
 
+  async getAssociatedTickets(hardwareId: string): Promise<HardwareAssociatedTicket[]> {
+    const { data, error } = await supabase
+      .from('tickets')
+      .select('id, ticket_number, title, status, priority, category, created_at')
+      .eq('hardware_id', hardwareId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return (data || []) as HardwareAssociatedTicket[];
+  }
+
   async createFollowUp(
     hardwareId: string, 
     payload: { 
       tipo: string
       detalle: string
+      accion_recomendada?: string
       actividades?: string[]
       foto_url?: string
       fecha_registro?: string
@@ -184,6 +206,7 @@ export class HardwareService {
       hardware_id: hardwareId,
       tipo: payload.tipo,
       detalle: payload.detalle,
+      accion_recomendada: payload.accion_recomendada || null,
       actividades: payload.actividades || [],
       foto_url: payload.foto_url || null,
       fecha_registro: payload.fecha_registro || new Date().toISOString(),

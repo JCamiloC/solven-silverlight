@@ -13,6 +13,7 @@ import {
   Ticket, 
   Code,
   CalendarClock,
+  MapPin,
   Save,
   ArrowLeft
 } from 'lucide-react'
@@ -190,6 +191,13 @@ export default function ClienteDetailPage() {
       icon: CalendarClock,
       href: `/dashboard/clientes/${clientId}/mantenimientos`,
       color: 'bg-amber-500 hover:bg-amber-600',
+    },
+    {
+      title: 'Visitas',
+      description: 'Registrar visitas técnicas y equipos atendidos',
+      icon: MapPin,
+      href: `/dashboard/clientes/${clientId}/visitas`,
+      color: 'bg-cyan-500 hover:bg-cyan-600',
     },
   ]
 

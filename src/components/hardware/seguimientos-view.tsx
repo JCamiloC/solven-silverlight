@@ -71,6 +71,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
   const [tipo, setTipo] = useState<string>('')
   const [actividades, setActividades] = useState<string[]>([])
   const [detalle, setDetalle] = useState('')
+  const [accionRecomendada, setAccionRecomendada] = useState('')
   const [foto, setFoto] = useState<File | null>(null)
   const [fotoPreview, setFotoPreview] = useState<string | null>(null)
 
@@ -107,7 +108,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!tipo || !detalle) {
+    if (!tipo || !detalle || !accionRecomendada) {
       toast.error('Por favor complete todos los campos requeridos')
       return
     }
@@ -134,6 +135,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
         payload: {
           tipo,
           detalle,
+          accion_recomendada: accionRecomendada,
           actividades,
           foto_url: fotoUrl,
           fecha_registro: new Date(fechaRegistro).toISOString(),
@@ -145,6 +147,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
       setTipo('')
       setActividades([])
       setDetalle('')
+      setAccionRecomendada('')
       setFoto(null)
       setFotoPreview(null)
       setFechaRegistro(format(new Date(), "yyyy-MM-dd'T'HH:mm"))
@@ -278,6 +281,18 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="accion-recomendada">Acción recomendada *</Label>
+              <Textarea
+                id="accion-recomendada"
+                value={accionRecomendada}
+                onChange={(e) => setAccionRecomendada(e.target.value)}
+                rows={3}
+                placeholder="Indique la acción sugerida posterior al mantenimiento"
+                required
+              />
+            </div>
+
             {/* Foto/Archivo */}
             <div className="space-y-2">
               <Label htmlFor="foto" className="flex items-center gap-2">
@@ -323,6 +338,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
                   setTipo('')
                   setActividades([])
                   setDetalle('')
+                  setAccionRecomendada('')
                   setFoto(null)
                   setFotoPreview(null)
                 }}
@@ -370,6 +386,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
                     <TableHead className="whitespace-nowrap">Tipo</TableHead>
                     <TableHead className="whitespace-nowrap">Actividades</TableHead>
                     <TableHead className="whitespace-nowrap">Detalle</TableHead>
+                    <TableHead className="whitespace-nowrap">Acción recomendada</TableHead>
                     <TableHead className="whitespace-nowrap">Creado por</TableHead>
                     <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
                   </TableRow>
@@ -404,6 +421,11 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
                       <TableCell className="max-w-md">
                         <div className="truncate" title={seg.detalle}>
                           {seg.detalle}
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-md">
+                        <div className="truncate" title={seg.accion_recomendada || ''}>
+                          {seg.accion_recomendada || '-'}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -499,6 +521,16 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
                 <Textarea
                   value={selectedSeguimiento.detalle}
                   rows={6}
+                  disabled
+                  className="resize-none"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Acción recomendada</Label>
+                <Textarea
+                  value={selectedSeguimiento.accion_recomendada || 'No registrada'}
+                  rows={4}
                   disabled
                   className="resize-none"
                 />

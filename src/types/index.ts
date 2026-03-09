@@ -112,6 +112,7 @@ export interface HardwareSeguimiento {
   hardware_id: string
   tipo: TipoSeguimiento
   detalle: string
+  accion_recomendada?: string
   actividades?: string[]
   foto_url?: string
   fecha_registro: string
@@ -203,6 +204,7 @@ export interface MaintenanceReportRow {
   antivirus: string
   sistemaOperativo: string
   detalleSeguimiento: string
+  accionRecomendada: string
   fechaSeguimiento: string
 }
 
@@ -261,6 +263,42 @@ export interface CustomAppFollowup {
   tecnico_responsable: string
   created_at: string
   updated_at: string
+}
+
+export type VisitType = 'programada' | 'no_programada' | 'diagnostico' | 'mantenimiento' | 'soporte' | 'otro'
+
+export type VisitStatus = 'completada' | 'pendiente' | 'cancelada'
+
+export interface ClientVisitEquipment {
+  id: string
+  visita_id: string
+  hardware_id?: string | null
+  hardware_nombre_manual?: string | null
+  tareas_realizadas: string
+  created_at: string
+  hardware?: Pick<HardwareAsset, 'id' | 'name' | 'serial_number' | 'type'> | null
+}
+
+export interface ClientVisit {
+  id: string
+  client_id: string
+  fecha_visita: string
+  tipo: VisitType
+  estado: VisitStatus
+  detalle: string
+  actividades: string[]
+  recomendaciones?: string | null
+  tecnico_responsable?: string | null
+  creado_por?: string | null
+  created_at: string
+  updated_at: string
+  tecnico?: {
+    id: string
+    first_name?: string
+    last_name?: string
+    email?: string
+  } | null
+  equipos: ClientVisitEquipment[]
 }
 
 export interface AccessCredential {

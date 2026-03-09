@@ -30,14 +30,15 @@ export default function HardwareSeguimientosPage() {
         description: 'Por favor espera...',
       })
 
-      // Obtener upgrades y seguimientos
-      const [upgrades, followUps] = await Promise.all([
+      // Obtener upgrades, seguimientos y tickets asociados
+      const [upgrades, followUps, tickets] = await Promise.all([
         hardwareService.getUpgrades(hardwareId),
         hardwareService.getFollowUps(hardwareId),
+        hardwareService.getAssociatedTickets(hardwareId),
       ])
 
       // Generar PDF
-      await HardwareLifesheetPDF.generateLifesheet(hardware, upgrades, followUps)
+      await HardwareLifesheetPDF.generateLifesheet(hardware, upgrades, followUps, tickets)
 
       toast.success('Hoja de Vida Generada', {
         description: 'El PDF se ha descargado correctamente.',
