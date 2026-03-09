@@ -13,6 +13,7 @@ import {
   Building2,
   BarChart3, 
   Ticket,
+  Headset,
   Users,
   Settings,
   LogOut
@@ -113,6 +114,12 @@ const allNavigationItems: NavigationItem[] = [
     name: 'Tickets',
     href: '/dashboard/tickets',
     icon: Ticket,
+    roles: ['administrador', 'lider_soporte', 'agente_soporte'],
+  },
+  {
+    name: 'Soporte Chat',
+    href: '/dashboard/soporte-chat',
+    icon: Headset,
     roles: ['administrador', 'lider_soporte', 'agente_soporte'],
   },
   {

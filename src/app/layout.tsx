@@ -5,6 +5,7 @@ import { ReactQueryProvider } from '@/components/providers/react-query-provider'
 import { ThemeProvider as BrandThemeProvider } from '@/components/providers/theme-provider-brand'
 import { SessionTimeoutProvider } from '@/components/providers/session-timeout-provider'
 import { Toaster } from '@/components/ui/sonner'
+import { FloatingChat } from '@/components/chat/floating-chat'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,6 +40,7 @@ export default function RootLayout({
               enabled={true}
             >
               {children}
+              <FloatingChat />
               <Toaster />
             </SessionTimeoutProvider>
           </ReactQueryProvider>

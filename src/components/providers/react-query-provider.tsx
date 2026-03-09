@@ -7,6 +7,10 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
 export function ReactQueryProvider({ children }: { children: React.ReactNode }) {
+  const showDevtools =
+    process.env.NODE_ENV !== 'production' &&
+    process.env.NEXT_PUBLIC_SHOW_REACT_QUERY_DEVTOOLS === 'true'
+
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -51,7 +55,7 @@ export function ReactQueryProvider({ children }: { children: React.ReactNode }) 
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      <ReactQueryDevtools initialIsOpen={false} />
+      {showDevtools ? <ReactQueryDevtools initialIsOpen={false} /> : null}
     </QueryClientProvider>
   )
 }
