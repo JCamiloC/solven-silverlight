@@ -72,6 +72,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
   const [actividades, setActividades] = useState<string[]>([])
   const [detalle, setDetalle] = useState('')
   const [accionRecomendada, setAccionRecomendada] = useState('')
+  const [accionRecomendadaEstado, setAccionRecomendadaEstado] = useState<'realizado' | 'no_realizado'>('no_realizado')
   const [foto, setFoto] = useState<File | null>(null)
   const [fotoPreview, setFotoPreview] = useState<string | null>(null)
 
@@ -136,6 +137,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
           tipo,
           detalle,
           accion_recomendada: accionRecomendada,
+          accion_recomendada_estado: accionRecomendadaEstado,
           actividades,
           foto_url: fotoUrl,
           fecha_registro: new Date(fechaRegistro).toISOString(),
@@ -148,6 +150,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
       setActividades([])
       setDetalle('')
       setAccionRecomendada('')
+      setAccionRecomendadaEstado('no_realizado')
       setFoto(null)
       setFotoPreview(null)
       setFechaRegistro(format(new Date(), "yyyy-MM-dd'T'HH:mm"))
@@ -169,6 +172,26 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
     if (tipo.includes('no_programado')) return 'destructive'
     if (tipo.includes('remoto')) return 'secondary'
     return 'outline'
+  }
+
+  const getAccionEstadoLabel = (estado?: string) => {
+    return estado === 'realizado' ? 'Realizado' : 'No realizado'
+  }
+
+  const getAccionEstadoVariant = (estado?: string): 'default' | 'secondary' => {
+    return estado === 'realizado' ? 'default' : 'secondary'
+  }
+
+  const truncateText = (text: string | undefined, max = 70) => {
+    if (!text) return '-'
+    return text.length > max ? `${text.slice(0, max)}...` : text
+  }
+
+  const getActividadesResumen = (items: string[] | undefined) => {
+    if (!items || items.length === 0) return '-'
+    const first = truncateText(items[0], 40)
+    if (items.length === 1) return first
+    return `${first} (+${items.length - 1})`
   }
 
   const handleViewDetail = (seguimiento: any) => {
@@ -293,6 +316,22 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="accion-recomendada-estado">Estado de la acción recomendada *</Label>
+              <Select
+                value={accionRecomendadaEstado}
+                onValueChange={(value) => setAccionRecomendadaEstado(value as 'realizado' | 'no_realizado')}
+              >
+                <SelectTrigger id="accion-recomendada-estado">
+                  <SelectValue placeholder="Seleccione estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no_realizado">No realizado</SelectItem>
+                  <SelectItem value="realizado">Realizado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Foto/Archivo */}
             <div className="space-y-2">
               <Label htmlFor="foto" className="flex items-center gap-2">
@@ -339,6 +378,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
                   setActividades([])
                   setDetalle('')
                   setAccionRecomendada('')
+                  setAccionRecomendadaEstado('no_realizado')
                   setFoto(null)
                   setFotoPreview(null)
                 }}
@@ -379,16 +419,17 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
             </div>
           ) : (
             <div className="rounded-md border overflow-x-auto">
-              <Table className="min-w-[800px]">
+              <Table className="min-w-[980px] table-fixed">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="whitespace-nowrap">Fecha</TableHead>
-                    <TableHead className="whitespace-nowrap">Tipo</TableHead>
-                    <TableHead className="whitespace-nowrap">Actividades</TableHead>
-                    <TableHead className="whitespace-nowrap">Detalle</TableHead>
-                    <TableHead className="whitespace-nowrap">Acción recomendada</TableHead>
-                    <TableHead className="whitespace-nowrap">Creado por</TableHead>
-                    <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
+                    <TableHead className="whitespace-nowrap w-[150px]">Fecha</TableHead>
+                    <TableHead className="whitespace-nowrap w-[170px]">Tipo</TableHead>
+                    <TableHead className="whitespace-nowrap w-[180px]">Actividades</TableHead>
+                    <TableHead className="whitespace-nowrap w-[220px]">Detalle</TableHead>
+                    <TableHead className="whitespace-nowrap w-[220px]">Acción recomendada</TableHead>
+                    <TableHead className="whitespace-nowrap w-[130px]">Estado acción</TableHead>
+                    <TableHead className="whitespace-nowrap w-[150px]">Creado por</TableHead>
+                    <TableHead className="text-right whitespace-nowrap w-[130px]">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -397,50 +438,57 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
                       <TableCell className="whitespace-nowrap">
                         {format(new Date(seg.fecha_registro), 'dd/MM/yyyy HH:mm', { locale: es })}
                       </TableCell>
-                      <TableCell>
-                        <Badge variant={getTipoBadgeVariant(seg.tipo)}>
+                      <TableCell className="align-top">
+                        <Badge
+                          variant={getTipoBadgeVariant(seg.tipo)}
+                          className="max-w-[160px] h-auto whitespace-normal break-words text-center leading-tight"
+                          title={getTipoLabel(seg.tipo)}
+                        >
                           {getTipoLabel(seg.tipo)}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {seg.actividades && seg.actividades.length > 0 ? (
-                          <div className="max-w-xs">
-                            <div className="text-sm">
-                              {seg.actividades.slice(0, 2).join(', ')}
-                              {seg.actividades.length > 2 && (
-                                <span className="text-muted-foreground">
-                                  {' '}+{seg.actividades.length - 2} más
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-md">
-                        <div className="truncate" title={seg.detalle}>
-                          {seg.detalle}
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-md">
-                        <div className="truncate" title={seg.accion_recomendada || ''}>
-                          {seg.accion_recomendada || '-'}
+                        <div className="max-w-[170px] truncate text-sm" title={(seg.actividades || []).join(', ')}>
+                          {getActividadesResumen(seg.actividades)}
                         </div>
                       </TableCell>
                       <TableCell>
-                        {seg.creator
-                          ? `${seg.creator.first_name || ''} ${seg.creator.last_name || ''}`.trim()
-                          : '-'}
+                        <div className="max-w-[210px] truncate" title={seg.detalle || ''}>
+                          {truncateText(seg.detalle, 85)}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell>
+                        <div className="max-w-[210px] truncate" title={seg.accion_recomendada || ''}>
+                          {truncateText(seg.accion_recomendada, 85)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getAccionEstadoVariant(seg.accion_recomendada_estado)}>
+                          {getAccionEstadoLabel(seg.accion_recomendada_estado)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div
+                          className="max-w-[145px] truncate"
+                          title={
+                            seg.creator
+                              ? `${seg.creator.first_name || ''} ${seg.creator.last_name || ''}`.trim()
+                              : '-'
+                          }
+                        >
+                          {seg.creator
+                            ? `${seg.creator.first_name || ''} ${seg.creator.last_name || ''}`.trim()
+                            : '-'}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleViewDetail(seg)}
                         >
-                          <Eye className="mr-2 h-4 w-4" />
-                          Ver Detalle
+                          <Eye className="h-4 w-4 sm:mr-2" />
+                          <span className="hidden sm:inline">Ver Detalle</span>
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -534,6 +582,15 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
                   disabled
                   className="resize-none"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Estado de la acción recomendada</Label>
+                <div>
+                  <Badge variant={getAccionEstadoVariant(selectedSeguimiento.accion_recomendada_estado)}>
+                    {getAccionEstadoLabel(selectedSeguimiento.accion_recomendada_estado)}
+                  </Badge>
+                </div>
               </div>
 
               {/* Foto */}

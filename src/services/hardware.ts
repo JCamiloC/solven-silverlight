@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import { HardwareAsset, HardwareUpgrade } from '@/types';
+import { HardwareAsset, HardwareUpgrade, AccionRecomendadaEstado } from '@/types';
 
 const supabase = createClient();
 
@@ -196,6 +196,7 @@ export class HardwareService {
       tipo: string
       detalle: string
       accion_recomendada?: string
+      accion_recomendada_estado?: AccionRecomendadaEstado
       actividades?: string[]
       foto_url?: string
       fecha_registro?: string
@@ -207,6 +208,7 @@ export class HardwareService {
       tipo: payload.tipo,
       detalle: payload.detalle,
       accion_recomendada: payload.accion_recomendada || null,
+      accion_recomendada_estado: payload.accion_recomendada_estado || 'no_realizado',
       actividades: payload.actividades || [],
       foto_url: payload.foto_url || null,
       fecha_registro: payload.fecha_registro || new Date().toISOString(),

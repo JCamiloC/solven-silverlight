@@ -116,7 +116,7 @@ export default function ClienteHardwarePage() {
             )}
           </div>
         </div>
-        <HardwareStats clientId={clientId} />
+        <HardwareStats clientId={clientId} assets={assets || []} showTypeCards />
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Lista de Hardware</h2>

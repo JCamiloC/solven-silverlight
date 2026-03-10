@@ -3,11 +3,13 @@ import { toast } from 'sonner'
 import {
   clientMaintenancesService,
   ClientMaintenanceUpdate,
+  UpcomingClientMaintenance,
 } from '@/lib/services/client-maintenances'
 
 export const clientMaintenanceKeys = {
   all: ['client-maintenances'] as const,
   byClientYear: (clientId: string, year: number) => [...clientMaintenanceKeys.all, clientId, year] as const,
+  upcoming: (limit: number) => [...clientMaintenanceKeys.all, 'upcoming', limit] as const,
 }
 
 export function useClientMaintenances(clientId: string, year: number) {
@@ -16,6 +18,16 @@ export function useClientMaintenances(clientId: string, year: number) {
     queryFn: () => clientMaintenancesService.listByClient(clientId, year),
     enabled: !!clientId && !!year,
     staleTime: 60 * 1000,
+  })
+}
+
+export function useUpcomingClientMaintenances(limit = 5, enabled = true) {
+  return useQuery<UpcomingClientMaintenance[]>({
+    queryKey: clientMaintenanceKeys.upcoming(limit),
+    queryFn: () => clientMaintenancesService.listUpcoming(limit),
+    enabled,
+    staleTime: 60 * 1000,
+    refetchInterval: 2 * 60 * 1000,
   })
 }
 

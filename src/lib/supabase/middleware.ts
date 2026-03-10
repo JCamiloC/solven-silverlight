@@ -1,10 +1,19 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 
+const MIDDLEWARE_AUTH_TIMEOUT_MS = 10000
+
+function hasSupabaseAuthCookie(request: NextRequest) {
+  return request.cookies
+    .getAll()
+    .some(({ name }) => name.startsWith('sb-') && name.includes('-auth-token'))
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   })
+  const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard')
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,8 +41,8 @@ export async function updateSession(request: NextRequest) {
   try {
     // Agregar timeout al getUser para evitar que se quede colgado
     const getUserPromise = supabase.auth.getUser()
-    const timeoutPromise = new Promise<never>((_, reject) => 
-      setTimeout(() => reject(new Error('Middleware timeout')), 5000)
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Middleware timeout')), MIDDLEWARE_AUTH_TIMEOUT_MS)
     )
     
     const { data: { user }, error } = await Promise.race([
@@ -42,23 +51,30 @@ export async function updateSession(request: NextRequest) {
     ]) as any
     
     // Si hay error de autenticación y estamos en una ruta protegida, redirigir
-    if (error && request.nextUrl.pathname.startsWith('/dashboard')) {
+    if (error && isProtectedRoute) {
       console.log('[Middleware] Auth error, redirecting to login:', error.message)
       const redirectUrl = new URL('/auth/login?reason=expired', request.url)
       return NextResponse.redirect(redirectUrl)
     }
     
     // Si no hay usuario y estamos en ruta protegida, redirigir
-    if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+    if (!user && isProtectedRoute) {
       console.log('[Middleware] No user found, redirecting to login')
       const redirectUrl = new URL('/auth/login', request.url)
       return NextResponse.redirect(redirectUrl)
     }
   } catch (error) {
     console.error('[Middleware] Error in session validation:', error)
-    
-    // Si hay timeout y es ruta protegida, redirigir
-    if (request.nextUrl.pathname.startsWith('/dashboard')) {
+
+    // Si hay timeout pero existen cookies de sesión, permitir que la app cliente complete validación
+    const message = error instanceof Error ? error.message.toLowerCase() : ''
+    if (isProtectedRoute && message.includes('timeout') && hasSupabaseAuthCookie(request)) {
+      console.warn('[Middleware] Timeout detectado con cookies de auth presentes, permitiendo request')
+      return supabaseResponse
+    }
+
+    // Sin cookies válidas en ruta protegida, redirigir a login
+    if (isProtectedRoute) {
       const redirectUrl = new URL('/auth/login?reason=expired', request.url)
       return NextResponse.redirect(redirectUrl)
     }

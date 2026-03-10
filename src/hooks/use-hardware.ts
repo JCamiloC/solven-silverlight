@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { hardwareService } from '@/services/hardware';
 import { toast } from 'sonner';
-import { HardwareAsset } from '@/types';
+import { HardwareAsset, AccionRecomendadaEstado } from '@/types';
 
 // Estadísticas globales de hardware
 export function useHardwareStats() {
@@ -34,6 +34,7 @@ export function useCreateFollowUp() {
         tipo: string
         detalle: string
         accion_recomendada?: string
+        accion_recomendada_estado?: AccionRecomendadaEstado
         actividades?: string[]
         foto_url?: string
         fecha_registro?: string

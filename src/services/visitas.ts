@@ -79,14 +79,17 @@ class VisitasService {
     return new Error(fallback)
   }
 
-  async listByClient(clientId: string): Promise<ClientVisit[]> {
-    if (!clientId) return []
-
-    const { data, error } = await supabase
+  private async list(clientId?: string): Promise<ClientVisit[]> {
+    let query = supabase
       .from('client_visitas')
       .select('*')
-      .eq('client_id', clientId)
       .order('fecha_visita', { ascending: false })
+
+    if (clientId) {
+      query = query.eq('client_id', clientId)
+    }
+
+    const { data, error } = await query
 
     if (error) throw this.toError(error, 'No se pudieron consultar las visitas')
 
@@ -200,6 +203,15 @@ class VisitasService {
       tecnico: visit.tecnico_responsable ? profileMap.get(visit.tecnico_responsable) || null : null,
       equipos: equipmentByVisit.get(visit.id) || [],
     }))
+  }
+
+  async listByClient(clientId: string): Promise<ClientVisit[]> {
+    if (!clientId) return []
+    return this.list(clientId)
+  }
+
+  async listAll(): Promise<ClientVisit[]> {
+    return this.list()
   }
 
   async createVisit(input: CreateClientVisitInput): Promise<ClientVisit> {

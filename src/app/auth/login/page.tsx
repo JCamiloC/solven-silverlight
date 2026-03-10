@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { authService } from '@/services/auth'
+import { createClient } from '@/lib/supabase/client'
 import { NavigationLoader } from '@/components/ui/navigation-loader'
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
@@ -16,10 +17,35 @@ function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
   const [error, setError] = useState('')
   const [sessionMessage, setSessionMessage] = useState('')
   const router = useRouter()
   const searchParams = useSearchParams()
+  const supabase = useMemo(() => createClient(), [])
+
+  const withTimeout = async <T,>(promise: Promise<T>, timeoutMs = 8000): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        setTimeout(() => reject(new Error('Session verification timeout')), timeoutMs)
+      }),
+    ])
+  }
+
+  const resolveRedirectPath = async (userId: string) => {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, client_id')
+      .eq('user_id', userId)
+      .single()
+
+    if (profile?.role === 'cliente' && profile.client_id) {
+      return `/dashboard/clientes/${profile.client_id}`
+    }
+
+    return '/dashboard'
+  }
 
   useEffect(() => {
     const reason = searchParams.get('reason')
@@ -30,6 +56,39 @@ function LoginForm() {
     }
   }, [searchParams])
 
+  useEffect(() => {
+    let isMounted = true
+
+    const checkExistingSession = async () => {
+      try {
+        const {
+          data: { session },
+        } = await withTimeout(supabase.auth.getSession())
+
+        if (!isMounted) return
+
+        if (session?.user) {
+          const redirectPath = await resolveRedirectPath(session.user.id)
+          if (!isMounted) return
+          router.replace(redirectPath)
+          return
+        }
+      } catch (sessionError) {
+        console.error('Error checking existing session:', sessionError)
+      } finally {
+        if (isMounted) {
+          setCheckingSession(false)
+        }
+      }
+    }
+
+    checkExistingSession()
+
+    return () => {
+      isMounted = false
+    }
+  }, [router, supabase])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -37,28 +96,43 @@ function LoginForm() {
 
     try {
       const { user } = await authService.signIn(email, password)
-      
-      // Obtener el perfil del usuario para determinar redirección
-      const { createClient } = await import('@/lib/supabase/client')
-      const supabase = createClient()
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, client_id')
-        .eq('user_id', user.id)
-        .single()
-      
-      // Redirigir según rol
-      if (profile?.role === 'cliente' && profile.client_id) {
-        router.push(`/dashboard/clientes/${profile.client_id}`)
-      } else {
-        router.push('/dashboard')
+
+      // Validar sesión efectiva antes de navegar (evita carreras de estado/cookies)
+      const {
+        data: { session },
+      } = await withTimeout(supabase.auth.getSession())
+
+      const userId = session?.user?.id || user?.id
+      if (!userId) {
+        throw new Error('No se pudo establecer la sesión. Intenta nuevamente.')
       }
+
+      const redirectPath = await resolveRedirectPath(userId)
+      window.location.assign(redirectPath)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al iniciar sesión'
       setError(errorMessage)
     } finally {
       setLoading(false)
     }
+  }
+
+  if (checkingSession) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <NavigationLoader />
+        <div className="w-full max-w-md">
+          <Card>
+            <CardContent className="py-8">
+              <div className="flex items-center justify-center text-muted-foreground">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Verificando sesión...
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
   }
 
   return (

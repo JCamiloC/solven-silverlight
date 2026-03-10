@@ -107,12 +107,15 @@ export type TipoSeguimiento =
   | 'soporte_remoto'
   | 'soporte_en_sitio'
 
+export type AccionRecomendadaEstado = 'realizado' | 'no_realizado'
+
 export interface HardwareSeguimiento {
   id: string
   hardware_id: string
   tipo: TipoSeguimiento
   detalle: string
   accion_recomendada?: string
+  accion_recomendada_estado?: AccionRecomendadaEstado
   actividades?: string[]
   foto_url?: string
   fecha_registro: string

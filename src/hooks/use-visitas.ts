@@ -4,7 +4,16 @@ import { CreateClientVisitInput, visitasService } from '@/services/visitas'
 
 export const visitasKeys = {
   all: ['visitas'] as const,
+  list: () => [...visitasKeys.all, 'list'] as const,
   byClient: (clientId: string) => [...visitasKeys.all, 'client', clientId] as const,
+}
+
+export function useAllClientVisits() {
+  return useQuery({
+    queryKey: visitasKeys.list(),
+    queryFn: () => visitasService.listAll(),
+    staleTime: 60 * 1000,
+  })
 }
 
 export function useClientVisits(clientId: string) {
