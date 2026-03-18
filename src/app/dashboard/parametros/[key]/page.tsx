@@ -54,19 +54,23 @@ export default function ParametroDetailPage() {
   const onSave = async () => {
     if (!key) return
     
-    // Validar que no haya opciones vacías
-    const validOptions = options.filter(opt => opt.value.trim() !== '' && opt.label.trim() !== '')
-    
-    if (validOptions.length === 0) {
-      toast.error('Debe agregar al menos una opción válida')
+    const normalizedOptions = options.map((opt) => ({
+      value: opt.value.trim(),
+      label: opt.label.trim(),
+    }))
+
+    // Permite guardar lista vacía, pero evita filas parcialmente diligenciadas.
+    const hasPartiallyFilledOption = normalizedOptions.some(
+      (opt) => (opt.value === '' && opt.label !== '') || (opt.value !== '' && opt.label === '')
+    )
+
+    if (hasPartiallyFilledOption) {
+      toast.error('Cada opción debe tener valor y etiqueta, o estar completamente vacía')
       return
     }
 
     // Convertir a formato backend (sin el id temporal)
-    const backendOptions = validOptions.map(opt => ({
-      value: opt.value.trim(),
-      label: opt.label.trim()
-    }))
+    const backendOptions = normalizedOptions.filter((opt) => opt.value !== '' && opt.label !== '')
 
     try {
       await update.mutateAsync({ 
