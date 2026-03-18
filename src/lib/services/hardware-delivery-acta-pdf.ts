@@ -36,7 +36,7 @@ export class HardwareDeliveryActaPDF {
   /**
    * Genera el acta de entrega del hardware en PDF
    */
-  static async generateActa(data: ActaDeliveryData): Promise<void> {
+  private static async buildActaDocument(data: ActaDeliveryData): Promise<jsPDF> {
     try {
       const doc = new jsPDF()
 
@@ -443,15 +443,27 @@ export class HardwareDeliveryActaPDF {
       doc.text('SILVERLIGHT COLOMBIA - Sistema de Gestión de Activos Tecnológicos', pageWidth / 2, footerY, { align: 'center' })
       doc.text(`Generado el: ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: es })}`, pageWidth / 2, footerY + 4, { align: 'center' })
 
-      // Descargar PDF
-      const filename = `ActaEntrega_${hardware.name?.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`
-      doc.save(filename)
+      return doc
     } catch (error) {
       console.error('Error generating delivery acta PDF:', error)
       throw new Error(
         `Failed to generate delivery acta PDF: ${error instanceof Error ? error.message : 'unknown error'}`
       )
     }
+  }
+
+  static async generateActa(data: ActaDeliveryData): Promise<void> {
+    const doc = await this.buildActaDocument(data)
+    const { hardware } = data
+
+      // Descargar PDF
+      const filename = `ActaEntrega_${hardware.name?.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`
+      doc.save(filename)
+  }
+
+  static async generateActaBlob(data: ActaDeliveryData): Promise<Blob> {
+    const doc = await this.buildActaDocument(data)
+    return doc.output('blob')
   }
 
   /**

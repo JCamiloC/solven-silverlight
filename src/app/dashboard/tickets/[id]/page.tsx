@@ -212,6 +212,13 @@ export default function TicketDetailPage() {
     })
   }
 
+  const handlePriorityChange = (priority: string) => {
+    updateTicketMutation.mutate({
+      id: ticketId,
+      data: { priority: priority as 'low' | 'medium' | 'high' | 'critical' }
+    })
+  }
+
   const handleSubmitComment = () => {
     if (!newComment.trim() || !user) return
     
@@ -527,7 +534,7 @@ export default function TicketDetailPage() {
                     {(profile?.role === 'administrador' || profile?.role === 'lider_soporte' || profile?.role === 'agente_soporte') && (
                       <div className="border-t pt-4 mt-4">
                         <h4 className="text-sm font-semibold mb-3">Acciones Rápidas</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div className="space-y-2">
                             <Label className="text-sm">Estado del Ticket</Label>
                             <Select 
@@ -542,6 +549,25 @@ export default function TicketDetailPage() {
                                 <SelectItem value="open">Abierto</SelectItem>
                                 <SelectItem value="pendiente_confirmacion">Pendiente Confirmación</SelectItem>
                                 <SelectItem value="solucionado">Solucionado</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-sm">Prioridad</Label>
+                            <Select
+                              value={ticket.priority}
+                              onValueChange={handlePriorityChange}
+                              disabled={updateTicketMutation.isPending}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Seleccionar prioridad" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="low">Baja</SelectItem>
+                                <SelectItem value="medium">Media</SelectItem>
+                                <SelectItem value="high">Alta</SelectItem>
+                                <SelectItem value="critical">Crítica</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>

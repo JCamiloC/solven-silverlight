@@ -4,6 +4,7 @@ import {
   DashboardStats,
   RecentTickets,
   HardwareOverview,
+  UpcomingMaintenances,
   QuickActions
 } from '@/components/dashboard'
 import { ProtectedRoute } from '@/components/auth/protected-route'
@@ -20,6 +21,8 @@ export default function DashboardPage() {
         </div>
 
         <DashboardStats />
+
+        <UpcomingMaintenances />
 
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
           <RecentTickets />

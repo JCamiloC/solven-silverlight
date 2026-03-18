@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Eye, Loader2, ChevronLeft, ChevronRight, Filter } from 'lucide-react'
+import { Eye, Loader2, ChevronLeft, ChevronRight, Filter, Search } from 'lucide-react'
 import { formatDistanceToNow, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useClients } from '@/hooks/use-clients'
@@ -98,6 +98,7 @@ export function TicketTable({
   const [selectedClient, setSelectedClient] = useState<string>('all')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
+  const [searchTerm, setSearchTerm] = useState('')
   const itemsPerPage = 10
 
   // Filtrar tickets
@@ -121,8 +122,26 @@ export function TicketTable({
       filtered = filtered.filter(t => new Date(t.created_at) <= end)
     }
 
+    // Búsqueda por texto (incluye persona responsable)
+    if (searchTerm.trim()) {
+      const query = searchTerm.trim().toLowerCase()
+      filtered = filtered.filter((ticket) => {
+        const assignedUser = assignableUsers.find((u) => u.id === ticket.assigned_to)
+        const responsable = assignedUser
+          ? `${assignedUser.first_name || ''} ${assignedUser.last_name || ''}`.trim()
+          : 'sin asignar'
+
+        return [
+          ticket.ticket_number || '',
+          ticket.title || '',
+          ticket.usuario_afectado || '',
+          responsable,
+        ].some((field) => field.toLowerCase().includes(query))
+      })
+    }
+
     return filtered
-  }, [tickets, selectedClient, startDate, endDate])
+  }, [tickets, selectedClient, startDate, endDate, searchTerm, assignableUsers])
 
   useEffect(() => {
     onFilteredTicketsChange?.(filteredTickets)
@@ -157,10 +176,16 @@ export function TicketTable({
     handleFilterChange()
   }
 
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value)
+    handleFilterChange()
+  }
+
   const clearFilters = () => {
     setSelectedClient('all')
     setStartDate('')
     setEndDate('')
+    setSearchTerm('')
     setCurrentPage(1)
   }
 
@@ -199,7 +224,7 @@ export function TicketTable({
             <Filter className="h-4 w-4" />
             <CardTitle className="text-base">Filtros</CardTitle>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className={`grid grid-cols-1 gap-4 ${showClientColumn ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
             {/* (mismo c\u00f3digo de filtros) */}
             {showClientColumn && (
               <div className="space-y-2">
@@ -219,6 +244,19 @@ export function TicketTable({
                 </Select>
               </div>
             )}
+            <div className="space-y-2">
+              <Label htmlFor="search-ticket-empty">Buscar</Label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="search-ticket-empty"
+                  placeholder="Ticket, título o responsable"
+                  value={searchTerm}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="start-date">Desde</Label>
               <Input
@@ -268,7 +306,7 @@ export function TicketTable({
           <Filter className="h-4 w-4" />
           <CardTitle className="text-base">Filtros</CardTitle>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className={`grid grid-cols-1 gap-4 ${showClientColumn ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
           {/* Filtro por Cliente */}
           {showClientColumn && (
             <div className="space-y-2">
@@ -288,6 +326,20 @@ export function TicketTable({
               </Select>
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="search-ticket">Buscar</Label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="search-ticket"
+                placeholder="Ticket, título o responsable"
+                value={searchTerm}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </div>
 
           {/* Fecha Inicio */}
           <div className="space-y-2">
@@ -344,7 +396,7 @@ export function TicketTable({
                 <TableHead className="whitespace-nowrap">Prioridad</TableHead>
                 <TableHead className="whitespace-nowrap">Estado</TableHead>
                 <TableHead className="whitespace-nowrap">Creado</TableHead>
-                <TableHead className="whitespace-nowrap">Asignado a</TableHead>
+                <TableHead className="whitespace-nowrap">Persona Responsable</TableHead>
                 <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
               </TableRow>
             </TableHeader>

@@ -21,13 +21,23 @@ export function SeguimientoForm({ hardwareId, open, onOpenChange, onSaved }: Seg
   const { profile } = useAuth()
   const [tipo, setTipo] = useState('')
   const [detalle, setDetalle] = useState('')
+  const [accionRecomendada, setAccionRecomendada] = useState('')
   const today = format(new Date(), "yyyy-MM-dd'T'HH:mm:ssxxx")
 
   const handleSave = async () => {
     try {
-      await createMutation.mutateAsync({ hardwareId, payload: { tipo, detalle, creado_por: profile?.id } })
+      await createMutation.mutateAsync({
+        hardwareId,
+        payload: {
+          tipo,
+          detalle,
+          accion_recomendada: accionRecomendada,
+          creado_por: profile?.id,
+        },
+      })
       setTipo('')
       setDetalle('')
+      setAccionRecomendada('')
       onSaved?.()
       onOpenChange(false)
     } catch (err) {
@@ -54,9 +64,17 @@ export function SeguimientoForm({ hardwareId, open, onOpenChange, onSaved }: Seg
             <label className="text-sm font-medium">Detalle</label>
             <Textarea value={detalle} onChange={(e) => setDetalle(e.target.value)} rows={5} />
           </div>
+          <div>
+            <label className="text-sm font-medium">Acción recomendada</label>
+            <Textarea
+              value={accionRecomendada}
+              onChange={(e) => setAccionRecomendada(e.target.value)}
+              rows={4}
+            />
+          </div>
           <div className="flex justify-end space-x-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={createMutation.isPending || !tipo || !detalle}>Guardar</Button>
+            <Button onClick={handleSave} disabled={createMutation.isPending || !tipo || !detalle || !accionRecomendada}>Guardar</Button>
           </div>
         </div>
       </DialogContent>
