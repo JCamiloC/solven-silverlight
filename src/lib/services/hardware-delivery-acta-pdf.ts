@@ -332,7 +332,7 @@ export class HardwareDeliveryActaPDF {
       doc.setFont('helvetica', 'normal')
       doc.text('_________________________________', col1X + 5, nameUnderlineYLeft)
 
-      doc.text('Cédula:', col1X + 5, cedulaYLeft)
+      doc.text('Cédula/NIT:', col1X + 5, cedulaYLeft)
       doc.setFont('helvetica', 'bold')
       doc.text(this.truncateText(entregaCedula, 30), col1X + 5, cedulaYLeft + 3)
       doc.setFont('helvetica', 'normal')
@@ -359,7 +359,7 @@ export class HardwareDeliveryActaPDF {
       doc.setFont('helvetica', 'normal')
       doc.text('_________________________________', col2X + 5, nameUnderlineYRight)
 
-      doc.text('Cédula:', col2X + 5, cedulaYRight)
+      doc.text('Cédula/NIT:', col2X + 5, cedulaYRight)
       doc.setFont('helvetica', 'bold')
       doc.text(this.truncateText(recibeCedula, 30), col2X + 5, cedulaYRight + 3)
       doc.setFont('helvetica', 'normal')
