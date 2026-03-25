@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import { LoadingButton } from '@/components/ui/loading-button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { User, Phone, Mail, Building2, Calendar, Shield } from 'lucide-react'
+import { useActionLock } from '@/hooks/use-action-lock'
 
 export function UserProfile() {
   const { profile, user } = useAuth()
@@ -21,6 +23,7 @@ export function UserProfile() {
   })
 
   const supabase = createClient()
+  const { runWithLock, isLocked } = useActionLock()
 
   useEffect(() => {
     if (profile && user) {
@@ -40,8 +43,9 @@ export function UserProfile() {
       return
     }
 
-    setLoading(true)
     try {
+      setLoading(true)
+      await runWithLock(async () => {
       console.log('Actualizando perfil con datos:', {
         user_id: profile.user_id,
         profile_id: profile.id,
@@ -92,6 +96,7 @@ export function UserProfile() {
       setTimeout(() => {
         window.location.reload()
       }, 1000)
+      }, { message: 'Guardando perfil...' })
     } catch (error: any) {
       console.error('Error updating profile:', error)
       toast.error(`Error al actualizar el perfil: ${error.message || 'Error desconocido'}`)
@@ -256,9 +261,9 @@ export function UserProfile() {
 
         {/* Submit Button */}
         <div className="flex justify-end pt-4">
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Guardando...' : 'Guardar Cambios'}
-          </Button>
+          <LoadingButton type="submit" loading={loading || isLocked} loadingText="Guardando...">
+            Guardar Cambios
+          </LoadingButton>
         </div>
       </form>
     </div>

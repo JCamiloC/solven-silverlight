@@ -17,12 +17,14 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/hooks/use-auth'
 import { usePageTitle } from '@/hooks/use-page-title'
+import { useActionLock } from '@/hooks/use-action-lock'
 import { useRouter } from 'next/navigation'
 
 export function Header() {
   const [notifications] = useState(0) // Real notification count will be implemented later
   const [mounted, setMounted] = useState(false)
   const { profile, signOut } = useAuth()
+  const { runWithLock, runNavigationLock, isLocked } = useActionLock()
   const title = usePageTitle() // Obtener título dinámico basado en la ruta
   const router = useRouter()
 
@@ -35,10 +37,21 @@ export function Header() {
 
   const handleLogout = async () => {
     try {
-      await signOut()
+      await runWithLock(
+        async () => {
+          await signOut()
+        },
+        { message: 'Cerrando sesión...' }
+      )
     } catch (error) {
       console.error('Error signing out:', error)
     }
+  }
+
+  const handleGoProfile = () => {
+    runNavigationLock(() => {
+      router.push('/dashboard/configuracion')
+    }, { message: 'Cargando...' })
   }
 
   const getUserInitials = () => {
@@ -122,12 +135,12 @@ export function Header() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push('/dashboard/configuracion')}>
+                  <DropdownMenuItem onClick={handleGoProfile} disabled={isLocked}>
                     <User className="mr-2 h-4 w-4" />
                     Perfil
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout}>
+                  <DropdownMenuItem onClick={handleLogout} disabled={isLocked}>
                     Cerrar sesión
                   </DropdownMenuItem>
                 </DropdownMenuContent>

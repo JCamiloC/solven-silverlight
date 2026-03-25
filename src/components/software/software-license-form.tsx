@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { LoadingButton } from '@/components/ui/loading-button'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
@@ -31,6 +32,7 @@ import {
 } from '@/components/ui/select'
 import { Loader2 } from 'lucide-react'
 import { SoftwareLicenseWithRelations } from '@/lib/services/software'
+import { useActionLock } from '@/hooks/use-action-lock'
 
 const formSchema = z.object({
   client_id: z.string().min(1, 'Selecciona un cliente'),
@@ -66,6 +68,7 @@ export function SoftwareLicenseForm({
   const { data: existingLicense, isLoading: loadingLicense } = useSoftwareLicense(licenseId || '')
   const createLicense = useCreateSoftwareLicense()
   const updateLicense = useUpdateSoftwareLicense()
+  const { runWithLock, isLocked } = useActionLock()
 
   const licenseData = license || existingLicense
 
@@ -112,14 +115,17 @@ export function SoftwareLicenseForm({
         expiry_date: data.expiry_date || undefined,
       }
 
-      if (licenseData) {
-        await updateLicense.mutateAsync({
-          id: licenseData.id,
-          data: cleanedData,
-        })
-      } else {
-        await createLicense.mutateAsync(cleanedData as any)
-      }
+      await runWithLock(async () => {
+        if (licenseData) {
+          await updateLicense.mutateAsync({
+            id: licenseData.id,
+            data: cleanedData,
+          })
+        } else {
+          await createLicense.mutateAsync(cleanedData as any)
+        }
+      }, { message: licenseData ? 'Actualizando licencia...' : 'Creando licencia...' })
+
       form.reset()
       onSuccess?.()
     } catch (error) {
@@ -127,7 +133,7 @@ export function SoftwareLicenseForm({
     }
   }
 
-  const isSubmitting = createLicense.isPending || updateLicense.isPending
+  const isSubmitting = createLicense.isPending || updateLicense.isPending || isLocked
 
   if (loadingLicense) {
     return (
@@ -411,10 +417,9 @@ export function SoftwareLicenseForm({
               Cancelar
             </Button>
           )}
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          <LoadingButton type="submit" loading={isSubmitting} loadingText={licenseData ? 'Actualizando licencia...' : 'Creando licencia...'}>
             {licenseData ? 'Actualizar' : 'Crear'} Licencia
-          </Button>
+          </LoadingButton>
         </div>
       </form>
     </Form>

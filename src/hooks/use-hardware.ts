@@ -3,7 +3,7 @@ import { hardwareService } from '@/services/hardware';
 import { toast } from 'sonner';
 import { HardwareAsset, AccionRecomendadaEstado } from '@/types';
 
-// Estadísticas globales de hardware
+// EstadÃ­sticas globales de hardware
 export function useHardwareStats() {
   return useQuery({
     queryKey: hardwareKeys.stats(),
@@ -127,10 +127,10 @@ export function useCreateHardware() {
     },
     onError: (err, newAsset, context) => {
       queryClient.setQueryData(hardwareKeys.list(), context?.previousAssets);
-      toast.error('Error al crear el equipo: ' + err.message);
+      toast.error('Error al crear el activo tecnológico: ' + err.message);
     },
     onSuccess: () => {
-      toast.success('Equipo creado exitosamente');
+      toast.success('Activo tecnológico creado exitosamente');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: hardwareKeys.list() });
@@ -171,10 +171,10 @@ export function useUpdateHardware() {
     onError: (err, { id }, context) => {
       queryClient.setQueryData(hardwareKeys.list(), context?.previousAssets);
       queryClient.setQueryData(hardwareKeys.detail(id), context?.previousAsset);
-      toast.error('Error al actualizar el equipo: ' + err.message);
+      toast.error('Error al actualizar el activo tecnológico: ' + err.message);
     },
     onSuccess: () => {
-      toast.success('Equipo actualizado exitosamente');
+      toast.success('Activo tecnológico actualizado exitosamente');
     },
     onSettled: (_, __, { id }) => {
       queryClient.invalidateQueries({ queryKey: hardwareKeys.list() });
@@ -206,10 +206,10 @@ export function useDeleteHardware() {
     },
     onError: (err, id, context) => {
       queryClient.setQueryData(hardwareKeys.list(), context?.previousAssets);
-      toast.error('Error al eliminar el equipo: ' + err.message);
+      toast.error('Error al eliminar el activo tecnológico: ' + err.message);
     },
     onSuccess: () => {
-      toast.success('Equipo eliminado exitosamente');
+      toast.success('Activo tecnológico eliminado exitosamente');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: hardwareKeys.list() });

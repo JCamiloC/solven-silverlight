@@ -30,7 +30,7 @@ export default function HardwarePage() {
           <div className="text-center">
             <h2 className="text-lg font-semibold text-destructive">Error al cargar los datos</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              {error.message || 'Ocurrió un error inesperado'}
+              {error.message || 'OcurriÃ³ un error inesperado'}
             </p>
           </div>
         </div>
@@ -45,7 +45,7 @@ export default function HardwarePage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Hardware</h1>
             <p className="text-muted-foreground">
-              Gestión de activos de hardware y equipos
+              GestiÃ³n de activos de hardware y activos tecnológicos
             </p>
           </div>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>

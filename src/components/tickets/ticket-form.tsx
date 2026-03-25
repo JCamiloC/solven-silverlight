@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { LoadingButton } from '@/components/ui/loading-button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -31,12 +32,13 @@ import { useClients } from '@/hooks/use-clients'
 import { useAssignableUsers } from '@/hooks/use-users'
 import { useCreateTicket, useUpdateTicket } from '@/hooks/use-tickets'
 import { useAuth } from '@/hooks/use-auth'
+import { useActionLock } from '@/hooks/use-action-lock'
 import { useHardwareAssetsByClient } from '@/hooks/use-hardware'
 import { useSoftwareByClient } from '@/hooks/use-software'
 import { useCustomApplicationsByClient } from '@/hooks/use-custom-applications'
 import { useAccessCredentialsByClient } from '@/hooks/use-access-credentials'
 import { createClient } from '@/lib/supabase/client'
-import { Loader2, AlertCircle, Upload, X } from 'lucide-react'
+import { AlertCircle, Upload, X } from 'lucide-react'
 
 const ticketFormSchema = z.object({
   client_id: z.string().min(1, 'Cliente es obligatorio'),
@@ -112,6 +114,7 @@ export function TicketForm({
   const { data: assignableUsers, isLoading: loadingUsers } = useAssignableUsers()
   const createTicket = useCreateTicket()
   const updateTicket = useUpdateTicket()
+  const { runWithLock, isLocked } = useActionLock()
 
   const isClientLocked = !!clientId
   const isEditMode = mode === 'edit'
@@ -206,6 +209,7 @@ export function TicketForm({
     setErrorMessage(null)
 
     try {
+      await runWithLock(async () => {
       // 1. Subir archivo si existe
       let attachmentData: { url?: string; name?: string; size?: number } = {}
       if (selectedFile) {
@@ -320,6 +324,7 @@ export function TicketForm({
           router.push('/dashboard/tickets')
         }
       }
+      }, { message: isEditMode ? 'Actualizando ticket...' : 'Creando ticket...' })
     } catch (error: any) {
       console.error(`Error ${isEditMode ? 'updating' : 'creating'} ticket:`, error)
       
@@ -617,23 +622,25 @@ export function TicketForm({
                   <FormItem>
                     <FormLabel>Equipo de Hardware</FormLabel>
                     <FormControl>
-                      <Select
-                        onValueChange={field.onChange}
+                      <ClientSearchCombobox
+                        options={[
+                          ...(hardwareList?.map((hw) => ({
+                            value: hw.id,
+                            label: `${hw.persona_responsable || 'Sin responsable'} - ${hw.brand} ${hw.model}`,
+                          })) || []),
+                          {
+                            value: 'other',
+                            label: 'Otro (no está en la lista)',
+                          },
+                        ]}
                         value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder={loadingHardware ? 'Cargando...' : 'Seleccione un equipo'}
+                        searchPlaceholder="Buscar equipo por tipo, marca, modelo o serial..."
+                        emptyMessage="No se encontraron equipos"
+                        minSearchChars={1}
                         disabled={loadingHardware}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder={loadingHardware ? "Cargando..." : "Seleccione un equipo"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {hardwareList?.map((hw) => (
-                            <SelectItem key={hw.id} value={hw.id}>
-                              {hw.type} - {hw.brand} {hw.model} (S/N: {hw.serial_number})
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="other">Otro (no está en la lista)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -649,7 +656,21 @@ export function TicketForm({
                   <FormItem>
                     <FormLabel>Software</FormLabel>
                     <FormControl>
-                      <Select
+                      <ClientSearchCombobox
+                        options={[
+                          ...softwareOptions,
+                          {
+                            value: 'other',
+                            label: 'Otro (no está en la lista)',
+                          },
+                        ]}
+                        value={
+                          field.value === 'other'
+                            ? 'other'
+                            : field.value && form.watch('software_source')
+                              ? `${form.watch('software_source')}:${field.value}`
+                              : undefined
+                        }
                         onValueChange={(value) => {
                           if (value === 'other') {
                             field.onChange('other')
@@ -665,27 +686,12 @@ export function TicketForm({
                           field.onChange(id)
                           form.setValue('software_source', source as 'license' | 'custom_app')
                         }}
-                        value={
-                          field.value === 'other'
-                            ? 'other'
-                            : field.value && form.watch('software_source')
-                              ? `${form.watch('software_source')}:${field.value}`
-                              : undefined
-                        }
+                        placeholder={(loadingSoftware || loadingCustomApplications) ? 'Cargando...' : 'Seleccione software o aplicativo'}
+                        searchPlaceholder="Buscar software, versión o aplicativo..."
+                        emptyMessage="No se encontraron opciones de software"
+                        minSearchChars={1}
                         disabled={loadingSoftware || loadingCustomApplications}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder={(loadingSoftware || loadingCustomApplications) ? "Cargando..." : "Seleccione software o aplicativo"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {softwareOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="other">Otro (no está en la lista)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -701,23 +707,25 @@ export function TicketForm({
                   <FormItem>
                     <FormLabel>Credencial de Acceso</FormLabel>
                     <FormControl>
-                      <Select
-                        onValueChange={field.onChange}
+                      <ClientSearchCombobox
+                        options={[
+                          ...(accessList?.map((acc) => ({
+                            value: acc.id,
+                            label: `${acc.system_name} - ${acc.username}`,
+                          })) || []),
+                          {
+                            value: 'other',
+                            label: 'Otro (no está en la lista)',
+                          },
+                        ]}
                         value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder={loadingAccess ? 'Cargando...' : 'Seleccione una credencial'}
+                        searchPlaceholder="Buscar por sistema o usuario..."
+                        emptyMessage="No se encontraron credenciales"
+                        minSearchChars={1}
                         disabled={loadingAccess}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder={loadingAccess ? "Cargando..." : "Seleccione una credencial"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {accessList?.map((acc) => (
-                            <SelectItem key={acc.id} value={acc.id}>
-                              {acc.system_name} - {acc.username}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="other">Otro (no está en la lista)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -808,23 +816,19 @@ export function TicketForm({
             type="button"
             variant="outline"
             onClick={() => router.back()}
+            disabled={createTicket.isPending || updateTicket.isPending || isLocked}
             className="w-full sm:w-auto"
           >
             Cancelar
           </Button>
-          <Button
+          <LoadingButton
             type="submit"
-            disabled={createTicket.isPending || updateTicket.isPending}
+            loading={createTicket.isPending || updateTicket.isPending || isLocked}
+            loadingText={isEditMode ? 'Actualizando...' : 'Creando...'}
             className="w-full sm:w-auto"
           >
-            {(createTicket.isPending || updateTicket.isPending) && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            )}
-            {isEditMode 
-              ? (updateTicket.isPending ? 'Actualizando...' : 'Actualizar Ticket')
-              : (createTicket.isPending ? 'Creando...' : 'Crear Ticket')
-            }
-          </Button>
+            {isEditMode ? 'Actualizar Ticket' : 'Crear Ticket'}
+          </LoadingButton>
         </div>
       </form>
     </Form>

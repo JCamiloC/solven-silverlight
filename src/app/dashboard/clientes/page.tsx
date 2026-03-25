@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Plus, Search, Building2, X } from 'lucide-react'
 import React from 'react'
 import { Button } from '@/components/ui/button'
+import { LoadingButton } from '@/components/ui/loading-button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -26,6 +27,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { useClients, useCreateClient } from '@/hooks/use-clients'
+import { useActionLock } from '@/hooks/use-action-lock'
 import { Client, ClientType } from '@/types'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -34,7 +36,8 @@ import { getClientTypeLabel } from '@/lib/utils/user-type-labels'
 export default function ClientesPage() {
   const router = useRouter()
   const { data: clients, isLoading, error } = useClients()
-  const { mutate: createClient, isPending: isCreating } = useCreateClient()
+  const { mutateAsync: createClient, isPending: isCreating } = useCreateClient()
+  const { runWithLock, isLocked } = useActionLock()
   const [searchTerm, setSearchTerm] = useState('')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [formData, setFormData] = useState({
@@ -248,12 +251,13 @@ export default function ClientesPage() {
           </DialogHeader>
           
           <form
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault()
               setFormError('')
-              
-              createClient(formData, {
-                onSuccess: () => {
+
+              try {
+                await runWithLock(async () => {
+                  await createClient(formData)
                   setShowCreateDialog(false)
                   setFormData({ 
                     name: '', 
@@ -265,11 +269,11 @@ export default function ClientesPage() {
                     mantenimientos_al_anio: 0,
                     client_type: 'no_aplica',
                   })
-                },
-                onError: (err: Error) => {
-                  setFormError(err.message || 'Error al crear cliente')
-                },
-              })
+                }, { message: 'Creando cliente...' })
+              } catch (err) {
+                const error = err as Error
+                setFormError(error.message || 'Error al crear cliente')
+              }
             }}
             className="space-y-4"
           >
@@ -401,16 +405,17 @@ export default function ClientesPage() {
                 type="button" 
                 variant="outline"
                 onClick={() => setShowCreateDialog(false)}
-                disabled={isCreating}
+                disabled={isCreating || isLocked}
               >
                 Cancelar
               </Button>
-              <Button 
+              <LoadingButton 
                 type="submit" 
-                disabled={isCreating}
+                loading={isCreating || isLocked}
+                loadingText="Creando..."
               >
-                {isCreating ? 'Creando...' : 'Crear Cliente'}
-              </Button>
+                Crear Cliente
+              </LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>

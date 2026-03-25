@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { LoadingButton } from '@/components/ui/loading-button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -35,6 +36,7 @@ import { Loader2, Upload, X, Calendar, FileText, CheckSquare, ChevronDown, Chevr
 import { Badge } from '@/components/ui/badge'
 import { uploadSeguimientoFoto } from '@/lib/storage'
 import { toast } from 'sonner'
+import { useActionLock } from '@/hooks/use-action-lock'
 
 const TIPOS_SEGUIMIENTO = [
   { value: 'actualizacion', label: 'Actualización' },
@@ -75,6 +77,7 @@ interface SeguimientosViewProps {
 export function SeguimientosView({ applicationId, applicationName }: SeguimientosViewProps) {
   const { profile } = useAuth()
   const createMutation = useCreateCustomAppFollowup()
+  const { runWithLock, isLocked } = useActionLock()
   const { data: seguimientos, isLoading, refetch } = useCustomAppFollowups(applicationId)
 
   console.log('SeguimientosView - applicationId:', applicationId)
@@ -149,15 +152,17 @@ export function SeguimientosView({ applicationId, applicationName }: Seguimiento
         }
       }
 
-      await createMutation.mutateAsync({
-        application_id: applicationId,
-        tipo: tipo as 'actualizacion' | 'mantenimiento' | 'soporte' | 'backup' | 'migracion' | 'optimizacion' | 'bug_fix' | 'nueva_funcionalidad' | 'otro',
-        detalle,
-        actividades,
-        foto_url: fotoUrl,
-        fecha_registro: new Date(fechaRegistro).toISOString(),
-        tecnico_responsable: profile.id,
-      })
+      await runWithLock(async () => {
+        await createMutation.mutateAsync({
+          application_id: applicationId,
+          tipo: tipo as 'actualizacion' | 'mantenimiento' | 'soporte' | 'backup' | 'migracion' | 'optimizacion' | 'bug_fix' | 'nueva_funcionalidad' | 'otro',
+          detalle,
+          actividades,
+          foto_url: fotoUrl,
+          fecha_registro: new Date(fechaRegistro).toISOString(),
+          tecnico_responsable: profile.id,
+        })
+      }, { message: 'Guardando seguimiento...' })
 
       // Reset form
       setTipo('')
@@ -349,12 +354,13 @@ export function SeguimientosView({ applicationId, applicationName }: Seguimiento
               >
                 Limpiar
               </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
+              <LoadingButton
+                type="submit"
+                loading={createMutation.isPending || isLocked}
+                loadingText="Guardando seguimiento..."
+              >
                 Guardar Seguimiento
-              </Button>
+              </LoadingButton>
             </div>
           </form>
             </CardContent>

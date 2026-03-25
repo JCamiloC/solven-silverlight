@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, CalendarClock, CheckCircle2, ClipboardCheck } from 'lucide-react'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { Button } from '@/components/ui/button'
+import { LoadingButton } from '@/components/ui/loading-button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,6 +21,7 @@ import {
   useUpdateClientMaintenance,
 } from '@/hooks/use-client-maintenances'
 import { useAuth } from '@/hooks/use-auth'
+import { useActionLock } from '@/hooks/use-action-lock'
 import type { ClientMaintenanceStatus } from '@/lib/services/client-maintenances'
 
 const statusLabels: Record<ClientMaintenanceStatus, string> = {
@@ -50,6 +52,7 @@ export default function ClienteMantenimientosPage() {
 
   const ensureSchedule = useEnsureClientMaintenanceSchedule()
   const updateMaintenance = useUpdateClientMaintenance()
+  const { runWithLock, isLocked } = useActionLock()
 
   const target = client?.mantenimientos_al_anio || 0
 
@@ -65,11 +68,13 @@ export default function ClienteMantenimientosPage() {
 
   const handleGenerateSchedule = async () => {
     try {
-      await ensureSchedule.mutateAsync({
-        clientId,
-        year,
-        totalMaintenances: target,
-      })
+      await runWithLock(async () => {
+        await ensureSchedule.mutateAsync({
+          clientId,
+          year,
+          totalMaintenances: target,
+        })
+      }, { message: 'Generando agenda...' })
     } catch {
       // El error ya se notifica en el hook (onError)
     }
@@ -77,13 +82,15 @@ export default function ClienteMantenimientosPage() {
 
   const handleUpdate = async (id: string, updates: { expected_date: string; status: ClientMaintenanceStatus; notes?: string | null }) => {
     try {
-      await updateMaintenance.mutateAsync({
-        id,
-        updates,
-        clientId,
-        year,
-        updaterId: profile?.id,
-      })
+      await runWithLock(async () => {
+        await updateMaintenance.mutateAsync({
+          id,
+          updates,
+          clientId,
+          year,
+          updaterId: profile?.id,
+        })
+      }, { message: 'Guardando mantenimiento...' })
     } catch {
       // El error ya se notifica en el hook (onError)
     }
@@ -153,14 +160,16 @@ export default function ClienteMantenimientosPage() {
               </div>
 
               {!readOnly && (
-                <Button
+                <LoadingButton
                   onClick={handleGenerateSchedule}
-                  disabled={ensureSchedule.isPending || target <= 0}
+                  loading={ensureSchedule.isPending || isLocked}
+                  loadingText="Generando..."
+                  disabled={target <= 0}
                   className="w-full sm:w-auto"
                 >
                   <ClipboardCheck className="mr-2 h-4 w-4" />
-                  {ensureSchedule.isPending ? 'Generando...' : 'Generar / Completar agenda'}
-                </Button>
+                  Generar / Completar agenda
+                </LoadingButton>
               )}
             </div>
 
@@ -190,7 +199,7 @@ export default function ClienteMantenimientosPage() {
                         row={row}
                         readOnly={readOnly}
                         onSave={(updates) => handleUpdate(row.id, updates)}
-                        saving={updateMaintenance.isPending}
+                        saving={updateMaintenance.isPending || isLocked}
                       />
                     ))}
                   </TableBody>

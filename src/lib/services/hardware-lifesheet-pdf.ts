@@ -1,6 +1,6 @@
 /**
  * Servicio para generar PDF de Hoja de Vida de Hardware
- * Genera un documento PDF con información completa del equipo:
+ * Genera un documento PDF con información completa del activo tecnol�gico:
  * - Información General
  * - Especificaciones Técnicas (con historial de upgrades)
  * - Historial de Mantenimientos
@@ -45,6 +45,7 @@ export class HardwareLifesheetPDF {
   ): Promise<void> {
     try {
       const { default: jsPDF } = await import('jspdf')
+      const { autoTable } = await import('jspdf-autotable')
       const doc = new jsPDF()
 
       let yPos = 20
@@ -62,6 +63,13 @@ export class HardwareLifesheetPDF {
         return false
       }
 
+      const runAutoTable = (options: any) => {
+        autoTable(doc as any, options)
+        if (!(doc as any).lastAutoTable) {
+          ;(doc as any).lastAutoTable = { finalY: options.startY || yPos }
+        }
+      }
+
       // ==========================================
       // ENCABEZADO PRINCIPAL
       // ==========================================
@@ -71,7 +79,7 @@ export class HardwareLifesheetPDF {
       doc.setTextColor(255, 255, 255)
       doc.setFontSize(24)
       doc.setFont('helvetica', 'bold')
-      doc.text('HOJA DE VIDA DEL EQUIPO', 105, 15, { align: 'center' })
+      doc.text('HOJA DE VIDA DEL ACTIVO TECNOLÓGICO', 105, 15, { align: 'center' })
       
       doc.setFontSize(12)
       doc.setFont('helvetica', 'normal')
@@ -100,7 +108,7 @@ export class HardwareLifesheetPDF {
       doc.setFont('helvetica', 'normal')
 
       const generalInfo = [
-        { label: 'Nombre del Equipo', value: hardware.name || 'N/A' },
+        { label: 'Nombre del Activo tecnol�gico', value: hardware.name || 'N/A' },
         { label: 'Tipo', value: hardware.type || 'N/A' },
         { label: 'Estado', value: this.translateStatus(hardware.status) },
         { label: 'Ubicación', value: hardware.location || 'No especificada' },
@@ -237,70 +245,44 @@ export class HardwareLifesheetPDF {
 
       if (followUps.length === 0) {
         doc.setFont('helvetica', 'italic')
-        doc.text('No hay mantenimientos registrados para este equipo.', margin, yPos)
+        doc.text('No hay mantenimientos registrados para este activo tecnol�gico.', margin, yPos)
         yPos += 10
       } else {
-        followUps.forEach((followUp, index) => {
-          checkNewPage(35)
+        const maintenanceRows = followUps.map((followUp) => [
+          format(new Date(followUp.fecha_registro), 'dd/MM/yyyy HH:mm', { locale: es }),
+          this.translateTipo(followUp.tipo),
+          followUp.creator
+            ? `${followUp.creator.first_name || ''} ${followUp.creator.last_name || ''}`.trim()
+            : 'Sin asignar',
+          followUp.detalle || '-',
+        ])
 
-          // Fondo alternado
-          if (index % 2 === 0) {
-            doc.setFillColor(250, 250, 250)
-            doc.rect(margin, yPos - 4, maxWidth, 30, 'F')
-          }
-
-          doc.setFont('helvetica', 'bold')
-          doc.text(`${index + 1}. ${this.translateTipo(followUp.tipo)}`, margin + 2, yPos)
-          
-          doc.setFont('helvetica', 'normal')
-          doc.setTextColor(100, 100, 100)
-          doc.text(
-            format(new Date(followUp.fecha_registro), "dd/MM/yyyy HH:mm", { locale: es }),
-            margin + 2,
-            yPos + 5
-          )
-          doc.setTextColor(0, 0, 0)
-          yPos += 10
-
-          // Detalle
-          const detailLines = doc.splitTextToSize(followUp.detalle, maxWidth - 10)
-          detailLines.forEach((line: string) => {
-            checkNewPage(8)
-            doc.text(line, margin + 4, yPos)
-            yPos += 5
-          })
-
-          // Actividades
-          if (followUp.actividades && followUp.actividades.length > 0) {
-            yPos += 2
-            doc.setFontSize(9)
-            doc.setTextColor(100, 100, 100)
-            doc.text('Actividades:', margin + 4, yPos)
-            yPos += 4
-            followUp.actividades.forEach(actividad => {
-              checkNewPage(6)
-              doc.text(`• ${actividad}`, margin + 8, yPos)
-              yPos += 4
-            })
-            doc.setFontSize(10)
-            doc.setTextColor(0, 0, 0)
-          }
-
-          // Técnico
-          if (followUp.creator) {
-            doc.setFontSize(8)
-            doc.setTextColor(150, 150, 150)
-            doc.text(
-              `Técnico: ${followUp.creator.first_name} ${followUp.creator.last_name}`,
-              margin + 4,
-              yPos
-            )
-            doc.setFontSize(10)
-            doc.setTextColor(0, 0, 0)
-          }
-
-          yPos += 8
+        runAutoTable({
+          startY: yPos,
+          head: [['Fecha', 'Tipo', 'Técnico asignado', 'Detalle']],
+          body: maintenanceRows,
+          theme: 'grid',
+          headStyles: {
+            fillColor: [41, 128, 185],
+            fontSize: 9,
+            fontStyle: 'bold',
+          },
+          styles: {
+            fontSize: 8,
+            cellPadding: 2,
+            overflow: 'linebreak',
+          },
+          columnStyles: {
+            0: { cellWidth: 30 },
+            1: { cellWidth: 35 },
+            2: { cellWidth: 40 },
+            3: { cellWidth: 75 },
+          },
+          margin: { left: margin, right: margin },
+          alternateRowStyles: { fillColor: [245, 245, 245] },
         })
+
+        yPos = (doc as any).lastAutoTable.finalY + 10
       }
 
       // ==========================================
@@ -324,7 +306,7 @@ export class HardwareLifesheetPDF {
 
       if (tickets.length === 0) {
         doc.setFont('helvetica', 'italic')
-        doc.text('No hay tickets asociados a este equipo.', margin, yPos)
+        doc.text('No hay tickets asociados a este activo tecnol�gico.', margin, yPos)
         yPos += 10
       } else {
         tickets.forEach((ticket, index) => {

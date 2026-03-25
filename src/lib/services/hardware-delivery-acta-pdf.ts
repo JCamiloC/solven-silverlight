@@ -1,6 +1,6 @@
 /**
  * Servicio para generar PDF de Acta de Entrega de Hardware
- * Genera un documento formal para registrar la entrega de equipos
+ * Genera un documento formal para registrar la entrega de activos tecnol�gicos
  */
 
 import { format } from 'date-fns'
@@ -57,7 +57,7 @@ export class HardwareDeliveryActaPDF {
       doc.setTextColor(255, 255, 255)
       doc.setFontSize(20)
       doc.setFont('helvetica', 'bold')
-      doc.text('ACTA DE ENTREGA DE EQUIPO', pageWidth / 2, 15, { align: 'center' })
+      doc.text('ACTA DE ENTREGA DE ACTIVO TECNOLÓGICO', pageWidth / 2, 15, { align: 'center' })
       
       doc.setFontSize(11)
       doc.setFont('helvetica', 'normal')
@@ -115,12 +115,12 @@ export class HardwareDeliveryActaPDF {
       yPos += 10
 
       // ==========================================
-      // DESCRIPCIÓN DEL EQUIPO ENTREGADO
+      // DESCRIPCIÓN DEL ACTIVO TECNOLÓGICO ENTREGADO
       // ==========================================
       doc.setFontSize(13)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(41, 128, 185)
-      doc.text('DESCRIPCIÓN DEL EQUIPO ENTREGADO', margin, yPos)
+      doc.text('DESCRIPCIÓN DEL ACTIVO TECNOLÓGICO ENTREGADO', margin, yPos)
       yPos += 8
 
       doc.setTextColor(0, 0, 0)
@@ -129,7 +129,7 @@ export class HardwareDeliveryActaPDF {
 
       // Detalles del Hardware en formato tabla
       const hardwareDetails = [
-        ['Nombre del Equipo:', hardware.name || 'N/A'],
+        ['Nombre del Activo tecnol�gico:', hardware.name || 'N/A'],
         ['Tipo:', hardware.type || 'N/A'],
         ['Marca:', hardware.brand || 'N/A'],
         ['Modelo:', hardware.model || 'N/A'],
@@ -298,7 +298,7 @@ export class HardwareDeliveryActaPDF {
       doc.setTextColor(0, 0, 0)
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      doc.text('Certificamos que el equipo descrito fue entregado y recibido en las condiciones mencionadas.', margin, yPos)
+      doc.text('Certificamos que el activo tecnol�gico descrito fue entregado y recibido en las condiciones mencionadas.', margin, yPos)
       yPos += 15
 
       // Sección de firmas - Dos columnas

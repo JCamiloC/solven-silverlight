@@ -7,6 +7,7 @@ import type { Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,6 +28,7 @@ import {
 } from '@/components/ui/form';
 import { HardwareAsset } from '@/types';
 import { useCreateHardware, useUpdateHardware, hardwareKeys } from '@/hooks/use-hardware';
+import { useActionLock } from '@/hooks/use-action-lock';
 import { useParameters } from '@/hooks/use-parameters';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -133,6 +135,7 @@ interface HardwareFormProps {
 export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareFormProps) {
   const createMutation = useCreateHardware();
   const updateMutation = useUpdateHardware();
+  const { runWithLock, isLocked } = useActionLock();
   const queryClient = useQueryClient();
   const { data: parameters } = useParameters();
 
@@ -251,6 +254,7 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
     })
 
     try {
+      await runWithLock(async () => {
       if (asset) {
         console.log('Calling updateMutation.mutateAsync with:', { id: asset.id, updates: data })
         const res = await updateMutation.mutateAsync({ id: asset.id, updates: data })
@@ -275,6 +279,7 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
         }
       }
       onSuccess?.();
+      }, { message: asset ? 'Actualizando activo tecnológico...' : 'Creando activo tecnológico...' })
     } catch (error: any) {
       // Try to extract server error details if present
       try {
@@ -666,8 +671,10 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
         )} />
 
         <div className="flex justify-end space-x-2">
-          <Button variant="outline" type="button" onClick={onCancel}>Cancelar</Button>
-          <Button type="submit" disabled={isLoading}>{isLoading ? 'Guardando...' : asset ? 'Actualizar' : 'Guardar'}</Button>
+          <Button variant="outline" type="button" onClick={onCancel} disabled={isLoading || isLocked}>Cancelar</Button>
+          <LoadingButton type="submit" loading={isLoading || isLocked} loadingText="Guardando...">
+            {asset ? 'Actualizar' : 'Guardar'}
+          </LoadingButton>
         </div>
       </form>
     </Form>

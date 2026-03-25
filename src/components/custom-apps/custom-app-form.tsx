@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { LoadingButton } from '@/components/ui/loading-button'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
@@ -30,6 +31,7 @@ import {
 } from '@/components/ui/select'
 import { Loader2 } from 'lucide-react'
 import { CustomApplicationWithRelations } from '@/lib/services/custom-applications'
+import { useActionLock } from '@/hooks/use-action-lock'
 
 const formSchema = z.object({
   client_id: z.string().min(1, 'Selecciona un cliente'),
@@ -91,6 +93,7 @@ export function CustomAppForm({
   const { data: clients, isLoading: loadingClients } = useClients()
   const createApp = useCreateCustomApplication()
   const updateApp = useUpdateCustomApplication()
+  const { runWithLock, isLocked } = useActionLock()
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -162,14 +165,17 @@ export function CustomAppForm({
         return acc
       }, {} as any)
 
-      if (application) {
-        await updateApp.mutateAsync({
-          id: application.id,
-          data: cleanedData,
-        })
-      } else {
-        await createApp.mutateAsync(cleanedData)
-      }
+      await runWithLock(async () => {
+        if (application) {
+          await updateApp.mutateAsync({
+            id: application.id,
+            data: cleanedData,
+          })
+        } else {
+          await createApp.mutateAsync(cleanedData)
+        }
+      }, { message: application ? 'Actualizando aplicación...' : 'Creando aplicación...' })
+
       form.reset()
       onSuccess?.()
     } catch (error) {
@@ -177,7 +183,7 @@ export function CustomAppForm({
     }
   }
 
-  const isSubmitting = createApp.isPending || updateApp.isPending
+  const isSubmitting = createApp.isPending || updateApp.isPending || isLocked
 
   return (
     <Form {...form}>
@@ -723,10 +729,9 @@ export function CustomAppForm({
               Cancelar
             </Button>
           )}
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          <LoadingButton type="submit" loading={isSubmitting} loadingText={application ? 'Actualizando aplicación...' : 'Creando aplicación...'}>
             {application ? 'Actualizar' : 'Crear'} Aplicación
-          </Button>
+          </LoadingButton>
         </div>
       </form>
     </Form>

@@ -3,11 +3,13 @@
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { LoadingButton } from '@/components/ui/loading-button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { format } from 'date-fns'
 import { useCreateFollowUp } from '@/hooks/use-hardware'
 import { useAuth } from '@/hooks/use-auth'
+import { useActionLock } from '@/hooks/use-action-lock'
 
 interface SeguimientoFormProps {
   hardwareId: string
@@ -18,6 +20,7 @@ interface SeguimientoFormProps {
 
 export function SeguimientoForm({ hardwareId, open, onOpenChange, onSaved }: SeguimientoFormProps) {
   const createMutation = useCreateFollowUp()
+  const { runWithLock, isLocked } = useActionLock()
   const { profile } = useAuth()
   const [tipo, setTipo] = useState('')
   const [detalle, setDetalle] = useState('')
@@ -26,15 +29,17 @@ export function SeguimientoForm({ hardwareId, open, onOpenChange, onSaved }: Seg
 
   const handleSave = async () => {
     try {
-      await createMutation.mutateAsync({
-        hardwareId,
-        payload: {
-          tipo,
-          detalle,
-          accion_recomendada: accionRecomendada,
-          creado_por: profile?.id,
-        },
-      })
+      await runWithLock(async () => {
+        await createMutation.mutateAsync({
+          hardwareId,
+          payload: {
+            tipo,
+            detalle,
+            accion_recomendada: accionRecomendada,
+            creado_por: profile?.id,
+          },
+        })
+      }, { message: 'Guardando seguimiento...' })
       setTipo('')
       setDetalle('')
       setAccionRecomendada('')
@@ -74,7 +79,14 @@ export function SeguimientoForm({ hardwareId, open, onOpenChange, onSaved }: Seg
           </div>
           <div className="flex justify-end space-x-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={createMutation.isPending || !tipo || !detalle || !accionRecomendada}>Guardar</Button>
+            <LoadingButton
+              onClick={handleSave}
+              loading={createMutation.isPending || isLocked}
+              loadingText="Guardando..."
+              disabled={!tipo || !detalle || !accionRecomendada}
+            >
+              Guardar
+            </LoadingButton>
           </div>
         </div>
       </DialogContent>

@@ -2,8 +2,10 @@ import React, { useRef, useState } from 'react'
 import SignaturePad, { SignaturePadHandle } from '@/components/ui/SignaturePad'
 import { useCreateActa } from '@/hooks/use-actas'
 import { Button } from '@/components/ui/button'
+import { LoadingButton } from '@/components/ui/loading-button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useActionLock } from '@/hooks/use-action-lock'
 
 type Props = {
   hardwareAssetId: string
@@ -16,18 +18,19 @@ export default function ActaGeneratorModal({ hardwareAssetId, onCreated }: Props
   const [cedula, setCedula] = useState('')
 
   const { mutateAsync, status } = useCreateActa()
+  const { runWithLock, isLocked } = useActionLock()
   const isLoading = status === 'pending'
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const dataUrl = sigRef.current?.getDataURL()
     try {
-      const res: any = await mutateAsync({
+      const res: any = await runWithLock(async () => mutateAsync({
         hardware_asset_id: hardwareAssetId,
         generador_nombre: nombre,
         generador_cedula: cedula,
         generador_firma_dataurl: dataUrl,
-      })
+      }), { message: 'Generando acta...' })
 
       if (res?.link_temporal && onCreated) onCreated(res.link_temporal)
     } catch (err) {
@@ -58,7 +61,9 @@ export default function ActaGeneratorModal({ hardwareAssetId, onCreated }: Props
       </div>
 
       <div className="pt-2">
-        <Button type="submit" disabled={isLoading} className="w-full">Generar link y guardar</Button>
+        <LoadingButton type="submit" loading={isLoading || isLocked} loadingText="Generando..." className="w-full">
+          Generar link y guardar
+        </LoadingButton>
       </div>
     </form>
   )

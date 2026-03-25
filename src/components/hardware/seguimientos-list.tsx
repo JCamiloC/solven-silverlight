@@ -35,17 +35,17 @@ export function SeguimientosList({ hardwareId, open, onOpenChange }: Seguimiento
                 <TableRow>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead>Técnico asignado</TableHead>
                   <TableHead>Detalle</TableHead>
-                  <TableHead>Creado por</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {data?.map((s: any) => (
                   <TableRow key={s.id}>
                     <TableCell>{format(new Date(s.fecha_registro), 'dd/MM/yyyy HH:mm')}</TableCell>
-                    <TableCell>{s.tipo}</TableCell>
+                    <TableCell>{translateTipo(s.tipo)}</TableCell>
+                    <TableCell>{s.creator ? `${s.creator.first_name || ''} ${s.creator.last_name || ''}`.trim() : 'Sin asignar'}</TableCell>
                     <TableCell>{s.detalle}</TableCell>
-                    <TableCell>{s.creator ? `${s.creator.first_name || ''} ${s.creator.last_name || ''}`.trim() : (s.creado_por || '-')}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -58,4 +58,15 @@ export function SeguimientosList({ hardwareId, open, onOpenChange }: Seguimiento
       </DialogContent>
     </Dialog>
   )
+}
+
+function translateTipo(tipo: string) {
+  const translations: Record<string, string> = {
+    mantenimiento_programado: 'Mantenimiento Programado',
+    mantenimiento_no_programado: 'Mantenimiento No Programado',
+    soporte_remoto: 'Soporte Remoto',
+    soporte_en_sitio: 'Soporte en Sitio',
+  }
+
+  return translations[tipo] || tipo
 }

@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { authService } from '@/services/auth'
 import { createClient } from '@/lib/supabase/client'
 import { NavigationLoader } from '@/components/ui/navigation-loader'
+import { destroyClientSession } from '@/lib/auth/session-cleanup'
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 
@@ -25,12 +26,20 @@ function LoginForm() {
   const supabase = useMemo(() => createClient(), [])
 
   const withTimeout = async <T,>(promise: Promise<T>, timeoutMs = 8000): Promise<T> => {
-    return Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        setTimeout(() => reject(new Error('Session verification timeout')), timeoutMs)
-      }),
-    ])
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<T>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('Session verification timeout')), timeoutMs)
+        }),
+      ])
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    }
   }
 
   const resolveRedirectPath = async (userId: string) => {
@@ -68,10 +77,9 @@ function LoginForm() {
         if (!isMounted) return
 
         if (session?.user) {
-          const redirectPath = await resolveRedirectPath(session.user.id)
+          await destroyClientSession(supabase, { preferLocal: true, timeoutMs: 3000 })
           if (!isMounted) return
-          router.replace(redirectPath)
-          return
+          setSessionMessage('Se detectó una sesión anterior y fue cerrada. Inicia sesión nuevamente.')
         }
       } catch (sessionError) {
         console.error('Error checking existing session:', sessionError)
@@ -95,14 +103,19 @@ function LoginForm() {
     setError('')
 
     try {
-      const { user } = await authService.signIn(email, password)
+      await destroyClientSession(supabase, { preferLocal: true, timeoutMs: 3000 })
+      const { user, session } = await authService.signIn(email, password)
 
-      // Validar sesión efectiva antes de navegar (evita carreras de estado/cookies)
-      const {
-        data: { session },
-      } = await withTimeout(supabase.auth.getSession())
+      // Priorizar la sesión devuelta por signIn para evitar falsos timeout en getSession.
+      let userId = session?.user?.id || user?.id
 
-      const userId = session?.user?.id || user?.id
+      if (!userId) {
+        const {
+          data: { user: currentUser },
+        } = await withTimeout(supabase.auth.getUser(), 12000)
+        userId = currentUser?.id
+      }
+
       if (!userId) {
         throw new Error('No se pudo establecer la sesión. Intenta nuevamente.')
       }

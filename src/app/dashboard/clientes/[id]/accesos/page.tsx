@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Plus, Search, Eye, EyeOff, Shield, Key, Clock, Copy, AlertTriangle, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { LoadingButton } from '@/components/ui/loading-button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,6 +19,7 @@ import { TwoFactorRequiredNotice } from '@/components/security/2fa-required-noti
 import { useAuth } from '@/hooks/use-auth'
 import { useClient } from '@/hooks/use-clients'
 import { useClientPermissions } from '@/hooks/use-client-permissions'
+import { useActionLock } from '@/hooks/use-action-lock'
 import { Loading } from '@/components/ui/loading'
 import { 
   useAccessCredentialsByClient,
@@ -77,6 +79,7 @@ function ClienteAccesosContent() {
   const updateMutation = useUpdateAccessCredential()
   const deleteMutation = useDeleteAccessCredential()
   const revealMutation = useRevealPassword()
+  const { runWithLock, isLocked } = useActionLock()
 
   // Status badge configuration
   const statusConfig = {
@@ -106,9 +109,11 @@ function ClienteAccesosContent() {
   // Reveal password
   const handleRevealPassword = async (credentialId: string) => {
     try {
-      const result = await revealMutation.mutateAsync({
+      const result = await runWithLock(async () => revealMutation.mutateAsync({
         id: credentialId,
         purpose: 'Visualización desde módulo de cliente'
+      }), {
+        message: 'Revelando contraseña...'
       })
       
       if (!result) {
@@ -144,7 +149,9 @@ function ClienteAccesosContent() {
   // Handle create
   const handleCreate = async (data: AccessCredentialInsert) => {
     try {
-      await createMutation.mutateAsync({ ...data, client_id: clientId })
+      await runWithLock(async () => {
+        await createMutation.mutateAsync({ ...data, client_id: clientId })
+      }, { message: 'Creando credencial...' })
       setIsCreateDialogOpen(false)
     } catch (error) {
       console.error('Error creating credential:', error)
@@ -154,7 +161,9 @@ function ClienteAccesosContent() {
   // Handle update
   const handleUpdate = async (id: string, data: AccessCredentialUpdate) => {
     try {
-      await updateMutation.mutateAsync({ id, data })
+      await runWithLock(async () => {
+        await updateMutation.mutateAsync({ id, data })
+      }, { message: 'Actualizando credencial...' })
       setIsEditDialogOpen(false)
       setEditingCredential(null)
     } catch (error) {
@@ -165,7 +174,9 @@ function ClienteAccesosContent() {
   // Handle delete
   const handleDelete = async (id: string) => {
     try {
-      await deleteMutation.mutateAsync(id)
+      await runWithLock(async () => {
+        await deleteMutation.mutateAsync(id)
+      }, { message: 'Eliminando credencial...' })
     } catch (error) {
       console.error('Error deleting credential:', error)
     }
@@ -230,7 +241,7 @@ function ClienteAccesosContent() {
             <AccessCredentialForm
               onSubmit={handleCreate}
               onCancel={() => setIsCreateDialogOpen(false)}
-              isLoading={createMutation.isPending}
+              isLoading={createMutation.isPending || isLocked}
             />
           </DialogContent>
         </Dialog>
@@ -417,7 +428,7 @@ function ClienteAccesosContent() {
                                 size="icon"
                                 className="h-6 w-6"
                                 onClick={() => handleRevealPassword(credential.id)}
-                                disabled={revealMutation.isPending}
+                                disabled={revealMutation.isPending || isLocked}
                               >
                                 <Eye className="h-3 w-3" />
                               </Button>
@@ -519,7 +530,7 @@ function ClienteAccesosContent() {
                 setIsEditDialogOpen(false)
                 setEditingCredential(null)
               }}
-              isLoading={updateMutation.isPending}
+              isLoading={updateMutation.isPending || isLocked}
             />
           )}
         </DialogContent>
@@ -650,9 +661,9 @@ function AccessCredentialForm({ credential, onSubmit, onCancel, isLoading }: Acc
         <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? 'Guardando...' : credential ? 'Actualizar' : 'Crear'}
-        </Button>
+        <LoadingButton type="submit" loading={isLoading} loadingText="Guardando...">
+          {credential ? 'Actualizar' : 'Crear'}
+        </LoadingButton>
       </div>
     </form>
   )

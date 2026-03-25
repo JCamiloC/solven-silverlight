@@ -1,6 +1,6 @@
 /**
  * Servicio para generar PDF del Reporte Completo de Hardware
- * Incluye todas las métricas, análisis, alertas y tabla de equipos
+ * Incluye todas las métricas, análisis, alertas y tabla de activos tecnol�gicos
  */
 
 import { format } from 'date-fns'
@@ -87,7 +87,7 @@ export class HardwareReportPDF {
 
       // Crear grid de métricas (2x2)
       const metrics = [
-        { label: 'Total Equipos', value: analytics.metrics.totalAssets, color: [52, 152, 219] },
+        { label: 'Total Activos tecnol�gicos', value: analytics.metrics.totalAssets, color: [52, 152, 219] },
         { label: 'Activos', value: analytics.metrics.activeAssets, color: [46, 204, 113] },
         { label: 'En Mantenimiento', value: analytics.metrics.maintenanceAssets, color: [241, 196, 15] },
         { label: 'Áreas Registradas', value: analytics.metrics.uniqueAreas, color: [155, 89, 182] },
@@ -149,28 +149,28 @@ export class HardwareReportPDF {
 
         if (analytics.alerts.warrantyExpiringSoon.length > 0) {
           doc.setFont('helvetica', 'bold')
-          doc.text(`• Garantías por vencer: ${analytics.alerts.warrantyExpiringSoon.length} equipo(s)`, margin + 5, yPos)
+          doc.text(`• Garantías por vencer: ${analytics.alerts.warrantyExpiringSoon.length} activo tecnol�gico(s)`, margin + 5, yPos)
           doc.setFont('helvetica', 'normal')
           yPos += 6
         }
 
         if (analytics.alerts.expiredWarranty.length > 0) {
           doc.setFont('helvetica', 'bold')
-          doc.text(`• Garantías vencidas: ${analytics.alerts.expiredWarranty.length} equipo(s)`, margin + 5, yPos)
+          doc.text(`• Garantías vencidas: ${analytics.alerts.expiredWarranty.length} activo tecnol�gico(s)`, margin + 5, yPos)
           doc.setFont('helvetica', 'normal')
           yPos += 6
         }
 
         if (analytics.alerts.oldEquipment.length > 0) {
           doc.setFont('helvetica', 'bold')
-          doc.text(`• Equipos antiguos (>5 años): ${analytics.alerts.oldEquipment.length} equipo(s)`, margin + 5, yPos)
+          doc.text(`• Activos tecnol�gicos antiguos (>5 años): ${analytics.alerts.oldEquipment.length} activo tecnol�gico(s)`, margin + 5, yPos)
           doc.setFont('helvetica', 'normal')
           yPos += 6
         }
 
         if (analytics.criticalEquipment.length > 0) {
           doc.setFont('helvetica', 'bold')
-          doc.text(`• Equipos críticos: ${analytics.criticalEquipment.length} equipo(s)`, margin + 5, yPos)
+          doc.text(`• Activos tecnol�gicos críticos: ${analytics.criticalEquipment.length} activo tecnol�gico(s)`, margin + 5, yPos)
           doc.setFont('helvetica', 'normal')
           yPos += 6
         }
@@ -310,7 +310,7 @@ export class HardwareReportPDF {
 
         runAutoTable({
           startY: yPos,
-          head: [['Equipo', 'Tipo', 'Fecha Vencimiento', 'Estado']],
+          head: [['Activo tecnol�gico', 'Tipo', 'Fecha Vencimiento', 'Estado']],
           body: expirationData,
           theme: 'striped',
           headStyles: { fillColor: [41, 128, 185], fontSize: 9 },
@@ -391,7 +391,7 @@ export class HardwareReportPDF {
       }
 
       // ==========================================
-      // TABLA COMPLETA DE EQUIPOS
+      // TABLA COMPLETA DE ACTIVOS TECNOLÓGICOS
       // ==========================================
       doc.addPage()
       yPos = 20
@@ -399,7 +399,7 @@ export class HardwareReportPDF {
       doc.setFontSize(16)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(41, 128, 185)
-      doc.text('INVENTARIO COMPLETO DE EQUIPOS', margin, yPos)
+      doc.text('INVENTARIO COMPLETO DE ACTIVOS TECNOLÓGICOS', margin, yPos)
       yPos += 10
 
       const tableData = assets.map(asset => {

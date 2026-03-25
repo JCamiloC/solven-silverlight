@@ -30,6 +30,7 @@ interface ClientSearchComboboxProps {
   placeholder?: string
   searchPlaceholder?: string
   emptyMessage?: string
+  minSearchChars?: number
   disabled?: boolean
   className?: string
 }
@@ -41,6 +42,7 @@ export function ClientSearchCombobox({
   placeholder = "Seleccione...",
   searchPlaceholder = "Buscar...",
   emptyMessage = "No se encontraron resultados",
+  minSearchChars = 3,
   disabled = false,
   className,
 }: ClientSearchComboboxProps) {
@@ -49,7 +51,7 @@ export function ClientSearchCombobox({
 
   // Filtrar opciones solo si hay 3 o más caracteres
   const filteredOptions = React.useMemo(() => {
-    if (searchQuery.length < 3) {
+    if (searchQuery.length < minSearchChars) {
       return []
     }
     
@@ -57,7 +59,7 @@ export function ClientSearchCombobox({
     return options.filter((option) =>
       option.label.toLowerCase().includes(query)
     )
-  }, [options, searchQuery])
+  }, [options, searchQuery, minSearchChars])
 
   const selectedOption = options.find((option) => option.value === value)
 
@@ -83,10 +85,10 @@ export function ClientSearchCombobox({
             onValueChange={setSearchQuery}
           />
           <CommandList>
-            {searchQuery.length < 3 ? (
+            {searchQuery.length < minSearchChars ? (
               <div className="py-6 text-center text-sm text-muted-foreground">
                 <Search className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                Escribe al menos 3 caracteres para buscar
+                Escribe al menos {minSearchChars} {minSearchChars === 1 ? 'carácter' : 'caracteres'} para buscar
               </div>
             ) : filteredOptions.length === 0 ? (
               <CommandEmpty>{emptyMessage}</CommandEmpty>

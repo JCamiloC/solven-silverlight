@@ -137,7 +137,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
     },
     {
       accessorKey: 'serial_number',
-      header: 'Número de Serie',
+      header: 'NÃºmero de Serie',
     },
     {
       accessorKey: 'status',
@@ -173,7 +173,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Abrir menú</span>
+                <span className="sr-only">Abrir menÃº</span>
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -257,7 +257,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
   }
 
   const handleDelete = async (asset: HardwareAsset) => {
-    if (confirm(`¿Está seguro de que desea eliminar el equipo "${asset.name}"?`)) {
+    if (confirm(`Â¿EstÃ¡ seguro de que desea eliminar el activo tecnológico "${asset.name}"?`)) {
       deleteMutation.mutate(asset.id)
     }
   }
@@ -269,7 +269,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       setPdfType('lifesheet')
       setGeneratingPDF(true)
       setPdfProgress(0)
-      setPdfProgressText('Iniciando generación...')
+      setPdfProgressText('Iniciando generaciÃ³n...')
 
       // Simular progreso mientras se cargan los datos
       const progressInterval = setInterval(() => {
@@ -280,12 +280,12 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       }, 500)
 
       // Paso 1: Obtener datos del hardware
-      setPdfProgressText('Cargando información del equipo...')
+      setPdfProgressText('Cargando informaciÃ³n del activo tecnológico...')
       setPdfProgress(20)
       const hardware = await hardwareService.getById(asset.id)
 
       if (!hardware) {
-        throw new Error('No se pudo obtener la información del hardware')
+        throw new Error('No se pudo obtener la informaciÃ³n del hardware')
       }
 
       // Paso 2: Obtener upgrades
@@ -310,7 +310,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
 
       clearInterval(progressInterval)
       setPdfProgress(100)
-      setPdfProgressText('¡Completado!')
+      setPdfProgressText('Â¡Completado!')
 
       setTimeout(() => {
         setGeneratingPDF(false)
@@ -359,13 +359,13 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
     try {
       const senderEmail = (user?.email || profile?.email || '').trim()
       if (!senderEmail) {
-        throw new Error('No se pudo identificar tu correo de usuario para el envío')
+        throw new Error('No se pudo identificar tu correo de usuario para el envÃ­o')
       }
 
       setPdfType('acta')
       setGeneratingPDF(true)
       setPdfProgress(0)
-      setPdfProgressText('Preparando acta para envío...')
+      setPdfProgressText('Preparando acta para envÃ­o...')
 
       progressInterval = setInterval(() => {
         setPdfProgress((prev) => {
@@ -376,10 +376,10 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
 
       setPdfProgress(20)
       const hardware = await hardwareService.getById(asset.id)
-      if (!hardware) throw new Error('No se pudo obtener la información del hardware')
+      if (!hardware) throw new Error('No se pudo obtener la informaciÃ³n del hardware')
 
       if (!hardware.correo_responsable) {
-        throw new Error('El equipo no tiene correo del responsable configurado')
+        throw new Error('El activo tecnológico no tiene correo del responsable configurado')
       }
 
       setPdfProgressText('Buscando acta firmada...')
@@ -387,10 +387,10 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       const existingActa = await ActasService.getByHardwareAssetId(asset.id)
 
       if (!existingActa || existingActa.estado_firma !== 'completo') {
-        throw new Error('El acta aún no está firmada por el receptor. Primero completa la firma para poder enviarla.')
+        throw new Error('El acta aÃºn no estÃ¡ firmada por el receptor. Primero completa la firma para poder enviarla.')
       }
 
-      setPdfProgressText('Obteniendo información del cliente...')
+      setPdfProgressText('Obteniendo informaciÃ³n del cliente...')
       setPdfProgress(50)
 
       let empresaCliente = undefined
@@ -420,7 +420,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       const bccRecipients = senderNormalized !== mainRecipient ? [senderNormalized] : []
 
       const confirmMessage = [
-        '¿Deseas enviar el acta por correo?',
+        'Â¿Deseas enviar el acta por correo?',
         '',
         `Para: ${mainRecipient}`,
         `CCO: ${bccRecipients.length ? bccRecipients.join(', ') : 'Sin copia adicional'}`,
@@ -442,7 +442,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
         empresaCliente,
         entregadoPor: {
           nombre: existingActa.generador_nombre || 'Silverlight Colombia',
-          cargo: 'Técnico de Soporte',
+          cargo: 'TÃ©cnico de Soporte',
           cedula: existingActa.generador_cedula || undefined,
         },
         recibidoPor: {
@@ -458,7 +458,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       setPdfProgressText('Enviando acta por correo...')
       setPdfProgress(85)
 
-      const fileName = `ActaEntrega_${(hardware.name || 'Equipo').replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`
+      const fileName = `ActaEntrega_${(hardware.name || 'Activo tecnológico').replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`
 
       const mailRes = await fetch('/api/actas/send-pdf', {
         method: 'POST',
@@ -482,15 +482,15 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       }
 
       setPdfProgress(100)
-      setPdfProgressText('¡Acta enviada!')
+      setPdfProgressText('Â¡Acta enviada!')
 
       setTimeout(() => {
         setGeneratingPDF(false)
         setPdfProgress(0)
         toast.success('Acta enviada por correo', {
           description: bccRecipients.length
-            ? `Se envió al responsable y te llegó copia oculta a ${senderEmail}.`
-            : 'Se envió correctamente al responsable.',
+            ? `Se enviÃ³ al responsable y te llegÃ³ copia oculta a ${senderEmail}.`
+            : 'Se enviÃ³ correctamente al responsable.',
         })
       }, 700)
     } catch (error) {
@@ -525,13 +525,13 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       setPdfProgress(20)
       const hardware = await hardwareService.getById(asset.id)
 
-      if (!hardware) throw new Error('No se pudo obtener la información del hardware')
+      if (!hardware) throw new Error('No se pudo obtener la informaciÃ³n del hardware')
 
       // Buscar acta existente
       setPdfProgress(35)
       const existingActa = await ActasService.getByHardwareAssetId(asset.id)
 
-      setPdfProgressText('Obteniendo información del cliente...')
+      setPdfProgressText('Obteniendo informaciÃ³n del cliente...')
       setPdfProgress(45)
 
       let empresaCliente = undefined
@@ -567,10 +567,10 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       )
 
       if (!firmaEmpresaCompleta) {
-        throw new Error('Debes registrar primero la firma de la empresa en Datos Básicos del cliente')
+        throw new Error('Debes registrar primero la firma de la empresa en Datos BÃ¡sicos del cliente')
       }
 
-      // Si existe y está completa, generar PDF con las firmas
+      // Si existe y estÃ¡ completa, generar PDF con las firmas
       if (existingActa && existingActa.estado_firma === 'completo') {
         setPdfProgressText('Generando documento PDF...')
         setPdfProgress(70)
@@ -580,7 +580,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
           empresaCliente,
           entregadoPor: {
             nombre: existingActa.generador_nombre || 'Silverlight Colombia',
-            cargo: 'Técnico de Soporte',
+            cargo: 'TÃ©cnico de Soporte',
             cedula: existingActa.generador_cedula || undefined,
           },
           recibidoPor: {
@@ -593,7 +593,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
 
         clearInterval(progressInterval)
         setPdfProgress(100)
-        setPdfProgressText('¡Completado!')
+        setPdfProgressText('Â¡Completado!')
 
         setTimeout(() => {
           setGeneratingPDF(false)
@@ -607,11 +607,11 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       }
 
       if (!hardware.correo_responsable) {
-        throw new Error('El equipo no tiene correo del responsable para enviar el link de firma')
+        throw new Error('El activo tecnológico no tiene correo del responsable para enviar el link de firma')
       }
 
       const confirmSend = window.confirm(
-        '¿Está seguro de enviar por correo el link de firma a quien recibe el hardware?'
+        'Â¿EstÃ¡ seguro de enviar por correo el link de firma a quien recibe el hardware?'
       )
 
       if (!confirmSend) {
@@ -634,7 +634,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       }
 
       if (!acta?.link_temporal) {
-        throw new Error('No se pudo generar el link público de firma')
+        throw new Error('No se pudo generar el link pÃºblico de firma')
       }
 
       const signingUrl = `${window.location.origin}/actas/${acta.link_temporal}`
@@ -662,13 +662,13 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
 
       clearInterval(progressInterval)
       setPdfProgress(100)
-      setPdfProgressText('¡Link enviado!')
+      setPdfProgressText('Â¡Link enviado!')
 
       setTimeout(() => {
         setGeneratingPDF(false)
         setPdfProgress(0)
         toast.success('Link de firma enviado por correo', {
-          description: 'Cuando el receptor firme, podrás descargar el acta.',
+          description: 'Cuando el receptor firme, podrÃ¡s descargar el acta.',
         })
       }, 700)
 
@@ -676,17 +676,17 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
 
       /*
       // ==========================================
-      // GENERACIÓN DIRECTA DE PDF (SIN FIRMAS) - DESHABILITADO
+      // GENERACIÃ“N DIRECTA DE PDF (SIN FIRMAS) - DESHABILITADO
       // ==========================================
       setPdfProgress(30)
       const hardware = await hardwareService.getById(asset.id)
 
-      if (!hardware) throw new Error('No se pudo obtener la información del hardware')
+      if (!hardware) throw new Error('No se pudo obtener la informaciÃ³n del hardware')
 
-      setPdfProgressText('Obteniendo información del cliente...')
+      setPdfProgressText('Obteniendo informaciÃ³n del cliente...')
       setPdfProgress(50)
 
-      // Obtener información del cliente para mostrar en el PDF
+      // Obtener informaciÃ³n del cliente para mostrar en el PDF
       let empresaCliente = undefined
       if (hardware.client_id) {
         try {
@@ -717,7 +717,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
         empresaCliente,
         entregadoPor: {
           nombre: 'Por definir',
-          cargo: 'Técnico de Soporte',
+          cargo: 'TÃ©cnico de Soporte',
         },
         recibidoPor: {
           nombre: hardware.persona_responsable || undefined,
@@ -726,7 +726,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
 
       clearInterval(progressInterval)
       setPdfProgress(100)
-      setPdfProgressText('¡Completado!')
+      setPdfProgressText('Â¡Completado!')
 
       setTimeout(() => {
         setGeneratingPDF(false)
@@ -854,7 +854,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       
       <div className="flex items-center justify-end space-x-2 py-4">
         <div className="flex-1 text-sm text-muted-foreground">
-          Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount()} · {table.getFilteredRowModel().rows.length} resultado(s)
+          PÃ¡gina {table.getState().pagination.pageIndex + 1} de {table.getPageCount()} Â· {table.getFilteredRowModel().rows.length} resultado(s)
         </div>
         <div className="space-x-2">
           <Button
@@ -882,7 +882,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
           <DialogHeader>
             <DialogTitle>Editar Hardware</DialogTitle>
             <DialogDescription>
-              Modifica los datos del equipo de hardware.
+              Modifica los datos del activo tecnológico de hardware.
             </DialogDescription>
           </DialogHeader>
           {editingAsset && (

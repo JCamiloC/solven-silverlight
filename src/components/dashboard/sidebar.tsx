@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { LoadingLink } from '@/components/ui/loading-link'
 import { useAuth } from '@/hooks/use-auth'
+import { useActionLock } from '@/hooks/use-action-lock'
 import { useSidebar } from './sidebar-context'
 import { 
   LayoutDashboard, 
@@ -133,6 +134,7 @@ const allNavigationItems: NavigationItem[] = [
 export function Sidebar({ className, onNavigate }: SidebarProps) {
   const pathname = usePathname()
   const { profile, signOut } = useAuth()
+  const { runWithLock, isLocked } = useActionLock()
   const { isCollapsed, isHovered, setIsHovered } = useSidebar()
 
   // Filter navigation items based on user role
@@ -148,7 +150,12 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
 
   const handleLogout = async () => {
     try {
-      await signOut()
+      await runWithLock(
+        async () => {
+          await signOut()
+        },
+        { message: 'Cerrando sesión...' }
+      )
     } catch (error) {
       console.error('Error signing out:', error)
     }
@@ -221,6 +228,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
                     variant="ghost" 
                     className="w-full justify-center px-1 sidebar-button"
                     onClick={handleLogout}
+                    disabled={isLocked}
                   >
                     <LogOut className="h-4 w-4" />
                   </Button>
@@ -235,6 +243,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
               variant="ghost" 
               className="w-full justify-start sidebar-button"
               onClick={handleLogout}
+              disabled={isLocked}
             >
               <LogOut className="mr-2 h-4 w-4" />
               Cerrar Sesión

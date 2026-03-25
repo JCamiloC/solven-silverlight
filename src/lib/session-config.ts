@@ -1,16 +1,13 @@
 // Configuración de sesión y seguridad
 export const SESSION_CONFIG = {
   // Tiempo de inactividad antes de logout automático (en minutos)
-  TIMEOUT_MINUTES: 30,
+  TIMEOUT_MINUTES: 5,
   
   // Tiempo de advertencia antes del logout (en minutos)
-  WARNING_MINUTES: 5,
+  WARNING_MINUTES: 0,
   
   // Habilitar/deshabilitar timeout de sesión
   ENABLED: true,
-  
-  // Tiempo de refresh automático de token (en minutos)
-  REFRESH_INTERVAL_MINUTES: 10,
   
   // Configuración de cookies de sesión
   COOKIE_OPTIONS: {
@@ -41,12 +38,7 @@ export const SESSION_CONFIG = {
 
 // Mensajes de sesión
 export const SESSION_MESSAGES = {
-  TIMEOUT_WARNING: (minutes: number) => 
-    `Tu sesión expirará en ${minutes} minutos. ¿Deseas continuar?`,
-  
   TIMEOUT_EXPIRED: 'Tu sesión ha expirado por inactividad',
-  
-  SESSION_EXTENDED: 'Sesión extendida correctamente',
   
   TOKEN_EXPIRED: 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.',
   

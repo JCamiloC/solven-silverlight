@@ -127,14 +127,14 @@ export function HardwareStats({ clientId, assets = [], showTypeCards = false }: 
 
   const statCards = [
     {
-      title: 'Total Equipos',
+      title: 'Total Activos tecnológicos',
       value: stats?.total || 0,
-      description: 'Equipos registrados',
+      description: 'Activos tecnológicos registrados',
       icon: Computer,
       color: 'text-blue-600',
     },
     {
-      title: 'Equipos Activos',
+      title: 'Activos tecnológicos Activos',
       value: stats?.active || 0,
       description: 'En funcionamiento',
       icon: TrendingUp,
@@ -143,7 +143,7 @@ export function HardwareStats({ clientId, assets = [], showTypeCards = false }: 
     {
       title: 'En Mantenimiento',
       value: stats?.maintenance || 0,
-      description: 'Requieren atención',
+      description: 'Requieren atenciÃ³n',
       icon: Wrench,
       color: 'text-yellow-600',
     },
@@ -192,7 +192,7 @@ export function HardwareStats({ clientId, assets = [], showTypeCards = false }: 
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{typeCard.value}</div>
-                  <p className="text-xs text-muted-foreground">Equipos por tipo</p>
+                  <p className="text-xs text-muted-foreground">Activos tecnológicos por tipo</p>
                 </CardContent>
               </Card>
             )

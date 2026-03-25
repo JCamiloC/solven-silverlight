@@ -5,6 +5,7 @@ import { useTransition } from 'react'
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useInteractionLock } from '@/components/providers/interaction-lock-provider'
 
 interface LoadingLinkProps {
   href: string
@@ -20,10 +21,18 @@ interface LoadingLinkProps {
 export function LoadingLink({ href, children, className, showSpinner = true, onClick }: LoadingLinkProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const { lockNavigation, isLocked } = useInteractionLock()
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (isLocked) {
+      e.preventDefault()
+      return
+    }
+
     e.preventDefault()
     onClick?.()
+    lockNavigation({ message: 'Cargando...' })
+
     startTransition(() => {
       router.push(href)
     })

@@ -4,8 +4,10 @@ import React, { useRef, useEffect, useState } from 'react'
 import { useActaByToken, useSignActa } from '@/hooks/use-actas'
 import SignaturePad, { SignaturePadHandle } from '@/components/ui/SignaturePad'
 import { Button } from '@/components/ui/button'
+import { LoadingButton } from '@/components/ui/loading-button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useActionLock } from '@/hooks/use-action-lock'
 
 type Props = { token?: string }
 
@@ -16,6 +18,7 @@ export default function ActaSigningClient({ token }: Props) {
   const [nombre, setNombre] = useState('')
   const [cedula, setCedula] = useState('')
   const [done, setDone] = useState(false)
+  const { runWithLock, isLocked } = useActionLock()
 
   useEffect(() => {
     if (acta) {
@@ -28,7 +31,9 @@ export default function ActaSigningClient({ token }: Props) {
     e.preventDefault()
     const dataUrl = sigRef.current?.getDataURL()
     try {
-      await signMutation.mutateAsync({ token, cliente_nombre: nombre, cliente_cedula: cedula, cliente_firma_dataurl: dataUrl })
+      await runWithLock(async () => {
+        await signMutation.mutateAsync({ token, cliente_nombre: nombre, cliente_cedula: cedula, cliente_firma_dataurl: dataUrl })
+      }, { message: 'Enviando firma...' })
       setDone(true)
     } catch (err) {
       // handled by hook
@@ -67,7 +72,14 @@ export default function ActaSigningClient({ token }: Props) {
         </div>
 
         <div>
-          <Button type="submit" className="w-full" disabled={signMutation.status === 'pending'}>Enviar firma</Button>
+          <LoadingButton
+            type="submit"
+            className="w-full"
+            loading={signMutation.status === 'pending' || isLocked}
+            loadingText="Enviando firma..."
+          >
+            Enviar firma
+          </LoadingButton>
         </div>
       </form>
     </div>

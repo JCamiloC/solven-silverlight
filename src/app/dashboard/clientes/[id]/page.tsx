@@ -18,6 +18,7 @@ import {
   ArrowLeft
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { LoadingButton } from '@/components/ui/loading-button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -41,6 +42,7 @@ import { ProtectedRoute } from '@/components/auth/protected-route'
 import { LoadingLink } from '@/components/ui/loading-link'
 import { InfoField } from '@/components/ui/info-field'
 import { useClient, useUpdateClient } from '@/hooks/use-clients'
+import { useActionLock } from '@/hooks/use-action-lock'
 import { useClientPermissions } from '@/hooks/use-client-permissions'
 import { useQuery } from '@tanstack/react-query'
 import { clientService } from '@/services/clients'
@@ -83,6 +85,7 @@ export default function ClienteDetailPage() {
   
   const { data: client, isLoading, error, refetch: refetchClient } = useClient(clientId)
   const updateClient = useUpdateClient()
+  const { runWithLock, isLocked } = useActionLock()
   
   // Obtener usuarios del cliente
   const { data: clientUsers = [], isLoading: isLoadingUsers } = useQuery({
@@ -120,7 +123,13 @@ export default function ClienteDetailPage() {
   }
 
   const onSubmit = async (data: ClientFormData) => {
-    updateClient.mutate({ id: clientId, updates: data })
+    try {
+      await runWithLock(async () => {
+        await updateClient.mutateAsync({ id: clientId, updates: data })
+      }, { message: 'Guardando cliente...' })
+    } catch {
+      // El error ya es manejado por el hook
+    }
   }
 
   if (isLoading) {
@@ -407,13 +416,14 @@ export default function ClienteDetailPage() {
                 />
 
                 <div className="flex justify-end">
-                  <Button 
+                  <LoadingButton 
                     type="submit" 
-                    disabled={updateClient.isPending}
+                    loading={updateClient.isPending || isLocked}
+                    loadingText="Guardando..."
                   >
                     <Save className="mr-2 h-4 w-4" />
-                    {updateClient.isPending ? 'Guardando...' : 'Guardar Cambios'}
-                  </Button>
+                    Guardar Cambios
+                  </LoadingButton>
                 </div>
               </form>
             </Form>

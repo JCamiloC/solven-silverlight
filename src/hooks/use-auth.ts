@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import { Profile, UserRole } from '@/types'
-import { toast } from 'sonner'
+import { clearSupabaseAuthStorage, destroyClientSession } from '@/lib/auth/session-cleanup'
 
 interface AuthState {
   user: User | null
@@ -80,7 +80,6 @@ export function useAuth() {
           loading: false,
         }
       })
-      toast.error('La verificación de sesión está tardando más de lo normal. Intenta recargar la página.')
     }, 15000)
 
     // Get initial session
@@ -111,31 +110,11 @@ export function useAuth() {
         
         if (session?.user) {
           console.log('[useAuth] Session found, fetching profile...')
-          let resolvedSession = session
-          
-          // Verificar si el token está próximo a expirar (menos de 5 minutos)
-          const expiresAt = session.expires_at
-          if (expiresAt) {
-            const expiresIn = expiresAt - Math.floor(Date.now() / 1000)
-            if (expiresIn < 300) { // Menos de 5 minutos
-              console.log('[useAuth] Token expiring soon, refreshing...')
-              try {
-                const { data: { session: refreshedSession } } = await supabase.auth.refreshSession()
-                if (refreshedSession) {
-                  console.log('[useAuth] Token refreshed successfully')
-                  resolvedSession = refreshedSession
-                }
-              } catch (refreshError) {
-                console.error('[useAuth] Error refreshing token:', refreshError)
-              }
-            }
-          }
-          
-          const profile = await getProfile(resolvedSession.user.id)
+          const profile = await getProfile(session.user.id)
           if (!isMounted) return
 
           setAuthState({
-            user: resolvedSession.user,
+            user: session.user,
             profile,
             loading: false,
           })
@@ -191,12 +170,8 @@ export function useAuth() {
             if (event === 'SIGNED_OUT') {
               // Limpiar caché
               profileCache = {}
+              clearSupabaseAuthStorage()
               router.replace('/auth/login')
-            } else if (event === 'TOKEN_REFRESHED' && !session) {
-              // Token refresh failed, likely expired
-              console.log('[useAuth] Token refresh failed, redirecting to login')
-              profileCache = {}
-              router.replace('/auth/login?reason=expired')
             }
           }
         } catch (error) {
@@ -223,8 +198,7 @@ export function useAuth() {
   const signOut = async () => {
     try {
       profileCache = {}
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
+      await destroyClientSession(supabase)
       
       // Redirigir explícitamente al login
       router.push('/auth/login')

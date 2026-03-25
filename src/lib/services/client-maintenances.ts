@@ -97,9 +97,32 @@ class ClientMaintenancesService {
     if (!clientId || !year || totalMaintenances <= 0) return []
 
     const existing = await this.listByClient(clientId, year)
+    const supabase = createClient()
     const existingSlots = new Set(existing.map((row) => row.slot_number))
 
     const missingRows: Array<Pick<ClientMaintenanceSchedule, 'client_id' | 'year' | 'slot_number' | 'expected_date' | 'status'>> = []
+    const rowsToDelete: string[] = []
+    const rowsToReschedule: Array<Pick<ClientMaintenanceSchedule, 'id' | 'expected_date'>> = []
+
+    for (const row of existing) {
+      if (row.slot_number > totalMaintenances) {
+        // Conservamos mantenimientos ya realizados por trazabilidad histórica.
+        if (row.status !== 'realizado') {
+          rowsToDelete.push(row.id)
+        }
+        continue
+      }
+
+      if (row.status !== 'realizado') {
+        const nextExpectedDate = this.calculateExpectedDate(year, row.slot_number, totalMaintenances)
+        if (row.expected_date !== nextExpectedDate) {
+          rowsToReschedule.push({
+            id: row.id,
+            expected_date: nextExpectedDate,
+          })
+        }
+      }
+    }
 
     for (let slot = 1; slot <= totalMaintenances; slot++) {
       if (!existingSlots.has(slot)) {
@@ -113,8 +136,27 @@ class ClientMaintenancesService {
       }
     }
 
+    if (rowsToDelete.length > 0) {
+      const { error } = await supabase
+        .from('client_maintenance_schedule')
+        .delete()
+        .in('id', rowsToDelete)
+
+      if (error) throw this.toError(error, 'No se pudo redimensionar la agenda al nuevo total anual')
+    }
+
+    if (rowsToReschedule.length > 0) {
+      for (const row of rowsToReschedule) {
+        const { error } = await supabase
+          .from('client_maintenance_schedule')
+          .update({ expected_date: row.expected_date })
+          .eq('id', row.id)
+
+        if (error) throw this.toError(error, 'No se pudo recalcular las fechas de la agenda')
+      }
+    }
+
     if (missingRows.length > 0) {
-      const supabase = createClient()
       const { error } = await supabase
         .from('client_maintenance_schedule')
         .upsert(missingRows, { onConflict: 'client_id,year,slot_number', ignoreDuplicates: true })

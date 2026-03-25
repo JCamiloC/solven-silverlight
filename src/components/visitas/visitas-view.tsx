@@ -25,6 +25,7 @@ import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { LoadingButton } from '@/components/ui/loading-button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -50,6 +51,7 @@ import {
 } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+import { useActionLock } from '@/hooks/use-action-lock'
 
 const OTHER_EQUIPMENT_VALUE = '__other__'
 
@@ -130,6 +132,7 @@ const formatDateTime = (value: string) => {
 export function VisitasView({ clientId, clientName, readOnly = false }: VisitasViewProps) {
   const { profile } = useAuth()
   const createVisitMutation = useCreateClientVisit()
+  const { runWithLock, isLocked } = useActionLock()
   const { data: hardwareAssets = [], isLoading: loadingHardware } = useHardwareAssetsByClient(clientId)
   const { data: visits = [], isLoading: loadingVisits } = useClientVisits(clientId)
 
@@ -218,28 +221,30 @@ export function VisitasView({ clientId, clientName, readOnly = false }: VisitasV
     }
 
     try {
-      await createVisitMutation.mutateAsync({
-        clientId,
-        fechaVisita: new Date(visitDate).toISOString(),
-        tipo: visitType,
-        estado: visitStatus,
-        detalle: visitDetail.trim(),
-        actividades: activities,
-        recomendaciones: recommendations.trim(),
-        tecnicoResponsable: profile?.id,
-        creadoPor: profile?.id,
-        equipos: normalizedEquipment.map((row) =>
-          row.selectedEquipment === OTHER_EQUIPMENT_VALUE
-            ? {
-                hardwareNombreManual: row.otherEquipmentName,
-                tareasRealizadas: row.tasks,
-              }
-            : {
-                hardwareId: row.selectedEquipment,
-                tareasRealizadas: row.tasks,
-              }
-        ),
-      })
+      await runWithLock(async () => {
+        await createVisitMutation.mutateAsync({
+          clientId,
+          fechaVisita: new Date(visitDate).toISOString(),
+          tipo: visitType,
+          estado: visitStatus,
+          detalle: visitDetail.trim(),
+          actividades: activities,
+          recomendaciones: recommendations.trim(),
+          tecnicoResponsable: profile?.id,
+          creadoPor: profile?.id,
+          equipos: normalizedEquipment.map((row) =>
+            row.selectedEquipment === OTHER_EQUIPMENT_VALUE
+              ? {
+                  hardwareNombreManual: row.otherEquipmentName,
+                  tareasRealizadas: row.tasks,
+                }
+              : {
+                  hardwareId: row.selectedEquipment,
+                  tareasRealizadas: row.tasks,
+                }
+          ),
+        })
+      }, { message: 'Guardando visita...' })
 
       resetForm()
     } catch (error) {
@@ -582,10 +587,13 @@ export function VisitasView({ clientId, clientName, readOnly = false }: VisitasV
                     <Button type="button" variant="outline" onClick={resetForm}>
                       Limpiar
                     </Button>
-                    <Button type="submit" disabled={createVisitMutation.isPending}>
-                      {createVisitMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <LoadingButton
+                      type="submit"
+                      loading={createVisitMutation.isPending || isLocked}
+                      loadingText="Guardando visita..."
+                    >
                       Guardar visita
-                    </Button>
+                    </LoadingButton>
                   </div>
                 </form>
               </CardContent>
