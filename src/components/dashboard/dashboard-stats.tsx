@@ -42,6 +42,12 @@ function shortenClientName(name: string, max = 18) {
   return `${name.slice(0, max - 1)}...`
 }
 
+function formatTooltipMetric(value: unknown, label: string): [string, string] {
+  if (typeof value === 'number') return [String(value), label]
+  if (typeof value === 'string') return [value, label]
+  return ['0', label]
+}
+
 function toStartOfDay(date: Date) {
   const normalized = new Date(date)
   normalized.setHours(0, 0, 0, 0)
@@ -162,7 +168,7 @@ export function DashboardStats() {
                   width={170}
                   tickFormatter={shortenClientName}
                 />
-                <Tooltip formatter={(value: number) => [value, 'Tickets']} />
+                <Tooltip formatter={(value) => formatTooltipMetric(value, 'Tickets')} />
                 <Bar dataKey="total" fill={TICKETS_BY_CLIENT_COLOR} radius={[0, 8, 8, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -199,7 +205,7 @@ export function DashboardStats() {
                       <Cell key={entry.name} fill={STATUS_COLORS[entry.name] || '#6b7280'} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => [value, 'Tickets']} />
+                  <Tooltip formatter={(value) => formatTooltipMetric(value, 'Tickets')} />
                 </PieChart>
               </ResponsiveContainer>
 
@@ -258,7 +264,7 @@ export function DashboardStats() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" angle={-20} textAnchor="end" interval={0} height={60} />
                 <YAxis allowDecimals={false} />
-                <Tooltip formatter={(value: number) => [value, 'Visitas']} />
+                <Tooltip formatter={(value) => formatTooltipMetric(value, 'Visitas')} />
                 <Area
                   type="monotone"
                   dataKey="total"

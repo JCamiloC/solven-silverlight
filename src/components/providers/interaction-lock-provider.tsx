@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
 type LockKind = 'action' | 'navigation'
@@ -33,7 +33,6 @@ const InteractionLockContext = createContext<InteractionLockContextValue | undef
 
 export function InteractionLockProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
 
   const [locks, setLocks] = useState<LockEntry[]>([])
   const idCounter = useRef(0)
@@ -92,7 +91,7 @@ export function InteractionLockProvider({ children }: { children: ReactNode }) {
       navigationLocks.forEach((entry) => clearLockTimer(entry.id))
       return prev.filter((entry) => entry.kind !== 'navigation')
     })
-  }, [pathname, searchParams, clearLockTimer])
+  }, [pathname, clearLockTimer])
 
   useEffect(() => {
     return () => {

@@ -107,7 +107,7 @@ function LoginForm() {
       const { user, session } = await authService.signIn(email, password)
 
       // Priorizar la sesión devuelta por signIn para evitar falsos timeout en getSession.
-      let userId = session?.user?.id || user?.id
+      let userId: string | undefined = session?.user?.id || user?.id
 
       if (!userId) {
         const {
