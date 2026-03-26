@@ -277,7 +277,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
       {hardwareName && (
         <div>
           <h2 className="text-xl sm:text-2xl font-bold">Seguimientos - {hardwareName}</h2>
-          <p className="text-sm sm:text-base text-muted-foreground">Registro y consulta de seguimientos del activo tecnol�gico</p>
+          <p className="text-sm sm:text-base text-muted-foreground">Registro y consulta de seguimientos del activo tecnológico</p>
         </div>
       )}
 
@@ -477,7 +477,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
         <CardHeader>
           <CardTitle>Historial de Seguimientos</CardTitle>
           <CardDescription>
-            Consulte todos los seguimientos registrados para este activo tecnol�gico
+            Consulte todos los seguimientos registrados para este activo tecnológico
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -489,7 +489,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
           ) : !seguimientos || seguimientos.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>No hay seguimientos registrados para este activo tecnol�gico</p>
+              <p>No hay seguimientos registrados para este activo tecnológico</p>
             </div>
           ) : (
             <div className="rounded-md border overflow-x-auto">

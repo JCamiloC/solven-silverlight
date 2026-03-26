@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { CreateClientVisitInput, visitasService } from '@/services/visitas'
+import { VisitStatus } from '@/types'
 
 export const visitasKeys = {
   all: ['visitas'] as const,
@@ -36,6 +37,23 @@ export function useCreateClientVisit() {
     },
     onError: (error: Error) => {
       toast.error(`Error al registrar visita: ${error.message}`)
+    },
+  })
+}
+
+export function useUpdateVisitStatus() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ visitId, status }: { visitId: string; status: VisitStatus }) =>
+      visitasService.updateVisitStatus({ visitId, status }),
+    onSuccess: (updatedVisit) => {
+      queryClient.invalidateQueries({ queryKey: visitasKeys.byClient(updatedVisit.client_id) })
+      queryClient.invalidateQueries({ queryKey: visitasKeys.list() })
+      toast.success('Estado de visita actualizado')
+    },
+    onError: (error: Error) => {
+      toast.error(`Error al actualizar estado: ${error.message}`)
     },
   })
 }

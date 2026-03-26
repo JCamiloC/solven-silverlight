@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 
-const MIDDLEWARE_AUTH_TIMEOUT_MS = 10000
+const MIDDLEWARE_AUTH_TIMEOUT_MS = 20000
 
 function hasSupabaseAuthCookie(request: NextRequest) {
   return request.cookies
@@ -50,9 +50,17 @@ export async function updateSession(request: NextRequest) {
       timeoutPromise
     ]) as any
     
-    // Si hay error de autenticación y estamos en una ruta protegida, redirigir
+    // Si hay error de autenticación en ruta protegida:
+    // - Con cookie de sesión presente, permitir request para evitar falsos logout por latencia/red.
+    // - Sin cookie, redirigir a login.
     if (error && isProtectedRoute) {
-      console.log('[Middleware] Auth error, redirecting to login:', error.message)
+      console.log('[Middleware] Auth error detected:', error.message)
+
+      if (hasSupabaseAuthCookie(request)) {
+        console.warn('[Middleware] Auth error con cookie presente, permitiendo request')
+        return supabaseResponse
+      }
+
       const redirectUrl = new URL('/auth/login?reason=expired', request.url)
       return NextResponse.redirect(redirectUrl)
     }

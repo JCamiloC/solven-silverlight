@@ -196,16 +196,24 @@ export function useAuth() {
   }, [getProfile, router, supabase])
 
   const signOut = async () => {
+    const redirectToLogin = () => {
+      router.replace('/auth/login')
+
+      if (typeof window !== 'undefined') {
+        // Fallback duro para evitar quedarse en una ruta protegida sin redirección.
+        window.location.assign('/auth/login')
+      }
+    }
+
     try {
       profileCache = {}
       await destroyClientSession(supabase)
-      
-      // Redirigir explícitamente al login
-      router.push('/auth/login')
+
+      redirectToLogin()
     } catch (error) {
       console.error('[useAuth] Error in signOut:', error)
       // Intentar redirigir de todas formas
-      router.push('/auth/login')
+      redirectToLogin()
       throw error
     }
   }

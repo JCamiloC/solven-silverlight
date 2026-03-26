@@ -127,14 +127,14 @@ export function HardwareStats({ clientId, assets = [], showTypeCards = false }: 
 
   const statCards = [
     {
-      title: 'Total Activos tecnológicos',
+      title: 'Total Activos Tecnológicos',
       value: stats?.total || 0,
       description: 'Activos tecnológicos registrados',
       icon: Computer,
       color: 'text-blue-600',
     },
     {
-      title: 'Activos tecnológicos Activos',
+      title: 'Activos Tecnológicos En Uso',
       value: stats?.active || 0,
       description: 'En funcionamiento',
       icon: TrendingUp,

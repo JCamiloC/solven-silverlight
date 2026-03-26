@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
@@ -19,7 +19,7 @@ import {
 
 import { useAuth } from '@/hooks/use-auth'
 import { useHardwareAssetsByClient } from '@/hooks/use-hardware'
-import { useClientVisits, useCreateClientVisit } from '@/hooks/use-visitas'
+import { useClientVisits, useCreateClientVisit, useUpdateVisitStatus } from '@/hooks/use-visitas'
 import { ClientVisit, VisitStatus, VisitType } from '@/types'
 import { toast } from 'sonner'
 
@@ -132,6 +132,7 @@ const formatDateTime = (value: string) => {
 export function VisitasView({ clientId, clientName, readOnly = false }: VisitasViewProps) {
   const { profile } = useAuth()
   const createVisitMutation = useCreateClientVisit()
+  const updateVisitStatusMutation = useUpdateVisitStatus()
   const { runWithLock, isLocked } = useActionLock()
   const { data: hardwareAssets = [], isLoading: loadingHardware } = useHardwareAssetsByClient(clientId)
   const { data: visits = [], isLoading: loadingVisits } = useClientVisits(clientId)
@@ -139,6 +140,7 @@ export function VisitasView({ clientId, clientName, readOnly = false }: VisitasV
   const [isFormOpen, setIsFormOpen] = useState(true)
   const [selectedVisit, setSelectedVisit] = useState<ClientVisit | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [detailStatus, setDetailStatus] = useState<VisitStatus>('completada')
 
   const [visitDate, setVisitDate] = useState(format(new Date(), "yyyy-MM-dd'T'HH:mm"))
   const [visitType, setVisitType] = useState<VisitType | ''>('')
@@ -254,7 +256,36 @@ export function VisitasView({ clientId, clientName, readOnly = false }: VisitasV
 
   const openVisitDetail = (visit: ClientVisit) => {
     setSelectedVisit(visit)
+    setDetailStatus(visit.estado)
     setIsDetailOpen(true)
+  }
+
+  useEffect(() => {
+    if (!selectedVisit) return
+    setDetailStatus(selectedVisit.estado)
+  }, [selectedVisit])
+
+  const handleUpdateVisitStatus = async () => {
+    if (!selectedVisit) return
+    if (detailStatus === selectedVisit.estado) {
+      toast.info('El estado no cambió')
+      return
+    }
+
+    try {
+      const updated = await runWithLock(
+        async () =>
+          updateVisitStatusMutation.mutateAsync({
+            visitId: selectedVisit.id,
+            status: detailStatus,
+          }),
+        { message: 'Actualizando estado de visita...' }
+      )
+
+      setSelectedVisit(updated)
+    } catch (error) {
+      console.error('Error updating visit status:', error)
+    }
   }
 
   const exportCsvReport = () => {
@@ -704,7 +735,34 @@ export function VisitasView({ clientId, clientName, readOnly = false }: VisitasV
                 </div>
                 <div>
                   <Label>Estado</Label>
-                  <Input disabled value={getStatusLabel(selectedVisit.estado)} />
+                  {readOnly ? (
+                    <Input disabled value={getStatusLabel(selectedVisit.estado)} />
+                  ) : (
+                    <div className="space-y-2">
+                      <Select value={detailStatus} onValueChange={(value) => setDetailStatus(value as VisitStatus)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccione estado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {VISIT_STATUS.map((item) => (
+                            <SelectItem key={item.value} value={item.value}>
+                              {item.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <LoadingButton
+                        type="button"
+                        size="sm"
+                        onClick={handleUpdateVisitStatus}
+                        loading={updateVisitStatusMutation.isPending || isLocked}
+                        loadingText="Guardando..."
+                        disabled={detailStatus === selectedVisit.estado}
+                      >
+                        Actualizar estado
+                      </LoadingButton>
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -60,6 +60,11 @@ export interface CreateClientVisitInput {
   equipos: VisitEquipmentInput[]
 }
 
+export interface UpdateVisitStatusInput {
+  visitId: string
+  status: VisitStatus
+}
+
 function parseActivities(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value.filter((item): item is string => typeof item === 'string')
@@ -287,6 +292,48 @@ class VisitasService {
       creado_por: (visitData as RawVisit).creado_por || null,
       created_at: (visitData as RawVisit).created_at,
       updated_at: (visitData as RawVisit).updated_at,
+      tecnico: null,
+      equipos: [],
+    }
+  }
+
+  async updateVisitStatus(input: UpdateVisitStatusInput): Promise<ClientVisit> {
+    if (!input.visitId) {
+      throw new Error('La visita es requerida para actualizar su estado')
+    }
+
+    const { data, error } = await supabase
+      .from('client_visitas')
+      .update({
+        estado: input.status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', input.visitId)
+      .select('*')
+      .single()
+
+    if (error || !data) {
+      throw this.toError(error, 'No se pudo actualizar el estado de la visita')
+    }
+
+    const visits = await this.listByClient((data as RawVisit).client_id)
+    const updated = visits.find((visit) => visit.id === input.visitId)
+
+    if (updated) return updated
+
+    return {
+      id: (data as RawVisit).id,
+      client_id: (data as RawVisit).client_id,
+      fecha_visita: (data as RawVisit).fecha_visita,
+      tipo: (data as RawVisit).tipo,
+      estado: (data as RawVisit).estado,
+      detalle: (data as RawVisit).detalle,
+      actividades: parseActivities((data as RawVisit).actividades),
+      recomendaciones: (data as RawVisit).recomendaciones || null,
+      tecnico_responsable: (data as RawVisit).tecnico_responsable || null,
+      creado_por: (data as RawVisit).creado_por || null,
+      created_at: (data as RawVisit).created_at,
+      updated_at: (data as RawVisit).updated_at,
       tecnico: null,
       equipos: [],
     }

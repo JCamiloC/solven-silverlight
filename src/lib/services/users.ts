@@ -6,7 +6,7 @@ const supabase = createClient()
 export interface User {
   id: string
   user_id: string
-  client_id?: string
+  client_id?: string | null
   email?: string
   first_name: string
   last_name: string
@@ -25,7 +25,7 @@ export interface UserInsert {
   password?: string
   phone?: string
   role: UserRole
-  client_id?: string
+  client_id?: string | null
   avatar_url?: string
 }
 
@@ -34,12 +34,19 @@ export interface UserUpdate {
   last_name?: string
   phone?: string
   role?: UserRole
-  client_id?: string
+  client_id?: string | null
   avatar_url?: string
+  password?: string
   updated_at?: string
 }
 
 export class UsersService {
+
+  private static normalizeClientId(clientId: string | null | undefined): string | null | undefined {
+    if (typeof clientId !== 'string') return clientId
+    const trimmed = clientId.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
 
 
   /**
@@ -143,7 +150,10 @@ export class UsersService {
             last_name: user.last_name,
             role: user.role,
             phone: user.phone,
-            client_id: user.client_id, // ⬅️ FALTABA ESTO
+            client_id:
+              user.role === 'cliente'
+                ? this.normalizeClientId(user.client_id)
+                : null,
           })
         })
 
@@ -191,8 +201,34 @@ export class UsersService {
    */
   static async update(id: string, updates: UserUpdate): Promise<User> {
     try {
+      const password = updates.password?.trim()
+
+      if (password) {
+        const response = await fetch('/api/users/update-password', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            profile_id: id,
+            password,
+          }),
+        })
+
+        const result = await response.json()
+        if (!response.ok) {
+          throw new Error(result.error || 'No se pudo actualizar la contraseña')
+        }
+      }
+
+      const { password: _ignoredPassword, ...profileUpdates } = updates
+
       const updateData = {
-        ...updates,
+        ...profileUpdates,
+        client_id:
+          profileUpdates.role && profileUpdates.role !== 'cliente'
+            ? null
+            : this.normalizeClientId(profileUpdates.client_id),
         updated_at: new Date().toISOString()
       }
 
@@ -211,7 +247,7 @@ export class UsersService {
       return data
     } catch (err) {
       console.error('Error in update user:', err)
-      throw new Error('Error al actualizar usuario')
+      throw new Error(`Error al actualizar usuario: ${err instanceof Error ? err.message : 'Error desconocido'}`)
     }
   }
 

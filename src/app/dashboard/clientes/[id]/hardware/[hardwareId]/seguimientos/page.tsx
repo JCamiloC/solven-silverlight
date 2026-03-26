@@ -3,6 +3,7 @@
 import { useParams, useRouter } from 'next/navigation'
 import { SeguimientosView } from '@/components/hardware'
 import { HardwareUpgradesHistory } from '@/components/hardware/hardware-upgrades-history'
+import { ProtectedRoute } from '@/components/auth/protected-route'
 import { useHardwareAsset } from '@/hooks/use-hardware'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -55,14 +56,17 @@ export default function HardwareSeguimientosPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </ProtectedRoute>
     )
   }
 
   return (
-    <div className="space-y-4">
+    <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
+      <div className="space-y-4">
       {/* Header con botones */}
       <div className="flex flex-col sm:flex-row gap-2 justify-between">
         <Button
@@ -117,6 +121,7 @@ export default function HardwareSeguimientosPage() {
           <HardwareUpgradesHistory hardwareId={hardwareId} />
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </ProtectedRoute>
   )
 }

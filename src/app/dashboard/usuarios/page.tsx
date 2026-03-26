@@ -151,7 +151,7 @@ export default function UsersPage() {
     {
       key: 'first_name' as keyof User,
       label: 'Nombre Completo',
-      render: (value: string | undefined, user: User) => `${user.first_name} ${user.last_name}`,
+      render: (value: string | null | undefined, user: User) => `${user.first_name} ${user.last_name}`,
     },
     {
       key: 'email' as keyof User,
@@ -160,12 +160,12 @@ export default function UsersPage() {
     {
       key: 'role' as keyof User,
       label: 'Rol',
-      render: (value: string | undefined) => value ? getRoleBadge(value) : null,
+      render: (value: string | null | undefined) => value ? getRoleBadge(value) : null,
     },
     {
       key: 'created_at' as keyof User,
       label: 'Creado',
-      render: (value: string | undefined) => value ? new Date(value).toLocaleDateString() : '',
+      render: (value: string | null | undefined) => value ? new Date(value).toLocaleDateString() : '',
     },
   ]
 
@@ -236,7 +236,7 @@ export default function UsersPage() {
       phone: formData.get('phone') as string,
       role: selectedRole,
       password: formData.get('password') as string,
-      client_id: selectedClientId,
+      client_id: selectedRole === 'cliente' ? selectedClientId : '',
     }
 
     console.log('[Usuarios Debug] userData antes de enviar:', userData)
@@ -244,9 +244,25 @@ export default function UsersPage() {
     if (selectedUser) {
       // Actualizar usuario existente (sin password)
       const { password, email, ...updateData } = userData
+      const isEditingSelf = selectedUser.id === currentUser.id
+
+      const payload: UserUpdate = {
+        ...updateData,
+        client_id: selectedRole === 'cliente' ? (selectedClientId || null) : null,
+      }
+
+      if (password && password.trim().length > 0) {
+        payload.password = password.trim()
+      }
+
+      // La política de BD bloquea cambio de rol del propio usuario.
+      if (!isEditingSelf && selectedRole !== selectedUser.role) {
+        payload.role = selectedRole
+      }
+
       updateUserMutation.mutate({
         id: selectedUser.id,
-        data: updateData as UserUpdate
+        data: payload
       }, {
         onSuccess: () => {
           setIsDialogOpen(false)
@@ -488,13 +504,47 @@ export default function UsersPage() {
                 </p>
               </div>
             )}
+
+            {selectedUser && (
+              <div className="space-y-2">
+                <Label htmlFor="password">Nueva Contraseña (Opcional)</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Dejar vacío para no cambiar"
+                    minLength={6}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? '👁️' : '👁️‍🗨️'}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Si escribes una nueva contraseña, se actualizará al guardar.
+                </p>
+              </div>
+            )}
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="role">Rol *</Label>
                 <Select 
                   value={selectedRole} 
-                  onValueChange={(value) => setSelectedRole(value as User['role'])}
+                  onValueChange={(value) => {
+                    const nextRole = value as User['role']
+                    setSelectedRole(nextRole)
+                    if (nextRole !== 'cliente') {
+                      setSelectedClientId('')
+                    }
+                  }}
+                  disabled={!!selectedUser && selectedUser.id === currentUser?.id}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar rol" />
@@ -506,6 +556,11 @@ export default function UsersPage() {
                     <SelectItem value="cliente">Cliente</SelectItem>
                   </SelectContent>
                 </Select>
+                {selectedUser && selectedUser.id === currentUser?.id && (
+                  <p className="text-xs text-muted-foreground">
+                    No puedes cambiar tu propio rol desde esta pantalla.
+                  </p>
+                )}
               </div>
               
               <div className="space-y-2">
@@ -519,11 +574,12 @@ export default function UsersPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="client_id">Cliente (Empresa) *</Label>
+              <Label htmlFor="client_id">Cliente (Empresa) {selectedRole === 'cliente' ? '*' : '(Opcional)'}</Label>
               <Select 
                 value={selectedClientId} 
                 onValueChange={setSelectedClientId}
-                required
+                required={selectedRole === 'cliente'}
+                disabled={selectedRole !== 'cliente'}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar cliente" />
