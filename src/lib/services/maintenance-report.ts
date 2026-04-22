@@ -68,8 +68,7 @@ export class MaintenanceReportService {
       const startDateISO = `${start.isoDate}T00:00:00.000Z`
       const endDateISO = `${end.isoDate}T23:59:59.999Z`
 
-      // Obtener seguimientos del mes con información de hardware
-      const { data: seguimientos, error } = await supabase
+      let query = supabase
         .from('hardware_seguimientos')
         .select(`
           id,
@@ -77,6 +76,7 @@ export class MaintenanceReportService {
           tipo,
           detalle,
           accion_recomendada,
+          accion_recomendada_estado,
           actividades,
           fecha_registro,
           hardware:hardware_assets!hardware_seguimientos_hardware_id_fkey (
@@ -98,6 +98,17 @@ export class MaintenanceReportService {
         .lte('fecha_registro', endDateISO)
         .order('fecha_registro', { ascending: true })
 
+      if (filters.seguimientoTipo && filters.seguimientoTipo !== 'all') {
+        query = query.eq('tipo', filters.seguimientoTipo)
+      }
+
+      if (filters.accionEstado && filters.accionEstado !== 'all') {
+        query = query.eq('accion_recomendada_estado', filters.accionEstado)
+      }
+
+      // Obtener seguimientos del mes con información de hardware
+      const { data: seguimientos, error } = await query
+
       if (error) throw error
 
       // Filtrar por cliente y transformar datos
@@ -110,6 +121,7 @@ export class MaintenanceReportService {
         usuario: seg.hardware?.persona_responsable || 'No asignado',
         equipoNombre: seg.hardware?.name || 'Sin nombre',
         tipo: seg.hardware?.type || 'N/A',
+        seguimientoTipo: seg.tipo || 'N/A',
         procesador: seg.hardware?.procesador || 'No especificado',
         ram: seg.hardware?.memoria_ram || 'No especificada',
         disco: seg.hardware?.disco_duro || 'No especificado',
@@ -119,6 +131,7 @@ export class MaintenanceReportService {
         sistemaOperativo: getSoftwareDisplayName(seg.hardware?.sistema_operativo),
         detalleSeguimiento: seg.detalle || '',
         accionRecomendada: seg.accion_recomendada || 'Sin acción recomendada',
+        accionRecomendadaEstado: seg.accion_recomendada_estado || 'no_realizado',
         fechaSeguimiento: seg.fecha_registro,
       }))
     } catch (error) {

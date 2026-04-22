@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import { User, Profile, UserRole } from '@/types'
-import { clearSupabaseAuthStorage, destroyClientSession } from '@/lib/auth/session-cleanup'
+import { clearSupabaseAuthStorage } from '@/lib/auth/session-cleanup'
 
 // Helper para agregar timeout a operaciones de auth
 function withAuthTimeout<T>(promise: Promise<T>, timeoutMs: number = 10000): Promise<T> {
@@ -16,9 +16,6 @@ export class AuthService {
   private supabase = createClient()
 
   async signIn(email: string, password: string) {
-    // Fallback defensivo: destruir cualquier sesión previa antes de autenticar.
-    await destroyClientSession(this.supabase, { preferLocal: true, timeoutMs: 3000 })
-
     const signInPromise = this.supabase.auth.signInWithPassword({
       email,
       password,

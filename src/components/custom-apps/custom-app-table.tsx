@@ -251,6 +251,10 @@ export function CustomAppTable({ clientId, onEdit, readOnly = false }: CustomApp
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                           <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => router.push(`/dashboard/software/${app.id}`)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            Ver detalle
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => onEdit?.(app.id)}>
                             <Pencil className="h-4 w-4 mr-2" />
                             Editar

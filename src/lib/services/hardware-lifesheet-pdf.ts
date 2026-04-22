@@ -1,6 +1,6 @@
 /**
  * Servicio para generar PDF de Hoja de Vida de Hardware
- * Genera un documento PDF con información completa del activo tecnol�gico:
+ * Genera un documento PDF con información completa del activo tecnológico:
  * - Información General
  * - Especificaciones Técnicas (con historial de upgrades)
  * - Historial de Mantenimientos
@@ -108,7 +108,7 @@ export class HardwareLifesheetPDF {
       doc.setFont('helvetica', 'normal')
 
       const generalInfo = [
-        { label: 'Nombre del Activo tecnol�gico', value: hardware.name || 'N/A' },
+        { label: 'Nombre del Activo tecnológico', value: hardware.name || 'N/A' },
         { label: 'Tipo', value: hardware.type || 'N/A' },
         { label: 'Estado', value: this.translateStatus(hardware.status) },
         { label: 'Ubicación', value: hardware.location || 'No especificada' },
@@ -245,7 +245,7 @@ export class HardwareLifesheetPDF {
 
       if (followUps.length === 0) {
         doc.setFont('helvetica', 'italic')
-        doc.text('No hay mantenimientos registrados para este activo tecnol�gico.', margin, yPos)
+        doc.text('No hay mantenimientos registrados para este activo tecnológico.', margin, yPos)
         yPos += 10
       } else {
         const maintenanceRows = followUps.map((followUp) => [
@@ -306,7 +306,7 @@ export class HardwareLifesheetPDF {
 
       if (tickets.length === 0) {
         doc.setFont('helvetica', 'italic')
-        doc.text('No hay tickets asociados a este activo tecnol�gico.', margin, yPos)
+        doc.text('No hay tickets asociados a este activo tecnológico.', margin, yPos)
         yPos += 10
       } else {
         tickets.forEach((ticket, index) => {

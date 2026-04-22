@@ -7,7 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:smoke:release": "playwright test -c playwright.release.config.ts",
+    "test:smoke:release:headed": "playwright test -c playwright.release.config.ts --headed"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -69,6 +71,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/nodemailer": "^7.0.11",

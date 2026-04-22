@@ -51,6 +51,7 @@ import {
 } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+import { ClientSearchCombobox } from '@/components/ui/client-search-combobox'
 import { useActionLock } from '@/hooks/use-action-lock'
 
 const OTHER_EQUIPMENT_VALUE = '__other__'
@@ -526,7 +527,18 @@ export function VisitasView({ clientId, clientName, readOnly = false }: VisitasV
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div className="space-y-2">
                                   <Label>Equipo</Label>
-                                  <Select
+                                  <ClientSearchCombobox
+                                    options={[
+                                      ...hardwareAssets.map((asset) => ({
+                                        value: asset.id,
+                                        label: `${asset.name}${asset.serial_number ? ` • S/N ${asset.serial_number}` : ''}`,
+                                        disabled: disabledHardwareIds.has(asset.id),
+                                      })),
+                                      {
+                                        value: OTHER_EQUIPMENT_VALUE,
+                                        label: 'Otro equipo (manual)',
+                                      },
+                                    ]}
                                     value={row.selectedEquipment}
                                     onValueChange={(value) =>
                                       updateEquipmentRow(row.rowId, {
@@ -534,25 +546,12 @@ export function VisitasView({ clientId, clientName, readOnly = false }: VisitasV
                                         otherEquipmentName: value === OTHER_EQUIPMENT_VALUE ? row.otherEquipmentName : '',
                                       })
                                     }
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue
-                                        placeholder={loadingHardware ? 'Cargando equipos...' : 'Seleccione equipo atendido'}
-                                      />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {hardwareAssets.map((asset) => (
-                                        <SelectItem
-                                          key={asset.id}
-                                          value={asset.id}
-                                          disabled={disabledHardwareIds.has(asset.id)}
-                                        >
-                                          {asset.name} {asset.serial_number ? `• S/N ${asset.serial_number}` : ''}
-                                        </SelectItem>
-                                      ))}
-                                      <SelectItem value={OTHER_EQUIPMENT_VALUE}>Otro equipo (manual)</SelectItem>
-                                    </SelectContent>
-                                  </Select>
+                                    placeholder={loadingHardware ? 'Cargando equipos...' : 'Seleccione equipo atendido'}
+                                    searchPlaceholder="Buscar equipo por nombre o serial..."
+                                    emptyMessage="No se encontraron equipos"
+                                    minSearchChars={1}
+                                    disabled={loadingHardware}
+                                  />
                                 </div>
 
                                 <div className="space-y-2">

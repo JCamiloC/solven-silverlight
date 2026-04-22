@@ -12,6 +12,10 @@
 
 # testing
 /coverage
+/tests/
+/testsprite_tests/
+/playwright-report-release/
+/test-results/
 
 # next.js
 /.next/
@@ -42,6 +46,9 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# editor local settings
+.vscode/
 
 # typescript
 *.tsbuildinfo

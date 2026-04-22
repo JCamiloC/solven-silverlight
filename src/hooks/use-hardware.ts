@@ -3,7 +3,7 @@ import { hardwareService } from '@/services/hardware';
 import { toast } from 'sonner';
 import { HardwareAsset, AccionRecomendadaEstado } from '@/types';
 
-// EstadÃ­sticas globales de hardware
+// Estadísticas globales de hardware
 export function useHardwareStats() {
   return useQuery({
     queryKey: hardwareKeys.stats(),

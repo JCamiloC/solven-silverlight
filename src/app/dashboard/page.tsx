@@ -4,8 +4,7 @@ import {
   DashboardStats,
   RecentTickets,
   HardwareOverview,
-  UpcomingMaintenances,
-  QuickActions
+  UpcomingMaintenances
 } from '@/components/dashboard'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 
@@ -28,8 +27,6 @@ export default function DashboardPage() {
           <RecentTickets />
           <HardwareOverview />
         </div>
-
-        <QuickActions />
       </div>
     </ProtectedRoute>
   )

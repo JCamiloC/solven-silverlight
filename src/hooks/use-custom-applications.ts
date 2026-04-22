@@ -7,6 +7,15 @@ import {
   CustomApplicationWithRelations,
   CustomApplicationStats,
   CustomAppFollowupInsert,
+  SoftwareDocumentInsert,
+  SoftwareMeetingInsert,
+  SoftwareMeetingItemInsert,
+  SoftwareProjectPhaseUpdate,
+  SoftwareReleaseInsert,
+  SoftwarePostsaleAdjustmentInsert,
+  SoftwareMeetingItemUpdate,
+  SoftwareReleaseUpdate,
+  SoftwarePostsaleAdjustmentUpdate,
 } from '@/lib/services/custom-applications'
 import { CustomAppFollowup } from '@/types'
 
@@ -22,6 +31,12 @@ export const customAppsKeys = {
   stats: () => [...customAppsKeys.all, 'stats'] as const,
   byClient: (clientId: string) => [...customAppsKeys.all, 'client', clientId] as const,
   followups: (appId: string) => [...customAppsKeys.all, 'followups', appId] as const,
+  phases: (appId: string) => [...customAppsKeys.all, 'phases', appId] as const,
+  documents: (appId: string) => [...customAppsKeys.all, 'documents', appId] as const,
+  meetings: (appId: string) => [...customAppsKeys.all, 'meetings', appId] as const,
+  meetingItems: (appId: string) => [...customAppsKeys.all, 'meeting-items', appId] as const,
+  releases: (appId: string) => [...customAppsKeys.all, 'releases', appId] as const,
+  postsale: (appId: string) => [...customAppsKeys.all, 'postsale', appId] as const,
 }
 
 // ===================================
@@ -73,6 +88,60 @@ export function useCustomAppFollowups(applicationId: string) {
     queryFn: () => customApplicationsService.getFollowups(applicationId),
     enabled: !!applicationId,
     staleTime: 2 * 60 * 1000,
+  })
+}
+
+export function useSoftwareProjectPhases(applicationId: string) {
+  return useQuery({
+    queryKey: customAppsKeys.phases(applicationId),
+    queryFn: () => customApplicationsService.getProjectPhases(applicationId),
+    enabled: !!applicationId,
+    staleTime: 60 * 1000,
+  })
+}
+
+export function useSoftwareDocuments(applicationId: string) {
+  return useQuery({
+    queryKey: customAppsKeys.documents(applicationId),
+    queryFn: () => customApplicationsService.getDocuments(applicationId),
+    enabled: !!applicationId,
+    staleTime: 60 * 1000,
+  })
+}
+
+export function useSoftwareMeetings(applicationId: string) {
+  return useQuery({
+    queryKey: customAppsKeys.meetings(applicationId),
+    queryFn: () => customApplicationsService.getMeetings(applicationId),
+    enabled: !!applicationId,
+    staleTime: 60 * 1000,
+  })
+}
+
+export function useSoftwareMeetingItems(applicationId: string) {
+  return useQuery({
+    queryKey: customAppsKeys.meetingItems(applicationId),
+    queryFn: () => customApplicationsService.getMeetingItems(applicationId),
+    enabled: !!applicationId,
+    staleTime: 60 * 1000,
+  })
+}
+
+export function useSoftwareReleases(applicationId: string) {
+  return useQuery({
+    queryKey: customAppsKeys.releases(applicationId),
+    queryFn: () => customApplicationsService.getReleases(applicationId),
+    enabled: !!applicationId,
+    staleTime: 60 * 1000,
+  })
+}
+
+export function useSoftwarePostsaleAdjustments(applicationId: string) {
+  return useQuery({
+    queryKey: customAppsKeys.postsale(applicationId),
+    queryFn: () => customApplicationsService.getPostsaleAdjustments(applicationId),
+    enabled: !!applicationId,
+    staleTime: 60 * 1000,
   })
 }
 
@@ -239,6 +308,146 @@ export function useDeleteCustomAppFollowup() {
     },
     onError: (err) => {
       toast.error('Error al eliminar seguimiento: ' + (err as Error).message)
+    },
+  })
+}
+
+export function useUpdateSoftwareProjectPhase(applicationId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: SoftwareProjectPhaseUpdate }) =>
+      customApplicationsService.updateProjectPhase(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: customAppsKeys.phases(applicationId) })
+      toast.success('Fase actualizada')
+    },
+    onError: (err) => {
+      toast.error('Error al actualizar fase: ' + (err as Error).message)
+    },
+  })
+}
+
+export function useCreateSoftwareDocument(applicationId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (data: SoftwareDocumentInsert) => customApplicationsService.createDocument(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: customAppsKeys.documents(applicationId) })
+      toast.success('Documento registrado')
+    },
+    onError: (err) => {
+      toast.error('Error al registrar documento: ' + (err as Error).message)
+    },
+  })
+}
+
+export function useCreateSoftwareMeeting(applicationId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (data: SoftwareMeetingInsert) => customApplicationsService.createMeeting(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: customAppsKeys.meetings(applicationId) })
+      toast.success('Reunión registrada')
+    },
+    onError: (err) => {
+      toast.error('Error al registrar reunión: ' + (err as Error).message)
+    },
+  })
+}
+
+export function useCreateSoftwareMeetingItem(applicationId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (data: SoftwareMeetingItemInsert) => customApplicationsService.createMeetingItem(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: customAppsKeys.meetingItems(applicationId) })
+      toast.success('Ítem registrado')
+    },
+    onError: (err) => {
+      toast.error('Error al registrar ítem: ' + (err as Error).message)
+    },
+  })
+}
+
+export function useUpdateSoftwareMeetingItem(applicationId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: SoftwareMeetingItemUpdate }) =>
+      customApplicationsService.updateMeetingItem(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: customAppsKeys.meetingItems(applicationId) })
+      toast.success('Ítem actualizado')
+    },
+    onError: (err) => {
+      toast.error('Error al actualizar ítem: ' + (err as Error).message)
+    },
+  })
+}
+
+export function useCreateSoftwareRelease(applicationId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (data: SoftwareReleaseInsert) => customApplicationsService.createRelease(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: customAppsKeys.releases(applicationId) })
+      toast.success('Salida registrada')
+    },
+    onError: (err) => {
+      toast.error('Error al registrar salida: ' + (err as Error).message)
+    },
+  })
+}
+
+export function useUpdateSoftwareRelease(applicationId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: SoftwareReleaseUpdate }) =>
+      customApplicationsService.updateRelease(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: customAppsKeys.releases(applicationId) })
+      toast.success('Salida actualizada')
+    },
+    onError: (err) => {
+      toast.error('Error al actualizar salida: ' + (err as Error).message)
+    },
+  })
+}
+
+export function useCreateSoftwarePostsaleAdjustment(applicationId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (data: SoftwarePostsaleAdjustmentInsert) =>
+      customApplicationsService.createPostsaleAdjustment(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: customAppsKeys.postsale(applicationId) })
+      toast.success('Ajuste posventa registrado')
+    },
+    onError: (err) => {
+      toast.error('Error al registrar posventa: ' + (err as Error).message)
+    },
+  })
+}
+
+export function useUpdateSoftwarePostsaleAdjustment(applicationId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: SoftwarePostsaleAdjustmentUpdate }) =>
+      customApplicationsService.updatePostsaleAdjustment(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: customAppsKeys.postsale(applicationId) })
+      toast.success('Ajuste posventa actualizado')
+    },
+    onError: (err) => {
+      toast.error('Error al actualizar posventa: ' + (err as Error).message)
     },
   })
 }

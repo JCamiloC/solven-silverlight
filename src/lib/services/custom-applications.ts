@@ -1,5 +1,24 @@
 import { createClient } from '@/lib/supabase/client'
-import { CustomApplication, CustomAppFollowup } from '@/types'
+import {
+  CustomApplication,
+  CustomAppFollowup,
+  SoftwareDocument,
+  SoftwareDocumentType,
+  SoftwareMeeting,
+  SoftwareMeetingItem,
+  SoftwareMeetingItemStatus,
+  SoftwareMeetingItemType,
+  SoftwareMeetingType,
+  SoftwarePhaseKey,
+  SoftwarePhaseStatus,
+  SoftwarePostsaleAdjustment,
+  SoftwarePostsalePriority,
+  SoftwarePostsaleStatus,
+  SoftwareProjectPhase,
+  SoftwareRelease,
+  SoftwareReleaseEnvironment,
+  SoftwareReleaseStatus,
+} from '@/types'
 
 const supabase = createClient()
 
@@ -78,6 +97,135 @@ export interface CustomAppFollowupInsert {
   detalle: string
   foto_url?: string
   tecnico_responsable: string
+}
+
+export interface SoftwareProjectPhaseInsert {
+  application_id: string
+  phase_key: SoftwarePhaseKey
+  title: string
+  status?: SoftwarePhaseStatus
+  planned_start_date?: string | null
+  planned_end_date?: string | null
+  actual_start_date?: string | null
+  actual_end_date?: string | null
+  completion_percentage?: number
+  owner_id?: string | null
+  notes?: string | null
+  sort_order?: number
+}
+
+export interface SoftwareProjectPhaseUpdate {
+  title?: string
+  status?: SoftwarePhaseStatus
+  planned_start_date?: string | null
+  planned_end_date?: string | null
+  actual_start_date?: string | null
+  actual_end_date?: string | null
+  completion_percentage?: number
+  owner_id?: string | null
+  notes?: string | null
+  sort_order?: number
+}
+
+export interface SoftwareDocumentInsert {
+  application_id: string
+  doc_type: SoftwareDocumentType
+  title: string
+  version?: string | null
+  storage_url?: string | null
+  summary?: string | null
+  approved?: boolean
+  created_by?: string | null
+}
+
+export interface SoftwareDocumentUpdate {
+  doc_type?: SoftwareDocumentType
+  title?: string
+  version?: string | null
+  storage_url?: string | null
+  summary?: string | null
+  approved?: boolean
+}
+
+export interface SoftwareMeetingInsert {
+  application_id: string
+  meeting_date: string
+  meeting_type: SoftwareMeetingType
+  attendees?: string[]
+  summary?: string | null
+  notes?: string | null
+  next_meeting_date?: string | null
+  created_by?: string | null
+}
+
+export interface SoftwareMeetingUpdate {
+  meeting_date?: string
+  meeting_type?: SoftwareMeetingType
+  attendees?: string[]
+  summary?: string | null
+  notes?: string | null
+  next_meeting_date?: string | null
+}
+
+export interface SoftwareMeetingItemInsert {
+  meeting_id: string
+  application_id: string
+  item_type: SoftwareMeetingItemType
+  description: string
+  owner_id?: string | null
+  due_date?: string | null
+  status?: SoftwareMeetingItemStatus
+}
+
+export interface SoftwareMeetingItemUpdate {
+  item_type?: SoftwareMeetingItemType
+  description?: string
+  owner_id?: string | null
+  due_date?: string | null
+  status?: SoftwareMeetingItemStatus
+}
+
+export interface SoftwareReleaseInsert {
+  application_id: string
+  version: string
+  environment: SoftwareReleaseEnvironment
+  release_date: string
+  status?: SoftwareReleaseStatus
+  changelog?: string | null
+  delivery_document_url?: string | null
+  delivered_by?: string | null
+}
+
+export interface SoftwareReleaseUpdate {
+  version?: string
+  environment?: SoftwareReleaseEnvironment
+  release_date?: string
+  status?: SoftwareReleaseStatus
+  changelog?: string | null
+  delivery_document_url?: string | null
+  delivered_by?: string | null
+}
+
+export interface SoftwarePostsaleAdjustmentInsert {
+  application_id: string
+  requested_at?: string
+  title: string
+  detail?: string | null
+  priority?: SoftwarePostsalePriority
+  status?: SoftwarePostsaleStatus
+  assigned_to?: string | null
+  resolved_at?: string | null
+  created_by?: string | null
+}
+
+export interface SoftwarePostsaleAdjustmentUpdate {
+  requested_at?: string
+  title?: string
+  detail?: string | null
+  priority?: SoftwarePostsalePriority
+  status?: SoftwarePostsaleStatus
+  assigned_to?: string | null
+  resolved_at?: string | null
 }
 
 export interface CustomApplicationStats {
@@ -301,6 +449,229 @@ export class CustomApplicationsService {
       .eq('id', id)
 
     if (error) throw error
+  }
+
+  // ===================================
+  // CICLO DE VIDA DEL PROYECTO
+  // ===================================
+
+  async getProjectPhases(applicationId: string): Promise<SoftwareProjectPhase[]> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_project_phases')
+      .select(`
+        *,
+        owner:profiles(id, first_name, last_name, email)
+      `)
+      .eq('application_id', applicationId)
+      .order('sort_order', { ascending: true })
+
+    if (error) throw error
+    return (data || []) as SoftwareProjectPhase[]
+  }
+
+  async createProjectPhase(payload: SoftwareProjectPhaseInsert): Promise<SoftwareProjectPhase> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_project_phases')
+      .insert(payload)
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return data as SoftwareProjectPhase
+  }
+
+  async updateProjectPhase(id: string, payload: SoftwareProjectPhaseUpdate): Promise<SoftwareProjectPhase> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_project_phases')
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return data as SoftwareProjectPhase
+  }
+
+  async getDocuments(applicationId: string): Promise<SoftwareDocument[]> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_documents')
+      .select('*')
+      .eq('application_id', applicationId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return (data || []) as SoftwareDocument[]
+  }
+
+  async createDocument(payload: SoftwareDocumentInsert): Promise<SoftwareDocument> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_documents')
+      .insert(payload)
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return data as SoftwareDocument
+  }
+
+  async updateDocument(id: string, payload: SoftwareDocumentUpdate): Promise<SoftwareDocument> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_documents')
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return data as SoftwareDocument
+  }
+
+  async getMeetings(applicationId: string): Promise<SoftwareMeeting[]> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_meetings')
+      .select('*')
+      .eq('application_id', applicationId)
+      .order('meeting_date', { ascending: false })
+
+    if (error) throw error
+    return (data || []) as SoftwareMeeting[]
+  }
+
+  async createMeeting(payload: SoftwareMeetingInsert): Promise<SoftwareMeeting> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_meetings')
+      .insert(payload)
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return data as SoftwareMeeting
+  }
+
+  async getMeetingItems(applicationId: string): Promise<SoftwareMeetingItem[]> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_meeting_items')
+      .select(`
+        *,
+        owner:profiles(id, first_name, last_name, email),
+        meeting:software_meetings(id, meeting_date, meeting_type)
+      `)
+      .eq('application_id', applicationId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return (data || []) as SoftwareMeetingItem[]
+  }
+
+  async createMeetingItem(payload: SoftwareMeetingItemInsert): Promise<SoftwareMeetingItem> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_meeting_items')
+      .insert(payload)
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return data as SoftwareMeetingItem
+  }
+
+  async updateMeetingItem(id: string, payload: SoftwareMeetingItemUpdate): Promise<SoftwareMeetingItem> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_meeting_items')
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return data as SoftwareMeetingItem
+  }
+
+  async getReleases(applicationId: string): Promise<SoftwareRelease[]> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_releases')
+      .select('*')
+      .eq('application_id', applicationId)
+      .order('release_date', { ascending: false })
+
+    if (error) throw error
+    return (data || []) as SoftwareRelease[]
+  }
+
+  async createRelease(payload: SoftwareReleaseInsert): Promise<SoftwareRelease> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_releases')
+      .insert(payload)
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return data as SoftwareRelease
+  }
+
+  async updateRelease(id: string, payload: SoftwareReleaseUpdate): Promise<SoftwareRelease> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_releases')
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return data as SoftwareRelease
+  }
+
+  async getPostsaleAdjustments(applicationId: string): Promise<SoftwarePostsaleAdjustment[]> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_postsale_adjustments')
+      .select('*')
+      .eq('application_id', applicationId)
+      .order('requested_at', { ascending: false })
+
+    if (error) throw error
+    return (data || []) as SoftwarePostsaleAdjustment[]
+  }
+
+  async createPostsaleAdjustment(payload: SoftwarePostsaleAdjustmentInsert): Promise<SoftwarePostsaleAdjustment> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_postsale_adjustments')
+      .insert(payload)
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return data as SoftwarePostsaleAdjustment
+  }
+
+  async updatePostsaleAdjustment(
+    id: string,
+    payload: SoftwarePostsaleAdjustmentUpdate
+  ): Promise<SoftwarePostsaleAdjustment> {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('software_postsale_adjustments')
+      .update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return data as SoftwarePostsaleAdjustment
   }
 }
 

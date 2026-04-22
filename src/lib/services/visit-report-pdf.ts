@@ -70,6 +70,7 @@ export class VisitReportPDF {
       styles: {
         fontSize: 7,
         cellPadding: 2,
+        overflow: 'linebreak',
       },
       headStyles: {
         fillColor: [41, 128, 185],

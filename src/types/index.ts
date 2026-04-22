@@ -192,6 +192,8 @@ export interface MaintenanceReportFilters {
   clientId: string
   startDate: string
   endDate: string
+  seguimientoTipo?: 'all' | 'mantenimiento_programado' | 'mantenimiento_no_programado' | 'soporte_remoto' | 'soporte_en_sitio'
+  accionEstado?: 'all' | 'realizado' | 'no_realizado'
 }
 
 export interface MaintenanceReportRow {
@@ -199,6 +201,7 @@ export interface MaintenanceReportRow {
   usuario: string
   equipoNombre: string
   tipo: string
+  seguimientoTipo: string
   procesador: string
   ram: string
   disco: string
@@ -208,6 +211,7 @@ export interface MaintenanceReportRow {
   sistemaOperativo: string
   detalleSeguimiento: string
   accionRecomendada: string
+  accionRecomendadaEstado: string
   fechaSeguimiento: string
 }
 
@@ -264,6 +268,150 @@ export interface CustomAppFollowup {
   detalle: string
   foto_url?: string
   tecnico_responsable: string
+  created_at: string
+  updated_at: string
+}
+
+export type SoftwarePhaseKey =
+  | 'discovery'
+  | 'drp'
+  | 'analisis'
+  | 'desarrollo'
+  | 'qa'
+  | 'uat'
+  | 'produccion'
+  | 'posventa'
+
+export type SoftwarePhaseStatus = 'pendiente' | 'en_progreso' | 'bloqueada' | 'completada'
+
+export interface SoftwareProjectPhase {
+  id: string
+  application_id: string
+  phase_key: SoftwarePhaseKey
+  title: string
+  status: SoftwarePhaseStatus
+  planned_start_date?: string | null
+  planned_end_date?: string | null
+  actual_start_date?: string | null
+  actual_end_date?: string | null
+  completion_percentage: number
+  owner_id?: string | null
+  notes?: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+  owner?: {
+    id: string
+    first_name?: string
+    last_name?: string
+    email?: string
+  } | null
+}
+
+export type SoftwareDocumentType =
+  | 'drp'
+  | 'caso_uso'
+  | 'modelo_bd'
+  | 'acta_reunion'
+  | 'entrega_produccion'
+  | 'manual'
+  | 'otro'
+
+export interface SoftwareDocument {
+  id: string
+  application_id: string
+  doc_type: SoftwareDocumentType
+  title: string
+  version?: string | null
+  storage_url?: string | null
+  summary?: string | null
+  approved: boolean
+  created_by?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type SoftwareMeetingType =
+  | 'kickoff'
+  | 'seguimiento'
+  | 'planeacion'
+  | 'qa'
+  | 'entrega'
+  | 'postventa'
+  | 'otro'
+
+export interface SoftwareMeeting {
+  id: string
+  application_id: string
+  meeting_date: string
+  meeting_type: SoftwareMeetingType
+  attendees: string[]
+  summary?: string | null
+  notes?: string | null
+  next_meeting_date?: string | null
+  created_by?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type SoftwareMeetingItemType = 'pendiente' | 'acuerdo' | 'riesgo'
+export type SoftwareMeetingItemStatus = 'pendiente' | 'en_progreso' | 'resuelto' | 'cerrado'
+
+export interface SoftwareMeetingItem {
+  id: string
+  meeting_id: string
+  application_id: string
+  item_type: SoftwareMeetingItemType
+  description: string
+  owner_id?: string | null
+  due_date?: string | null
+  status: SoftwareMeetingItemStatus
+  created_at: string
+  updated_at: string
+  owner?: {
+    id: string
+    first_name?: string
+    last_name?: string
+    email?: string
+  } | null
+  meeting?: {
+    id: string
+    meeting_date: string
+    meeting_type: SoftwareMeetingType
+  } | null
+}
+
+export type SoftwareReleaseEnvironment = 'staging' | 'produccion'
+export type SoftwareReleaseStatus = 'planeada' | 'ejecutada' | 'fallida' | 'rollback'
+
+export interface SoftwareRelease {
+  id: string
+  application_id: string
+  version: string
+  environment: SoftwareReleaseEnvironment
+  release_date: string
+  status: SoftwareReleaseStatus
+  changelog?: string | null
+  delivery_document_url?: string | null
+  delivered_by?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type SoftwarePostsalePriority = 'baja' | 'media' | 'alta' | 'critica'
+export type SoftwarePostsaleStatus = 'pendiente' | 'en_progreso' | 'resuelto' | 'cancelado'
+
+export interface SoftwarePostsaleAdjustment {
+  id: string
+  application_id: string
+  requested_at: string
+  title: string
+  detail?: string | null
+  priority: SoftwarePostsalePriority
+  status: SoftwarePostsaleStatus
+  assigned_to?: string | null
+  resolved_at?: string | null
+  created_by?: string | null
   created_at: string
   updated_at: string
 }

@@ -21,6 +21,7 @@ import {
 export interface ComboboxOption {
   value: string
   label: string
+  disabled?: boolean
 }
 
 interface ClientSearchComboboxProps {
@@ -98,7 +99,9 @@ export function ClientSearchCombobox({
                   <CommandItem
                     key={option.value}
                     value={option.value}
+                    disabled={option.disabled}
                     onSelect={(currentValue: string) => {
+                      if (option.disabled) return
                       onValueChange(currentValue === value ? "" : currentValue)
                       setOpen(false)
                       setSearchQuery("")

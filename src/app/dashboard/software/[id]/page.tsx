@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { useCustomApplications } from '@/hooks/use-custom-applications'
 import { CustomAppForm } from '@/components/custom-apps'
+import { ProjectLifecycleView } from '@/components/custom-apps'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -371,6 +372,8 @@ export default function SoftwareDetailPage() {
             </CardContent>
           </Card>
         )}
+
+        <ProjectLifecycleView applicationId={application.id} />
 
         {/* Edit Dialog */}
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>

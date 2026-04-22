@@ -54,7 +54,7 @@ export class UsersService {
    */
   static async getAll(): Promise<User[]> {
     try {
-      console.log('� Obteniendo usuarios desde profiles...')
+      console.log('Obteniendo usuarios desde profiles...')
       
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')

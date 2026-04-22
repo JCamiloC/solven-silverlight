@@ -111,6 +111,20 @@ export class TicketDetailPDF {
       const col2X = 110
       const labelWidth = 35
       const lineHeight = 7
+      const col2ValueWidth = 48
+
+      const writeCol2Field = (label: string, value: string) => {
+        doc.setFont('helvetica', 'bold')
+        doc.text(label, col2X, currentY)
+        doc.setFont('helvetica', 'normal')
+
+        const lines = doc.splitTextToSize(value || 'N/A', col2ValueWidth)
+        lines.forEach((line: string, index: number) => {
+          doc.text(line, col2X + labelWidth, currentY + index * 5)
+        })
+
+        currentY += Math.max(lineHeight, lines.length * 5 + 1)
+      }
 
       // Columna 1
       let currentY = yPos
@@ -143,27 +157,15 @@ export class TicketDetailPDF {
       // Columna 2
       currentY = yPos
 
-      doc.setFont('helvetica', 'bold')
-      doc.text('Usuario Afectado:', col2X, currentY)
-      doc.setFont('helvetica', 'normal')
       const usuarioAfectado = ticket.usuario_afectado || 'N/A'
-      doc.text(usuarioAfectado.length > 25 ? usuarioAfectado.substring(0, 22) + '...' : usuarioAfectado, col2X + labelWidth, currentY)
-      currentY += lineHeight
+      writeCol2Field('Usuario Afectado:', usuarioAfectado)
 
-      doc.setFont('helvetica', 'bold')
-      doc.text('Email de Contacto:', col2X, currentY)
-      doc.setFont('helvetica', 'normal')
       const contactEmail = ticket.contact_email || 'N/A'
-      doc.text(contactEmail.length > 25 ? contactEmail.substring(0, 22) + '...' : contactEmail, col2X + labelWidth, currentY)
-      currentY += lineHeight
+      writeCol2Field('Email de Contacto:', contactEmail)
 
       if (ticket.assigned_user) {
-        doc.setFont('helvetica', 'bold')
-        doc.text('Asignado a:', col2X, currentY)
-        doc.setFont('helvetica', 'normal')
         const assignedName = `${ticket.assigned_user.first_name} ${ticket.assigned_user.last_name}`
-        doc.text(assignedName.length > 25 ? assignedName.substring(0, 22) + '...' : assignedName, col2X + labelWidth, currentY)
-        currentY += lineHeight
+        writeCol2Field('Asignado a:', assignedName)
       }
 
       if (ticket.resolved_at) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,17 +19,95 @@ function ResetPasswordForm() {
   const [success, setSuccess] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [checkingRecovery, setCheckingRecovery] = useState(true)
+  const [recoveryReady, setRecoveryReady] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
+
+  const getRecoveryErrorMessage = (err: unknown) => {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+
+    if (
+      message.toLowerCase().includes('expired') ||
+      message.toLowerCase().includes('invalid') ||
+      message.toLowerCase().includes('token') ||
+      message.toLowerCase().includes('session')
+    ) {
+      return 'El enlace de recuperación es inválido o expiró. Solicita uno nuevo.'
+    }
+
+    return 'No se pudo validar el enlace de recuperación. Inténtalo de nuevo.'
+  }
 
   useEffect(() => {
-    // Verificar que tenemos los parámetros necesarios del email
-    const code = searchParams.get('code')
-    if (!code) {
-      setError('Enlace de recuperación inválido o expirado. Solicita uno nuevo.')
+    let isMounted = true
+
+    const prepareRecoverySession = async () => {
+      setCheckingRecovery(true)
+      setError('')
+      setRecoveryReady(false)
+
+      try {
+        const authError = searchParams.get('error_description') || searchParams.get('error')
+        if (authError) {
+          throw new Error(authError)
+        }
+
+        const code = searchParams.get('code')
+        if (code) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+          if (exchangeError) throw exchangeError
+        } else if (typeof window !== 'undefined') {
+          const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+          const accessToken = hashParams.get('access_token')
+          const refreshToken = hashParams.get('refresh_token')
+          const type = hashParams.get('type')
+
+          if (type === 'recovery' && accessToken && refreshToken) {
+            const { error: setSessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            })
+            if (setSessionError) throw setSessionError
+
+            window.history.replaceState(
+              null,
+              '',
+              `${window.location.pathname}${window.location.search}`
+            )
+          }
+        }
+
+        const {
+          data: { session },
+          error: getSessionError,
+        } = await supabase.auth.getSession()
+
+        if (getSessionError) throw getSessionError
+        if (!session?.user) {
+          throw new Error('Recovery session not found')
+        }
+
+        if (!isMounted) return
+        setRecoveryReady(true)
+      } catch (err) {
+        if (!isMounted) return
+        setError(getRecoveryErrorMessage(err))
+        setRecoveryReady(false)
+      } finally {
+        if (isMounted) {
+          setCheckingRecovery(false)
+        }
+      }
     }
-  }, [searchParams])
+
+    void prepareRecoverySession()
+
+    return () => {
+      isMounted = false
+    }
+  }, [searchParams, supabase])
 
   const validatePasswords = () => {
     if (password.length < 6) {
@@ -48,6 +126,11 @@ function ResetPasswordForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+
+    if (!recoveryReady) {
+      setError('El enlace de recuperación no es válido. Solicita uno nuevo.')
+      return
+    }
 
     if (!validatePasswords()) {
       return
@@ -141,6 +224,12 @@ function ResetPasswordForm() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {checkingRecovery && (
+                <Alert>
+                  <AlertDescription>Validando enlace de recuperación...</AlertDescription>
+                </Alert>
+              )}
+
               {error && (
                 <Alert variant="destructive">
                   <AlertDescription>{error}</AlertDescription>
@@ -207,7 +296,7 @@ function ResetPasswordForm() {
                 </div>
               </div>
               
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full" disabled={loading || checkingRecovery || !recoveryReady}>
                 {loading ? 'Actualizando...' : 'Actualizar Contraseña'}
               </Button>
             </form>

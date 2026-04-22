@@ -143,7 +143,7 @@ export function HardwareStats({ clientId, assets = [], showTypeCards = false }: 
     {
       title: 'En Mantenimiento',
       value: stats?.maintenance || 0,
-      description: 'Requieren atenciÃ³n',
+      description: 'Requieren atención',
       icon: Wrench,
       color: 'text-yellow-600',
     },

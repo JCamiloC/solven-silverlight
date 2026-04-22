@@ -6,9 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, FileText } from 'lucide-react'
+import { Loader2, FileText, Eye, Download } from 'lucide-react'
 import { useClients } from '@/hooks/use-clients'
-import { useMaintenanceReport, useExportMaintenanceWord } from '@/hooks/use-maintenance-reports'
+import { useMaintenanceReport, useExportMaintenancePDF, useExportMaintenanceWord } from '@/hooks/use-maintenance-reports'
 import { useTickets } from '@/hooks/use-tickets'
 import { useAllClientVisits } from '@/hooks/use-visitas'
 import { useAssignableUsers } from '@/hooks/use-users'
@@ -17,7 +17,9 @@ import { TicketReportPDF } from '@/lib/services/ticket-report-pdf'
 import { TicketReportWord } from '@/lib/services/ticket-report-word'
 import { VisitReportPDF, VisitReportRow } from '@/lib/services/visit-report-pdf'
 import { VisitReportWord } from '@/lib/services/visit-report-word'
+import { VisitDetailPDF } from '@/lib/services/visit-detail-pdf'
 import type { TicketWithRelations } from '@/lib/services/tickets'
+import type { ClientVisit, MaintenanceReportRow } from '@/types'
 import {
   Table,
   TableBody,
@@ -26,6 +28,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 
 type ReportType = 'mantenimiento' | 'tickets' | 'visitas' | null
@@ -34,6 +44,22 @@ interface SharedReportFilters {
   clientId: string
   startDate: string
   endDate: string
+  seguimientoTipo: 'all' | 'mantenimiento_programado' | 'mantenimiento_no_programado' | 'soporte_remoto' | 'soporte_en_sitio'
+  accionEstado: 'all' | 'realizado' | 'no_realizado'
+}
+
+const seguimientoTipoLabels: Record<SharedReportFilters['seguimientoTipo'], string> = {
+  all: 'Todos',
+  mantenimiento_programado: 'Mantenimiento programado',
+  mantenimiento_no_programado: 'Mantenimiento no programado',
+  soporte_remoto: 'Soporte remoto',
+  soporte_en_sitio: 'Soporte en sitio',
+}
+
+const accionEstadoLabels: Record<SharedReportFilters['accionEstado'], string> = {
+  all: 'Todos',
+  realizado: 'Realizado',
+  no_realizado: 'No realizado',
 }
 
 const categoryLabels: Record<string, string> = {
@@ -126,11 +152,19 @@ export default function ReportsPage() {
   const [selectedReport, setSelectedReport] = useState<ReportType>(null)
   const [isExportingTickets, setIsExportingTickets] = useState(false)
   const [isExportingVisits, setIsExportingVisits] = useState(false)
+  const [isExportingVisitDetail, setIsExportingVisitDetail] = useState(false)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detailType, setDetailType] = useState<ReportType>(null)
+  const [selectedMaintenanceRow, setSelectedMaintenanceRow] = useState<MaintenanceReportRow | null>(null)
+  const [selectedTicketRow, setSelectedTicketRow] = useState<TicketWithRelations | null>(null)
+  const [selectedVisitRow, setSelectedVisitRow] = useState<ClientVisit | null>(null)
 
   const [filters, setFilters] = useState<SharedReportFilters>({
     clientId: 'all',
     startDate: defaultStartDate,
     endDate: defaultEndDate,
+    seguimientoTipo: 'all',
+    accionEstado: 'all',
   })
 
   const [shouldFetchMaintenance, setShouldFetchMaintenance] = useState(false)
@@ -147,6 +181,8 @@ export default function ReportsPage() {
     clientId: filters.clientId === 'all' ? '' : filters.clientId,
     startDate: filters.startDate,
     endDate: filters.endDate,
+    seguimientoTipo: filters.seguimientoTipo,
+    accionEstado: filters.accionEstado,
   }
 
   const {
@@ -156,6 +192,7 @@ export default function ReportsPage() {
   } = useMaintenanceReport(maintenanceFilters, shouldFetchMaintenance)
 
   const exportWord = useExportMaintenanceWord()
+  const exportPDF = useExportMaintenancePDF()
 
   const selectedClient = clients?.find((c) => c.id === filters.clientId)
 
@@ -250,6 +287,16 @@ export default function ReportsPage() {
     })
   }
 
+  const handleExportMaintenancePDF = () => {
+    if (!maintenanceRows || !selectedClient) return
+    exportPDF.mutate({
+      rows: maintenanceRows,
+      clientName: selectedClient.name,
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+    })
+  }
+
   const handleExportTicketReport = async (format: 'pdf' | 'word') => {
     if (!ticketRows.length) {
       toast.error('No hay tickets para exportar')
@@ -306,6 +353,45 @@ export default function ReportsPage() {
     const assignedUser = assignableUsers.find((user) => user.id === assignedTo)
     if (!assignedUser) return 'Sin asignar'
     return `${assignedUser.first_name} ${assignedUser.last_name}`.trim()
+  }
+
+  const openMaintenanceDetail = (row: MaintenanceReportRow) => {
+    setDetailType('mantenimiento')
+    setSelectedMaintenanceRow(row)
+    setSelectedTicketRow(null)
+    setSelectedVisitRow(null)
+    setDetailOpen(true)
+  }
+
+  const openTicketDetail = (ticket: TicketWithRelations) => {
+    setDetailType('tickets')
+    setSelectedTicketRow(ticket)
+    setSelectedMaintenanceRow(null)
+    setSelectedVisitRow(null)
+    setDetailOpen(true)
+  }
+
+  const openVisitDetail = (visit: ClientVisit) => {
+    setDetailType('visitas')
+    setSelectedVisitRow(visit)
+    setSelectedMaintenanceRow(null)
+    setSelectedTicketRow(null)
+    setDetailOpen(true)
+  }
+
+  const handleExportVisitDetailPDF = async (visit: ClientVisit) => {
+    const clientName = clients?.find((client) => client.id === visit.client_id)?.name || 'Cliente'
+    setIsExportingVisitDetail(true)
+
+    try {
+      await VisitDetailPDF.generateVisitPDF(visit, clientName)
+      toast.success('PDF individual de visita generado')
+    } catch (error) {
+      console.error('Error exportando detalle de visita:', error)
+      toast.error('No se pudo generar el PDF individual de visita')
+    } finally {
+      setIsExportingVisitDetail(false)
+    }
   }
 
   return (
@@ -432,6 +518,38 @@ export default function ReportsPage() {
                   </div>
                 </div>
 
+                {selectedReport === 'mantenimiento' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Tipo de seguimiento</Label>
+                      <select
+                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        value={filters.seguimientoTipo}
+                        onChange={(event) => updateFilters({ seguimientoTipo: event.target.value as SharedReportFilters['seguimientoTipo'] })}
+                      >
+                        <option value="all">Todos</option>
+                        <option value="mantenimiento_programado">Mantenimiento programado</option>
+                        <option value="mantenimiento_no_programado">Mantenimiento no programado</option>
+                        <option value="soporte_remoto">Soporte remoto</option>
+                        <option value="soporte_en_sitio">Soporte en sitio</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Estado de acción recomendada</Label>
+                      <select
+                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        value={filters.accionEstado}
+                        onChange={(event) => updateFilters({ accionEstado: event.target.value as SharedReportFilters['accionEstado'] })}
+                      >
+                        <option value="all">Todos</option>
+                        <option value="realizado">Realizado</option>
+                        <option value="no_realizado">No realizado</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <Button
                     onClick={handleGenerateReport}
@@ -451,18 +569,33 @@ export default function ReportsPage() {
                   </Button>
 
                   {selectedReport === 'mantenimiento' && maintenanceRows && maintenanceRows.length > 0 && (
-                    <Button
-                      variant="outline"
-                      onClick={handleExportWord}
-                      disabled={exportWord.isPending}
-                    >
-                      {exportWord.isPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <FileText className="mr-2 h-4 w-4" />
-                      )}
-                      Exportar Word
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={handleExportMaintenancePDF}
+                        disabled={exportPDF.isPending}
+                      >
+                        {exportPDF.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileText className="mr-2 h-4 w-4" />
+                        )}
+                        Exportar PDF
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        onClick={handleExportWord}
+                        disabled={exportWord.isPending}
+                      >
+                        {exportWord.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileText className="mr-2 h-4 w-4" />
+                        )}
+                        Exportar Word
+                      </Button>
+                    </>
                   )}
 
                   {selectedReport === 'tickets' && shouldFetchTickets && (
@@ -540,6 +673,8 @@ export default function ReportsPage() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="w-12">#</TableHead>
+                          <TableHead>Seguimiento</TableHead>
+                          <TableHead>Estado acción</TableHead>
                           <TableHead>Usuario</TableHead>
                           <TableHead>Nombre</TableHead>
                           <TableHead>Tipo</TableHead>
@@ -552,12 +687,15 @@ export default function ReportsPage() {
                           <TableHead>S.O.</TableHead>
                           <TableHead className="min-w-[200px]">Detalle</TableHead>
                           <TableHead className="min-w-[220px]">Acción recomendada</TableHead>
+                          <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {maintenanceRows.map((row) => (
                           <TableRow key={row.rowNumber}>
                             <TableCell className="font-medium">{row.rowNumber}</TableCell>
+                            <TableCell>{seguimientoTipoLabels[(row.seguimientoTipo as SharedReportFilters['seguimientoTipo']) || 'all'] || row.seguimientoTipo}</TableCell>
+                            <TableCell>{accionEstadoLabels[(row.accionRecomendadaEstado as SharedReportFilters['accionEstado']) || 'no_realizado'] || row.accionRecomendadaEstado}</TableCell>
                             <TableCell>{row.usuario}</TableCell>
                             <TableCell>{row.equipoNombre}</TableCell>
                             <TableCell>{row.tipo}</TableCell>
@@ -568,11 +706,17 @@ export default function ReportsPage() {
                             <TableCell>{row.office}</TableCell>
                             <TableCell>{row.antivirus}</TableCell>
                             <TableCell>{row.sistemaOperativo}</TableCell>
-                            <TableCell className="max-w-[300px] truncate" title={row.detalleSeguimiento}>
+                            <TableCell className="max-w-[300px] whitespace-normal break-words" title={row.detalleSeguimiento}>
                               {row.detalleSeguimiento}
                             </TableCell>
-                            <TableCell className="max-w-[320px] truncate" title={row.accionRecomendada}>
+                            <TableCell className="max-w-[320px] whitespace-normal break-words" title={row.accionRecomendada}>
                               {row.accionRecomendada}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm" onClick={() => openMaintenanceDetail(row)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver detalle
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -604,6 +748,7 @@ export default function ReportsPage() {
                           <TableHead>Estado</TableHead>
                           <TableHead>Responsable</TableHead>
                           <TableHead>Fecha</TableHead>
+                          <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -614,7 +759,7 @@ export default function ReportsPage() {
                             <TableRow key={ticket.id}>
                               <TableCell>{ticket.ticket_number || `#${ticket.id.slice(-8)}`}</TableCell>
                               <TableCell>{clientName}</TableCell>
-                              <TableCell className="max-w-[280px] truncate" title={ticket.title}>
+                              <TableCell className="max-w-[280px] whitespace-normal break-words" title={ticket.title}>
                                 {ticket.title}
                               </TableCell>
                               <TableCell>{categoryLabels[ticket.category] || ticket.category}</TableCell>
@@ -622,6 +767,12 @@ export default function ReportsPage() {
                               <TableCell>{statusLabels[ticket.status as string] || ticket.status}</TableCell>
                               <TableCell>{getAssignedUserName(ticket.assigned_to)}</TableCell>
                               <TableCell>{new Date(ticket.created_at).toLocaleDateString('es-CO')}</TableCell>
+                              <TableCell className="text-right">
+                                <Button variant="ghost" size="sm" onClick={() => openTicketDetail(ticket)}>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Ver detalle
+                                </Button>
+                              </TableCell>
                             </TableRow>
                           )
                         })}
@@ -652,6 +803,7 @@ export default function ReportsPage() {
                           <TableHead>Técnico</TableHead>
                           <TableHead className="min-w-[220px]">Equipos</TableHead>
                           <TableHead className="min-w-[220px]">Detalle</TableHead>
+                          <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -674,11 +826,28 @@ export default function ReportsPage() {
                               <TableCell>{visitTypeLabels[visit.tipo] || visit.tipo}</TableCell>
                               <TableCell>{visitStatusLabels[visit.estado] || visit.estado}</TableCell>
                               <TableCell>{technician}</TableCell>
-                              <TableCell className="max-w-[260px] truncate" title={equipments}>
+                              <TableCell className="max-w-[260px] whitespace-normal break-words" title={equipments}>
                                 {equipments}
                               </TableCell>
-                              <TableCell className="max-w-[260px] truncate" title={visit.detalle}>
+                              <TableCell className="max-w-[260px] whitespace-normal break-words" title={visit.detalle}>
                                 {visit.detalle}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button variant="ghost" size="sm" onClick={() => openVisitDetail(visit)}>
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    Ver detalle
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleExportVisitDetailPDF(visit)}
+                                    disabled={isExportingVisitDetail}
+                                  >
+                                    <Download className="mr-2 h-4 w-4" />
+                                    PDF
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           )
@@ -724,6 +893,135 @@ export default function ReportsPage() {
                 </CardContent>
               </Card>
             )}
+
+            <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Detalle del reporte</DialogTitle>
+                  <DialogDescription>
+                    Vista completa del registro seleccionado.
+                  </DialogDescription>
+                </DialogHeader>
+
+                {detailType === 'mantenimiento' && selectedMaintenanceRow && (
+                  <div className="space-y-4 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div><span className="font-semibold">Usuario:</span> {selectedMaintenanceRow.usuario}</div>
+                      <div><span className="font-semibold">Equipo:</span> {selectedMaintenanceRow.equipoNombre}</div>
+                      <div><span className="font-semibold">Tipo:</span> {selectedMaintenanceRow.tipo}</div>
+                      <div><span className="font-semibold">Seguimiento:</span> {seguimientoTipoLabels[(selectedMaintenanceRow.seguimientoTipo as SharedReportFilters['seguimientoTipo']) || 'all'] || selectedMaintenanceRow.seguimientoTipo}</div>
+                      <div><span className="font-semibold">Estado acción:</span> {accionEstadoLabels[(selectedMaintenanceRow.accionRecomendadaEstado as SharedReportFilters['accionEstado']) || 'no_realizado'] || selectedMaintenanceRow.accionRecomendadaEstado}</div>
+                      <div><span className="font-semibold">Fecha:</span> {new Date(selectedMaintenanceRow.fechaSeguimiento).toLocaleString('es-CO')}</div>
+                      <div><span className="font-semibold">Procesador:</span> {selectedMaintenanceRow.procesador}</div>
+                      <div><span className="font-semibold">RAM:</span> {selectedMaintenanceRow.ram}</div>
+                      <div><span className="font-semibold">Disco:</span> {selectedMaintenanceRow.disco}</div>
+                      <div><span className="font-semibold">S.O.:</span> {selectedMaintenanceRow.sistemaOperativo}</div>
+                    </div>
+                    <div>
+                      <p className="font-semibold mb-1">Detalle</p>
+                      <p className="rounded-md border bg-muted/30 p-3 whitespace-pre-wrap break-words">{selectedMaintenanceRow.detalleSeguimiento}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold mb-1">Acción recomendada</p>
+                      <p className="rounded-md border bg-muted/30 p-3 whitespace-pre-wrap break-words">{selectedMaintenanceRow.accionRecomendada}</p>
+                    </div>
+                  </div>
+                )}
+
+                {detailType === 'tickets' && selectedTicketRow && (
+                  <div className="space-y-4 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div><span className="font-semibold">Ticket:</span> {selectedTicketRow.ticket_number || `#${selectedTicketRow.id.slice(-8)}`}</div>
+                      <div><span className="font-semibold">Fecha:</span> {new Date(selectedTicketRow.created_at).toLocaleString('es-CO')}</div>
+                      <div><span className="font-semibold">Cliente:</span> {clients?.find((client) => client.id === selectedTicketRow.client_id)?.name || 'N/A'}</div>
+                      <div><span className="font-semibold">Responsable:</span> {getAssignedUserName(selectedTicketRow.assigned_to)}</div>
+                      <div><span className="font-semibold">Categoría:</span> {categoryLabels[selectedTicketRow.category] || selectedTicketRow.category}</div>
+                      <div><span className="font-semibold">Prioridad:</span> {priorityLabels[selectedTicketRow.priority] || selectedTicketRow.priority}</div>
+                    </div>
+                    <div>
+                      <p className="font-semibold mb-1">Estado</p>
+                      <Badge variant="secondary">{statusLabels[selectedTicketRow.status as string] || selectedTicketRow.status}</Badge>
+                    </div>
+                    <div>
+                      <p className="font-semibold mb-1">Título</p>
+                      <p className="rounded-md border bg-muted/30 p-3 whitespace-pre-wrap break-words">{selectedTicketRow.title}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold mb-1">Descripción</p>
+                      <p className="rounded-md border bg-muted/30 p-3 whitespace-pre-wrap break-words">{selectedTicketRow.description}</p>
+                    </div>
+                  </div>
+                )}
+
+                {detailType === 'visitas' && selectedVisitRow && (
+                  <div className="space-y-4 text-sm">
+                    <div className="flex items-center justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleExportVisitDetailPDF(selectedVisitRow)}
+                        disabled={isExportingVisitDetail}
+                      >
+                        {isExportingVisitDetail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                        Exportar PDF individual
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div><span className="font-semibold">Fecha:</span> {new Date(selectedVisitRow.fecha_visita).toLocaleString('es-CO')}</div>
+                      <div><span className="font-semibold">Cliente:</span> {clients?.find((client) => client.id === selectedVisitRow.client_id)?.name || 'N/A'}</div>
+                      <div><span className="font-semibold">Tipo:</span> {visitTypeLabels[selectedVisitRow.tipo] || selectedVisitRow.tipo}</div>
+                      <div><span className="font-semibold">Estado:</span> {visitStatusLabels[selectedVisitRow.estado] || selectedVisitRow.estado}</div>
+                      <div className="md:col-span-2"><span className="font-semibold">Técnico:</span> {selectedVisitRow.tecnico ? `${selectedVisitRow.tecnico.first_name || ''} ${selectedVisitRow.tecnico.last_name || ''}`.trim() || '-' : '-'}</div>
+                    </div>
+
+                    <div>
+                      <p className="font-semibold mb-1">Detalle</p>
+                      <p className="rounded-md border bg-muted/30 p-3 whitespace-pre-wrap break-words">{selectedVisitRow.detalle}</p>
+                    </div>
+
+                    <div>
+                      <p className="font-semibold mb-1">Actividades</p>
+                      <p className="rounded-md border bg-muted/30 p-3 whitespace-pre-wrap break-words">
+                        {selectedVisitRow.actividades.length > 0 ? selectedVisitRow.actividades.join(', ') : 'Sin actividades registradas'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="font-semibold mb-1">Recomendaciones</p>
+                      <p className="rounded-md border bg-muted/30 p-3 whitespace-pre-wrap break-words">{selectedVisitRow.recomendaciones || 'Sin recomendaciones'}</p>
+                    </div>
+
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Equipo</TableHead>
+                            <TableHead>Serial</TableHead>
+                            <TableHead>Tareas realizadas</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedVisitRow.equipos.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={3} className="text-center text-muted-foreground">Sin equipos asociados</TableCell>
+                            </TableRow>
+                          ) : (
+                            selectedVisitRow.equipos.map((equipment) => (
+                              <TableRow key={equipment.id}>
+                                <TableCell>{equipment.hardware?.name || equipment.hardware_nombre_manual || 'Sin especificar'}</TableCell>
+                                <TableCell>{equipment.hardware?.serial_number || '-'}</TableCell>
+                                <TableCell className="whitespace-normal break-words">{equipment.tareas_realizadas}</TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
           </>
         )}
       </div>

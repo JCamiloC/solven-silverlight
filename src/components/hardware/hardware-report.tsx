@@ -65,11 +65,11 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
           Reporte de Hardware{clientName ? ` - ${clientName}` : ''}
         </h2>
         <p className="text-muted-foreground">
-          AnÃ¡lisis detallado y mÃ©tricas del inventario de hardware
+          Análisis detallado y métricas del inventario de hardware
         </p>
       </div>
 
-      {/* MÃ©tricas Principales */}
+      {/* Métricas Principales */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -102,18 +102,18 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{analytics.metrics.maintenanceAssets}</div>
-            <p className="text-xs text-muted-foreground">Requieren atenciÃ³n</p>
+            <p className="text-xs text-muted-foreground">Requieren atención</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ãreas Registradas</CardTitle>
+            <CardTitle className="text-sm font-medium">Áreas Registradas</CardTitle>
             <Building2 className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{analytics.metrics.uniqueAreas}</div>
-            <p className="text-xs text-muted-foreground">Ãreas Ãºnicas</p>
+            <p className="text-xs text-muted-foreground">Áreas únicas</p>
           </CardContent>
         </Card>
       </div>
@@ -134,9 +134,9 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
             {analytics.alerts.warrantyExpiringSoon.length > 0 && (
               <Alert>
                 <ShieldAlert className="h-4 w-4" />
-                <AlertTitle>GarantÃ­as por vencer</AlertTitle>
+                <AlertTitle>Garantías por vencer</AlertTitle>
                 <AlertDescription>
-                  {analytics.alerts.warrantyExpiringSoon.length} activo tecnológico(s) con garantÃ­a prÃ³xima a vencer (menos de 30 dÃ­as)
+                  {analytics.alerts.warrantyExpiringSoon.length} activo tecnológico(s) con garantía próxima a vencer (menos de 30 días)
                 </AlertDescription>
               </Alert>
             )}
@@ -144,9 +144,9 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
             {analytics.alerts.expiredWarranty.length > 0 && (
               <Alert variant="destructive">
                 <ShieldAlert className="h-4 w-4" />
-                <AlertTitle>GarantÃ­as vencidas</AlertTitle>
+                <AlertTitle>Garantías vencidas</AlertTitle>
                 <AlertDescription>
-                  {analytics.alerts.expiredWarranty.length} activo tecnológico(s) con garantÃ­a ya vencida
+                  {analytics.alerts.expiredWarranty.length} activo tecnológico(s) con garantía ya vencida
                 </AlertDescription>
               </Alert>
             )}
@@ -156,7 +156,7 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
                 <Calendar className="h-4 w-4" />
                 <AlertTitle>Activos tecnológicos antiguos</AlertTitle>
                 <AlertDescription>
-                  {analytics.alerts.oldEquipment.length} activo tecnológico(s) con mÃ¡s de 5 aÃ±os de antigÃ¼edad. Considere actualizaciÃ³n.
+                  {analytics.alerts.oldEquipment.length} activo tecnológico(s) con más de 5 años de antigüedad. Considere actualización.
                 </AlertDescription>
               </Alert>
             )}
@@ -164,7 +164,7 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
             {analytics.criticalEquipment.length > 0 && (
               <Alert>
                 <Wrench className="h-4 w-4" />
-                <AlertTitle>Activos tecnológicos crÃ­ticos</AlertTitle>
+                <AlertTitle>Activos tecnológicos críticos</AlertTitle>
                 <AlertDescription>
                   {analytics.criticalEquipment.length} activo tecnológico(s) actualmente en mantenimiento
                 </AlertDescription>
@@ -174,10 +174,10 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
         </Card>
       )}
 
-      {/* DistribuciÃ³n por Estado */}
+      {/* Distribución por Estado */}
       <Card>
         <CardHeader>
-          <CardTitle>DistribuciÃ³n por Estado</CardTitle>
+          <CardTitle>Distribución por Estado</CardTitle>
           <CardDescription>Estado actual de los activos tecnológicos en inventario</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -196,11 +196,11 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
-        {/* DistribuciÃ³n por Tipo */}
+        {/* Distribución por Tipo */}
         <Card>
           <CardHeader>
-            <CardTitle>DistribuciÃ³n por Tipo</CardTitle>
-            <CardDescription>CategorÃ­as de activos tecnológicos</CardDescription>
+            <CardTitle>Distribución por Tipo</CardTitle>
+            <CardDescription>Categorías de activos tecnológicos</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -226,7 +226,7 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
         <Card>
           <CardHeader>
             <CardTitle>Top Marcas</CardTitle>
-            <CardDescription>Marcas mÃ¡s utilizadas</CardDescription>
+            <CardDescription>Marcas más utilizadas</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -246,11 +246,11 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
         </Card>
       </div>
 
-      {/* Vencimientos PrÃ³ximos */}
+      {/* Vencimientos Próximos */}
       <Card>
         <CardHeader>
-          <CardTitle>Vencimientos PrÃ³ximos</CardTitle>
-          <CardDescription>PrÃ³ximas 5 fechas de vencimiento de licencias y software</CardDescription>
+          <CardTitle>Vencimientos Próximos</CardTitle>
+          <CardDescription>Próximas 5 fechas de vencimiento de licencias y software</CardDescription>
         </CardHeader>
         <CardContent>
           {analytics.upcomingExpirations.length === 0 ? (
@@ -282,10 +282,10 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
                           <Badge variant="destructive">Vencido</Badge>
                         ) : isExpiringSoon ? (
                           <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                            {expiry.daysUntilExpiry} dÃ­as
+                            {expiry.daysUntilExpiry} días
                           </Badge>
                         ) : (
-                          <Badge variant="default">{expiry.daysUntilExpiry} dÃ­as</Badge>
+                          <Badge variant="default">{expiry.daysUntilExpiry} días</Badge>
                         )}
                       </TableCell>
                     </TableRow>
@@ -298,13 +298,13 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
-        {/* DistribuciÃ³n por Sede */}
+        {/* Distribución por Sede */}
         {analytics.sedeAnalysis.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Building2 className="h-5 w-5" />
-                DistribuciÃ³n por Sede
+                Distribución por Sede
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -320,13 +320,13 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
           </Card>
         )}
 
-        {/* DistribuciÃ³n por Ãrea */}
+        {/* Distribución por Área */}
         {analytics.areaAnalysis.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MapPin className="h-5 w-5" />
-                DistribuciÃ³n por Ãrea
+                Distribución por Área
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -351,7 +351,7 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
               <Monitor className="h-5 w-5" />
               Sistemas Operativos
             </CardTitle>
-            <CardDescription>DistribuciÃ³n de SO instalados</CardDescription>
+            <CardDescription>Distribución de SO instalados</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -380,7 +380,7 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
                 <Package className="h-5 w-5" />
                 MS Office
               </CardTitle>
-              <CardDescription>DistribuciÃ³n de versiones de Office</CardDescription>
+              <CardDescription>Distribución de versiones de Office</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -408,7 +408,7 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
                 <ShieldAlert className="h-5 w-5" />
                 Antivirus
               </CardTitle>
-              <CardDescription>DistribuciÃ³n de software antivirus</CardDescription>
+              <CardDescription>Distribución de software antivirus</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -429,12 +429,12 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
         )}
       </div>
 
-      {/* Tabla de GarantÃ­as PrÃ³ximas a Vencer */}
+      {/* Tabla de Garantías Próximas a Vencer */}
       {analytics.alerts.warrantyExpiringSoon.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>GarantÃ­as PrÃ³ximas a Vencer</CardTitle>
-            <CardDescription>Activos tecnológicos con garantÃ­a que vence en menos de 30 dÃ­as</CardDescription>
+            <CardTitle>Garantías Próximas a Vencer</CardTitle>
+            <CardDescription>Activos tecnológicos con garantía que vence en menos de 30 días</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -464,12 +464,12 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
         </Card>
       )}
 
-      {/* Activos tecnológicos CrÃ­ticos */}
+      {/* Activos tecnológicos Críticos */}
       {analytics.criticalEquipment.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Activos tecnológicos en Mantenimiento</CardTitle>
-            <CardDescription>Activos tecnológicos que requieren atenciÃ³n actualmente</CardDescription>
+            <CardDescription>Activos tecnológicos que requieren atención actualmente</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -478,7 +478,7 @@ export function HardwareReport({ assets, clientName }: HardwareReportProps) {
                   <TableHead>Activo tecnológico</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Responsable</TableHead>
-                  <TableHead>UbicaciÃ³n</TableHead>
+                  <TableHead>Ubicación</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

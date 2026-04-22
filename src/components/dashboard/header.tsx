@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Bell, User, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MobileSidebar } from './mobile-sidebar'
@@ -27,13 +27,6 @@ export function Header() {
   const { runWithLock, runNavigationLock, isLocked } = useActionLock()
   const title = usePageTitle() // Obtener título dinámico basado en la ruta
   const router = useRouter()
-
-  // Prevent hydration mismatch
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setMounted(true)
-    }
-  }, [])
 
   const handleLogout = async () => {
     try {
@@ -72,11 +65,15 @@ export function Header() {
 
   const { toggleSidebar } = useSidebar()
 
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-14 items-center px-4 sm:px-6 lg:px-8">
         <div className="flex items-center">
-          <MobileSidebar />
+          {mounted ? <MobileSidebar /> : null}
           {/* Desktop sidebar toggle */}
           <Button
             variant="ghost"
@@ -107,13 +104,7 @@ export function Header() {
             </Button>
             
             {/* User menu */}
-            {!mounted ? (
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full" disabled>
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback>U</AvatarFallback>
-                </Avatar>
-              </Button>
-            ) : (
+            {mounted ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -145,6 +136,12 @@ export function Header() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            ) : (
+              <Button variant="ghost" className="relative h-8 w-8 rounded-full" disabled>
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback>U</AvatarFallback>
+                </Avatar>
+              </Button>
             )}
           </div>
         </div>

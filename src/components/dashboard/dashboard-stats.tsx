@@ -21,6 +21,7 @@ import {
 } from 'recharts'
 
 type DashboardChartRow = {
+  code: string
   name: string
   total: number
 }
@@ -37,7 +38,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 const STATUS_ORDER: TicketStatusLabel[] = ['Abierto', 'Pendiente confirmación', 'Solucionado']
 
-function shortenClientName(name: string, max = 18) {
+function shortenClientName(name: string, max = 24) {
   if (name.length <= max) return name
   return `${name.slice(0, max - 1)}...`
 }
@@ -60,8 +61,14 @@ function toLabelStatus(status: string) {
   return 'Solucionado'
 }
 
-function topRowsByTotal(rows: DashboardChartRow[], limit = 8) {
-  return rows.sort((a, b) => b.total - a.total).slice(0, limit)
+function topRowsByTotal(rows: Omit<DashboardChartRow, 'code'>[], limit = 8): DashboardChartRow[] {
+  return rows
+    .sort((a, b) => b.total - a.total)
+    .slice(0, limit)
+    .map((row, index) => ({
+      ...row,
+      code: `C${index + 1}`,
+    }))
 }
 
 export function DashboardStats() {
@@ -71,7 +78,15 @@ export function DashboardStats() {
 
   const isLoading = ticketsLoading || visitsLoading || clientsLoading
 
-  const { ticketsByClient, ticketsByStatus, ticketsByStatusSummary, ticketsLast30DaysTotal, visitsByClient } = useMemo(() => {
+  const {
+    ticketsByClient,
+    ticketsByClientCodeMap,
+    ticketsByStatus,
+    ticketsByStatusSummary,
+    ticketsLast30DaysTotal,
+    visitsByClient,
+    visitsByClientCodeMap,
+  } = useMemo(() => {
     const now = new Date()
     const cutoff = toStartOfDay(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000))
     const clientMap = new Map(clients.map((client) => [client.id, client.name]))
@@ -111,6 +126,10 @@ export function DashboardStats() {
       }))
     )
 
+    const ticketsByClientCodeMap = new Map(
+      ticketsByClientData.map((row) => [row.code, row.name])
+    )
+
     const ticketsByStatusData = Array.from(statusCounter.entries())
       .map(([name, total]) => ({ name, total }))
       .filter((row) => row.total > 0)
@@ -130,12 +149,18 @@ export function DashboardStats() {
       }))
     )
 
+    const visitsByClientCodeMap = new Map(
+      visitsByClientData.map((row) => [row.code, row.name])
+    )
+
     return {
       ticketsByClient: ticketsByClientData,
+      ticketsByClientCodeMap,
       ticketsByStatus: ticketsByStatusData,
       ticketsByStatusSummary,
       ticketsLast30DaysTotal,
       visitsByClient: visitsByClientData,
+      visitsByClientCodeMap,
     }
   }, [clients, tickets, visits])
 
@@ -154,24 +179,42 @@ export function DashboardStats() {
               No hay tickets registrados en los últimos 30 días.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={ticketsByClient}
-                layout="vertical"
-                margin={{ top: 8, right: 20, left: 16, bottom: 8 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" allowDecimals={false} />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={170}
-                  tickFormatter={shortenClientName}
-                />
-                <Tooltip formatter={(value) => formatTooltipMetric(value, 'Tickets')} />
-                <Bar dataKey="total" fill={TICKETS_BY_CLIENT_COLOR} radius={[0, 8, 8, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="flex h-full flex-col gap-3">
+              <div className="min-h-0 flex-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={ticketsByClient}
+                    layout="vertical"
+                    margin={{ top: 8, right: 20, left: 0, bottom: 8 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" allowDecimals={false} />
+                    <YAxis type="category" dataKey="code" width={34} />
+                    <Tooltip
+                      formatter={(value) => formatTooltipMetric(value, 'Tickets')}
+                      labelFormatter={(label) => `Cliente: ${ticketsByClientCodeMap.get(String(label)) || label}`}
+                    />
+                    <Bar dataKey="total" fill={TICKETS_BY_CLIENT_COLOR} radius={[0, 8, 8, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="rounded-md border bg-muted/20 p-2">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Leyenda de clientes
+                </p>
+                <div className="grid gap-1 sm:grid-cols-2">
+                  {ticketsByClient.map((row) => (
+                    <div key={row.code} className="flex items-center gap-2 text-xs">
+                      <span className="inline-flex min-w-8 items-center justify-center rounded bg-background px-1.5 py-0.5 font-semibold">
+                        {row.code}
+                      </span>
+                      <span className="min-w-0 truncate" title={row.name}>{row.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -253,27 +296,54 @@ export function DashboardStats() {
               No hay visitas registradas en los últimos 30 días.
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={visitsByClient} margin={{ top: 8, right: 20, left: 0, bottom: 32 }}>
-                <defs>
-                  <linearGradient id="visitsGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={VISITS_BY_CLIENT_COLOR} stopOpacity={0.35} />
-                    <stop offset="95%" stopColor={VISITS_BY_CLIENT_COLOR} stopOpacity={0.05} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" angle={-20} textAnchor="end" interval={0} height={60} />
-                <YAxis allowDecimals={false} />
-                <Tooltip formatter={(value) => formatTooltipMetric(value, 'Visitas')} />
-                <Area
-                  type="monotone"
-                  dataKey="total"
-                  stroke={VISITS_BY_CLIENT_COLOR}
-                  fill="url(#visitsGradient)"
-                  strokeWidth={3}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <div className="flex h-full flex-col gap-3">
+              <div className="min-h-0 flex-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={visitsByClient} margin={{ top: 8, right: 20, left: 0, bottom: 12 }}>
+                    <defs>
+                      <linearGradient id="visitsGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={VISITS_BY_CLIENT_COLOR} stopOpacity={0.35} />
+                        <stop offset="95%" stopColor={VISITS_BY_CLIENT_COLOR} stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="code"
+                      interval={0}
+                      height={24}
+                    />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip
+                      formatter={(value) => formatTooltipMetric(value, 'Visitas')}
+                      labelFormatter={(label) => `Cliente: ${visitsByClientCodeMap.get(String(label)) || label}`}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="total"
+                      stroke={VISITS_BY_CLIENT_COLOR}
+                      fill="url(#visitsGradient)"
+                      strokeWidth={3}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="rounded-md border bg-muted/20 p-2">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Leyenda de clientes
+                </p>
+                <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+                  {visitsByClient.map((row) => (
+                    <div key={row.code} className="flex items-center gap-2 text-xs">
+                      <span className="inline-flex min-w-8 items-center justify-center rounded bg-background px-1.5 py-0.5 font-semibold">
+                        {row.code}
+                      </span>
+                      <span className="min-w-0 truncate" title={row.name}>{row.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

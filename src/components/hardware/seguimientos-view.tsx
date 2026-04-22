@@ -48,7 +48,7 @@ const TIPOS_SEGUIMIENTO = [
 ]
 
 const ACTIVIDADES_DISPONIBLES = [
-  'Limpieza de activo tecnol�gico',
+  'Limpieza de activo tecnológico',
   'Actualización de sistema operativo',
   'Instalación de software',
   'Configuración de red',

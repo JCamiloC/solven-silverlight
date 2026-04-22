@@ -39,12 +39,31 @@ function clearStorageAuthKeys(storage: Storage) {
   })
 }
 
+function clearAuthCookies() {
+  if (typeof document === 'undefined') return
+
+  const cookies = document.cookie ? document.cookie.split(';') : []
+  const expires = 'expires=Thu, 01 Jan 1970 00:00:00 GMT'
+
+  cookies.forEach((cookieEntry) => {
+    const [rawName] = cookieEntry.split('=')
+    const name = rawName?.trim()
+    if (!name) return
+
+    if (name.startsWith('sb-') || name.includes('-auth-token')) {
+      document.cookie = `${name}=; ${expires}; path=/`
+      document.cookie = `${name}=; ${expires}; path=/; SameSite=Lax`
+    }
+  })
+}
+
 export function clearSupabaseAuthStorage() {
   if (typeof window === 'undefined') return
 
   try {
     clearStorageAuthKeys(window.localStorage)
     clearStorageAuthKeys(window.sessionStorage)
+    clearAuthCookies()
   } catch (error) {
     console.warn('[auth] Unable to clear auth storage keys:', error)
   }

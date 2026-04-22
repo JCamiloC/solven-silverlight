@@ -79,8 +79,8 @@ export function createClient() {
 
   const client = createBrowserClient(supabaseUrl, supabaseAnonKey, {
     auth: {
-      // Sesión estricta: no extender token automáticamente
-      autoRefreshToken: false,
+      // Mantener sesión activa mientras exista actividad del usuario.
+      autoRefreshToken: true,
       // Persistir sesión
       persistSession: true,
       // Detectar cambios en sesión

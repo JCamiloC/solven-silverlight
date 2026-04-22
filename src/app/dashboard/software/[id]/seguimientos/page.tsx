@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { useCustomApplications } from '@/hooks/use-custom-applications'
 import { Button } from '@/components/ui/button'
+import { SeguimientosView } from '@/components/custom-apps'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 
 export default function SoftwareSeguimientosPage() {
@@ -47,21 +48,7 @@ export default function SoftwareSeguimientosPage() {
           Volver a {application.name}
         </Button>
 
-        {/* Seguimientos Component - Coming Soon */}
-        <div className="rounded-lg border bg-card p-8">
-          <div className="flex flex-col items-center justify-center space-y-4">
-            <div className="rounded-full bg-muted p-4">
-              <Loader2 className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <div className="text-center space-y-2">
-              <h3 className="text-lg font-semibold">Seguimientos de {application.name}</h3>
-              <p className="text-sm text-muted-foreground max-w-md">
-                El módulo de seguimientos para aplicaciones estará disponible próximamente.
-                Podrás registrar actualizaciones, mantenimientos, backups y más.
-              </p>
-            </div>
-          </div>
-        </div>
+        <SeguimientosView applicationId={application.id} applicationName={application.name} />
       </div>
     </ProtectedRoute>
   )

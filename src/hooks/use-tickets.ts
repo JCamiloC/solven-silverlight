@@ -53,7 +53,7 @@ export function useMyTickets(userId: string) {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('client_id')
-        .eq('id', userId)
+        .eq('user_id', userId)
         .single()
 
       if (profileError) throw new Error(`Error al obtener perfil: ${profileError.message}`)

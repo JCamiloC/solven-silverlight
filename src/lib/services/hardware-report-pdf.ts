@@ -1,6 +1,6 @@
 /**
  * Servicio para generar PDF del Reporte Completo de Hardware
- * Incluye todas las métricas, análisis, alertas y tabla de activos tecnol�gicos
+ * Incluye todas las métricas, análisis, alertas y tabla de activos tecnológicos
  */
 
 import { format } from 'date-fns'
@@ -87,7 +87,7 @@ export class HardwareReportPDF {
 
       // Crear grid de métricas (2x2)
       const metrics = [
-        { label: 'Total Activos tecnol�gicos', value: analytics.metrics.totalAssets, color: [52, 152, 219] },
+        { label: 'Total Activos tecnológicos', value: analytics.metrics.totalAssets, color: [52, 152, 219] },
         { label: 'Activos', value: analytics.metrics.activeAssets, color: [46, 204, 113] },
         { label: 'En Mantenimiento', value: analytics.metrics.maintenanceAssets, color: [241, 196, 15] },
         { label: 'Áreas Registradas', value: analytics.metrics.uniqueAreas, color: [155, 89, 182] },
@@ -149,28 +149,28 @@ export class HardwareReportPDF {
 
         if (analytics.alerts.warrantyExpiringSoon.length > 0) {
           doc.setFont('helvetica', 'bold')
-          doc.text(`• Garantías por vencer: ${analytics.alerts.warrantyExpiringSoon.length} activo tecnol�gico(s)`, margin + 5, yPos)
+          doc.text(`• Garantías por vencer: ${analytics.alerts.warrantyExpiringSoon.length} activo tecnológico(s)`, margin + 5, yPos)
           doc.setFont('helvetica', 'normal')
           yPos += 6
         }
 
         if (analytics.alerts.expiredWarranty.length > 0) {
           doc.setFont('helvetica', 'bold')
-          doc.text(`• Garantías vencidas: ${analytics.alerts.expiredWarranty.length} activo tecnol�gico(s)`, margin + 5, yPos)
+          doc.text(`• Garantías vencidas: ${analytics.alerts.expiredWarranty.length} activo tecnológico(s)`, margin + 5, yPos)
           doc.setFont('helvetica', 'normal')
           yPos += 6
         }
 
         if (analytics.alerts.oldEquipment.length > 0) {
           doc.setFont('helvetica', 'bold')
-          doc.text(`• Activos tecnol�gicos antiguos (>5 años): ${analytics.alerts.oldEquipment.length} activo tecnol�gico(s)`, margin + 5, yPos)
+          doc.text(`• Activos tecnológicos antiguos (>5 años): ${analytics.alerts.oldEquipment.length} activo tecnológico(s)`, margin + 5, yPos)
           doc.setFont('helvetica', 'normal')
           yPos += 6
         }
 
         if (analytics.criticalEquipment.length > 0) {
           doc.setFont('helvetica', 'bold')
-          doc.text(`• Activos tecnol�gicos críticos: ${analytics.criticalEquipment.length} activo tecnol�gico(s)`, margin + 5, yPos)
+          doc.text(`• Activos tecnológicos críticos: ${analytics.criticalEquipment.length} activo tecnológico(s)`, margin + 5, yPos)
           doc.setFont('helvetica', 'normal')
           yPos += 6
         }
@@ -310,7 +310,7 @@ export class HardwareReportPDF {
 
         runAutoTable({
           startY: yPos,
-          head: [['Activo tecnol�gico', 'Tipo', 'Fecha Vencimiento', 'Estado']],
+          head: [['Activo tecnológico', 'Tipo', 'Fecha Vencimiento', 'Estado']],
           body: expirationData,
           theme: 'striped',
           headStyles: { fillColor: [41, 128, 185], fontSize: 9 },

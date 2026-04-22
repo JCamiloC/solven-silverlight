@@ -3,12 +3,6 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const MIDDLEWARE_AUTH_TIMEOUT_MS = 20000
 
-function hasSupabaseAuthCookie(request: NextRequest) {
-  return request.cookies
-    .getAll()
-    .some(({ name }) => name.startsWith('sb-') && name.includes('-auth-token'))
-}
-
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -50,17 +44,9 @@ export async function updateSession(request: NextRequest) {
       timeoutPromise
     ]) as any
     
-    // Si hay error de autenticación en ruta protegida:
-    // - Con cookie de sesión presente, permitir request para evitar falsos logout por latencia/red.
-    // - Sin cookie, redirigir a login.
+    // Modo estricto: cualquier error de auth en ruta protegida redirige a login.
     if (error && isProtectedRoute) {
       console.log('[Middleware] Auth error detected:', error.message)
-
-      if (hasSupabaseAuthCookie(request)) {
-        console.warn('[Middleware] Auth error con cookie presente, permitiendo request')
-        return supabaseResponse
-      }
-
       const redirectUrl = new URL('/auth/login?reason=expired', request.url)
       return NextResponse.redirect(redirectUrl)
     }
@@ -74,14 +60,7 @@ export async function updateSession(request: NextRequest) {
   } catch (error) {
     console.error('[Middleware] Error in session validation:', error)
 
-    // Si hay timeout pero existen cookies de sesión, permitir que la app cliente complete validación
-    const message = error instanceof Error ? error.message.toLowerCase() : ''
-    if (isProtectedRoute && message.includes('timeout') && hasSupabaseAuthCookie(request)) {
-      console.warn('[Middleware] Timeout detectado con cookies de auth presentes, permitiendo request')
-      return supabaseResponse
-    }
-
-    // Sin cookies válidas en ruta protegida, redirigir a login
+    // Modo estricto: ante excepción en ruta protegida redirigir a login.
     if (isProtectedRoute) {
       const redirectUrl = new URL('/auth/login?reason=expired', request.url)
       return NextResponse.redirect(redirectUrl)

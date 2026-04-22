@@ -56,8 +56,28 @@ function LoginForm() {
     return '/dashboard'
   }
 
+  const shouldRetryWithCleanup = (error: unknown) => {
+    if (!(error instanceof Error)) return false
+    const message = error.message.toLowerCase()
+
+    return (
+      message.includes('refresh token') ||
+      message.includes('invalid token') ||
+      message.includes('token') ||
+      message.includes('session') ||
+      message.includes('jwt')
+    )
+  }
+
   useEffect(() => {
     const reason = searchParams.get('reason')
+    const fromLogout = searchParams.get('logout') === '1'
+
+    if (fromLogout) {
+      setSessionMessage('Sesión cerrada correctamente. Puedes iniciar sesión nuevamente.')
+      return
+    }
+
     if (reason === 'timeout') {
       setSessionMessage('Tu sesión ha expirado por inactividad. Por favor, inicia sesión nuevamente.')
     } else if (reason === 'expired') {
@@ -67,9 +87,15 @@ function LoginForm() {
 
   useEffect(() => {
     let isMounted = true
+    const fromLogout = searchParams.get('logout') === '1'
 
     const checkExistingSession = async () => {
       try {
+        if (fromLogout) {
+          await destroyClientSession(supabase, { preferLocal: true, timeoutMs: 3000 })
+          return
+        }
+
         const {
           data: { session },
         } = await withTimeout(supabase.auth.getSession())
@@ -77,9 +103,21 @@ function LoginForm() {
         if (!isMounted) return
 
         if (session?.user) {
+          const {
+            data: { user: currentUser },
+          } = await withTimeout(supabase.auth.getUser(), 12000)
+
+          if (!isMounted) return
+
+          if (currentUser?.id) {
+            const redirectPath = await resolveRedirectPath(currentUser.id)
+            window.location.assign(redirectPath)
+            return
+          }
+
           await destroyClientSession(supabase, { preferLocal: true, timeoutMs: 3000 })
           if (!isMounted) return
-          setSessionMessage('Se detectó una sesión anterior y fue cerrada. Inicia sesión nuevamente.')
+          setSessionMessage('Se limpió una sesión inválida. Ahora puedes iniciar sesión de nuevo.')
         }
       } catch (sessionError) {
         console.error('Error checking existing session:', sessionError)
@@ -95,7 +133,7 @@ function LoginForm() {
     return () => {
       isMounted = false
     }
-  }, [router, supabase])
+  }, [router, searchParams, supabase])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -103,8 +141,20 @@ function LoginForm() {
     setError('')
 
     try {
-      await destroyClientSession(supabase, { preferLocal: true, timeoutMs: 3000 })
-      const { user, session } = await authService.signIn(email, password)
+      let signInResult: Awaited<ReturnType<typeof authService.signIn>>
+
+      try {
+        signInResult = await authService.signIn(email, password)
+      } catch (signInError) {
+        if (!shouldRetryWithCleanup(signInError)) {
+          throw signInError
+        }
+
+        await destroyClientSession(supabase, { preferLocal: true, timeoutMs: 3000 })
+        signInResult = await authService.signIn(email, password)
+      }
+
+      const { user, session } = signInResult
 
       // Priorizar la sesión devuelta por signIn para evitar falsos timeout en getSession.
       let userId: string | undefined = session?.user?.id || user?.id

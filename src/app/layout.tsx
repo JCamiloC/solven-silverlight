@@ -5,6 +5,7 @@ import { ReactQueryProvider } from '@/components/providers/react-query-provider'
 import { ThemeProvider as BrandThemeProvider } from '@/components/providers/theme-provider-brand'
 import { SessionTimeoutProvider } from '@/components/providers/session-timeout-provider'
 import { InteractionLockProvider } from '@/components/providers/interaction-lock-provider'
+import { AuthProvider } from '@/hooks/use-auth'
 import { Toaster } from '@/components/ui/sonner'
 import { FloatingChat } from '@/components/chat/floating-chat'
 
@@ -34,18 +35,20 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gradient-to-br from-blue-50/30 to-slate-50/50 min-h-screen`}
       >
         <BrandThemeProvider>
-          <InteractionLockProvider>
-            <ReactQueryProvider>
-              <SessionTimeoutProvider
-                timeoutMinutes={5}
-                enabled={true}
-              >
-                {children}
-                <FloatingChat />
-                <Toaster />
-              </SessionTimeoutProvider>
-            </ReactQueryProvider>
-          </InteractionLockProvider>
+          <AuthProvider>
+            <InteractionLockProvider>
+              <ReactQueryProvider>
+                <SessionTimeoutProvider
+                  timeoutMinutes={5}
+                  enabled={true}
+                >
+                  {children}
+                  <FloatingChat />
+                  <Toaster />
+                </SessionTimeoutProvider>
+              </ReactQueryProvider>
+            </InteractionLockProvider>
+          </AuthProvider>
         </BrandThemeProvider>
       </body>
     </html>

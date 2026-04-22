@@ -196,7 +196,7 @@ export class TicketReportPDF {
       const tableData = tickets.map(ticket => [
         ticket.ticket_number || `#${ticket.id.slice(-8)}`,
         format(new Date(ticket.created_at), 'dd/MM/yyyy', { locale: es }),
-        ticket.title.length > 40 ? ticket.title.substring(0, 37) + '...' : ticket.title,
+        ticket.title,
         this.getCategoryLabel(ticket.category),
         this.getPriorityLabel(ticket.priority),
         this.getStatusLabel(ticket.status),
@@ -215,6 +215,12 @@ export class TicketReportPDF {
         },
         bodyStyles: {
           fontSize: 8,
+          overflow: 'linebreak',
+        },
+        styles: {
+          overflow: 'linebreak',
+          cellPadding: 2,
+          valign: 'middle',
         },
         columnStyles: {
           0: { cellWidth: 25 },

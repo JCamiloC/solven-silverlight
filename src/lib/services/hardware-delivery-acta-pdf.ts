@@ -1,6 +1,6 @@
 /**
  * Servicio para generar PDF de Acta de Entrega de Hardware
- * Genera un documento formal para registrar la entrega de activos tecnol�gicos
+ * Genera un documento formal para registrar la entrega de activos tecnológicos
  */
 
 import { format } from 'date-fns'
@@ -129,7 +129,7 @@ export class HardwareDeliveryActaPDF {
 
       // Detalles del Hardware en formato tabla
       const hardwareDetails = [
-        ['Nombre del Activo tecnol�gico:', hardware.name || 'N/A'],
+        ['Nombre del Activo tecnológico:', hardware.name || 'N/A'],
         ['Tipo:', hardware.type || 'N/A'],
         ['Marca:', hardware.brand || 'N/A'],
         ['Modelo:', hardware.model || 'N/A'],
@@ -142,35 +142,36 @@ export class HardwareDeliveryActaPDF {
         ['Ubicación:', hardware.sede || hardware.location || 'No especificada'],
       ]
 
-      // Dibujar recuadro para detalles
-      const tableStartY = yPos
-      const rowHeight = 6
+      // Dibujar detalle con filas de altura variable para evitar truncado.
+      const rowMinHeight = 6
       const col1Width = 60
       const col2Width = maxWidth - col1Width
 
       hardwareDetails.forEach(([label, value], index) => {
+        const safeValue = String(value ?? 'N/A')
+        const valueLines = doc.splitTextToSize(safeValue, col2Width - 4)
+        const rowHeight = Math.max(rowMinHeight, valueLines.length * 5)
+
         // Fondo alternado
         if (index % 2 === 0) {
           doc.setFillColor(245, 245, 245)
-          doc.rect(margin, yPos - 4, maxWidth, rowHeight, 'F')
+          doc.rect(margin, yPos - 4, maxWidth, rowHeight + 2, 'F')
         }
 
         doc.setFont('helvetica', 'bold')
         doc.text(label, margin + 2, yPos)
         doc.setFont('helvetica', 'normal')
-        
-        // Truncar texto si es muy largo
-        const safeValue = String(value ?? 'N/A')
-        const valueText = safeValue.length > 50 ? safeValue.substring(0, 50) + '...' : safeValue
-        doc.text(valueText, margin + col1Width, yPos)
-        
-        yPos += rowHeight
-      })
 
-      // Borde del recuadro
-      doc.setDrawColor(100, 100, 100)
-      doc.setLineWidth(0.5)
-      doc.rect(margin, tableStartY - 4, maxWidth, rowHeight * hardwareDetails.length)
+        valueLines.forEach((line: string, lineIndex: number) => {
+          doc.text(line, margin + col1Width, yPos + lineIndex * 5)
+        })
+
+        doc.setDrawColor(220, 220, 220)
+        doc.setLineWidth(0.2)
+        doc.rect(margin, yPos - 4, maxWidth, rowHeight + 2)
+
+        yPos += rowHeight + 2
+      })
 
       yPos += 5
 
@@ -298,7 +299,7 @@ export class HardwareDeliveryActaPDF {
       doc.setTextColor(0, 0, 0)
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      doc.text('Certificamos que el activo tecnol�gico descrito fue entregado y recibido en las condiciones mencionadas.', margin, yPos)
+      doc.text('Certificamos que el activo tecnológico descrito fue entregado y recibido en las condiciones mencionadas.', margin, yPos)
       yPos += 15
 
       // Sección de firmas - Dos columnas
@@ -325,16 +326,18 @@ export class HardwareDeliveryActaPDF {
       // Mostrar datos de quien entrega
       const entregaNombre = data.entregadoPor?.nombre || 'No especificado'
       const entregaCedula = data.entregadoPor?.cedula || 'No especificada'
+      const entregaNombreLine = doc.splitTextToSize(entregaNombre, colWidth - 10).join(' ')
+      const entregaCedulaLine = doc.splitTextToSize(entregaCedula, colWidth - 10).join(' ')
 
       doc.text('Nombre:', col1X + 5, nameYLeft)
       doc.setFont('helvetica', 'bold')
-      doc.text(this.truncateText(entregaNombre, 30), col1X + 5, nameYLeft + 3)
+      doc.text(entregaNombreLine, col1X + 5, nameYLeft + 3)
       doc.setFont('helvetica', 'normal')
       doc.text('_________________________________', col1X + 5, nameUnderlineYLeft)
 
       doc.text('Cédula/NIT:', col1X + 5, cedulaYLeft)
       doc.setFont('helvetica', 'bold')
-      doc.text(this.truncateText(entregaCedula, 30), col1X + 5, cedulaYLeft + 3)
+      doc.text(entregaCedulaLine, col1X + 5, cedulaYLeft + 3)
       doc.setFont('helvetica', 'normal')
       doc.text('_________________________________', col1X + 5, cedulaUnderlineYLeft)
 
@@ -352,16 +355,18 @@ export class HardwareDeliveryActaPDF {
 
       const recibeNombre = data.recibidoPor?.nombre || 'No especificado'
       const recibeCedula = data.recibidoPor?.cedula || 'No especificada'
+      const recibeNombreLine = doc.splitTextToSize(recibeNombre, colWidth - 10).join(' ')
+      const recibeCedulaLine = doc.splitTextToSize(recibeCedula, colWidth - 10).join(' ')
 
       doc.text('Nombre:', col2X + 5, nameYRight)
       doc.setFont('helvetica', 'bold')
-      doc.text(this.truncateText(recibeNombre, 30), col2X + 5, nameYRight + 3)
+      doc.text(recibeNombreLine, col2X + 5, nameYRight + 3)
       doc.setFont('helvetica', 'normal')
       doc.text('_________________________________', col2X + 5, nameUnderlineYRight)
 
       doc.text('Cédula/NIT:', col2X + 5, cedulaYRight)
       doc.setFont('helvetica', 'bold')
-      doc.text(this.truncateText(recibeCedula, 30), col2X + 5, cedulaYRight + 3)
+      doc.text(recibeCedulaLine, col2X + 5, cedulaYRight + 3)
       doc.setFont('helvetica', 'normal')
       doc.text('_________________________________', col2X + 5, cedulaUnderlineYRight)
 
@@ -479,12 +484,4 @@ export class HardwareDeliveryActaPDF {
     return translations[status] || status
   }
 
-  /**
-   * Helper: Trunca texto largo añadiendo elipsis
-   */
-  private static truncateText(text: string, maxLength: number): string {
-    if (!text) return ''
-    if (text.length <= maxLength) return text
-    return text.substring(0, maxLength - 1) + '…'
-  }
 }

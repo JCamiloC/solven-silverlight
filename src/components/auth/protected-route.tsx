@@ -19,24 +19,37 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { user, profile, loading, hasRole } = useAuth()
   const router = useRouter()
-  const [hasChecked, setHasChecked] = useState(false)
+  const [isRedirecting, setIsRedirecting] = useState(false)
+  const [loadingGuardTriggered, setLoadingGuardTriggered] = useState(false)
 
   useEffect(() => {
-    if (loading) return
-
-    // Marcar que ya verificamos
-    if (!hasChecked) {
-      setHasChecked(true)
+    if (!loading) {
+      setLoadingGuardTriggered(false)
+      return
     }
+
+    const timeout = setTimeout(() => {
+      setLoadingGuardTriggered(true)
+    }, 3500)
+
+    return () => clearTimeout(timeout)
+  }, [loading])
+
+  const isCheckingAuth = loading && !loadingGuardTriggered
+
+  useEffect(() => {
+    if (isCheckingAuth || isRedirecting) return
 
     // Check if authentication is required and user is not logged in
     if (requireAuth && !user) {
+      setIsRedirecting(true)
       router.push('/auth/login')
       return
     }
 
     // Check if specific roles are required
     if (allowedRoles.length > 0 && !hasRole(allowedRoles)) {
+      setIsRedirecting(true)
       // Redirect based on user role
       if (profile?.role === 'cliente') {
         // Clientes van a su página de empresa si tienen client_id asignado
@@ -51,15 +64,19 @@ export function ProtectedRoute({
       }
       return
     }
-  }, [user, profile, loading, hasRole, allowedRoles, requireAuth, router, hasChecked])
+  }, [user, profile, hasRole, allowedRoles, requireAuth, router, isRedirecting, isCheckingAuth])
 
   // Show loading while checking authentication
-  if (loading) {
+  if (isCheckingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loading size="lg" text="Verificando autenticación..." />
       </div>
     )
+  }
+
+  if (isRedirecting) {
+    return null
   }
 
   // Show nothing while redirecting (user/profile requirements not met)
