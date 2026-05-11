@@ -6,6 +6,7 @@
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { TicketWithRelations } from '@/lib/services/tickets'
+import { getReportLogoForPdf } from '@/lib/services/report-logo'
 
 export class TicketReportPDF {
   /**
@@ -31,6 +32,7 @@ export class TicketReportPDF {
       
       let yPos = 20
       const pageHeight = doc.internal.pageSize.height
+      const pageWidth = doc.internal.pageSize.width
       const margin = 15
       const maxWidth = 180
 
@@ -40,25 +42,35 @@ export class TicketReportPDF {
       // ==========================================
       // ENCABEZADO PRINCIPAL
       // ==========================================
+      const logo = await getReportLogoForPdf(38)
+      const logoHeight = logo?.height || 0
+      const headerHeight = 54
+
       doc.setFillColor(41, 128, 185)
-      doc.rect(0, 0, 210, 40, 'F')
+      doc.rect(0, 0, pageWidth, headerHeight, 'F')
+
+      if (logo) {
+        doc.setFillColor(255, 255, 255)
+        doc.roundedRect(8, 6, logo.width + 4, logo.height + 4, 2, 2, 'F')
+        doc.addImage(logo.dataUrl, 'PNG', 10, 8, logo.width, logo.height)
+      }
       
       doc.setTextColor(255, 255, 255)
       doc.setFontSize(26)
       doc.setFont('helvetica', 'bold')
-      doc.text('REPORTE DE TICKETS', 105, 18, { align: 'center' })
+      doc.text('REPORTE DE TICKETS', pageWidth / 2, logoHeight + 24, { align: 'center' })
       
       doc.setFontSize(14)
       doc.setFont('helvetica', 'normal')
       const titleBase = isGeneralReport ? 'Reporte General' : clientName
       const title = reportPeriodLabel ? `${titleBase} - ${reportPeriodLabel}` : titleBase
-      doc.text(title, 105, 28, { align: 'center' })
+      doc.text(title, pageWidth / 2, logoHeight + 32, { align: 'center' })
 
       doc.setFontSize(10)
-      doc.text(`Generado: ${format(new Date(), "dd 'de' MMMM yyyy, HH:mm", { locale: es })}`, 105, 35, { align: 'center' })
+      doc.text(`Generado: ${format(new Date(), "dd 'de' MMMM yyyy, HH:mm", { locale: es })}`, pageWidth / 2, logoHeight + 38, { align: 'center' })
 
       doc.setTextColor(0, 0, 0)
-      yPos = 50
+      yPos = headerHeight + 10
 
       // ==========================================
       // MÉTRICAS PRINCIPALES
@@ -197,14 +209,14 @@ export class TicketReportPDF {
         ticket.ticket_number || `#${ticket.id.slice(-8)}`,
         format(new Date(ticket.created_at), 'dd/MM/yyyy', { locale: es }),
         ticket.title,
-        this.getCategoryLabel(ticket.category),
+        ticket.usuario_afectado?.trim() || 'No especificado',
         this.getPriorityLabel(ticket.priority),
         this.getStatusLabel(ticket.status),
       ])
 
       autoTable(doc, {
         startY: yPos,
-        head: [['N° Ticket', 'Fecha', 'Título', 'Categoría', 'Prioridad', 'Estado']],
+        head: [['N° Ticket', 'Fecha', 'Título', 'Usuario afectado', 'Prioridad', 'Estado']],
         body: tableData,
         theme: 'striped',
         headStyles: {
@@ -242,6 +254,11 @@ export class TicketReportPDF {
       const totalPages = (doc.internal as any).getNumberOfPages()
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i)
+        if (logo) {
+          doc.setFillColor(255, 255, 255)
+          doc.roundedRect(8, 6, logo.width + 4, logo.height + 4, 2, 2, 'F')
+          doc.addImage(logo.dataUrl, 'PNG', 10, 8, logo.width, logo.height)
+        }
         doc.setFontSize(8)
         doc.setTextColor(128, 128, 128)
         doc.text(

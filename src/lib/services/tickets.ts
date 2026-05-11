@@ -58,7 +58,7 @@ export interface TicketUpdate {
   description?: string
   priority?: 'low' | 'medium' | 'high' | 'critical'
   status?: 'open' | 'pendiente_confirmacion' | 'solucionado'
-  category?: 'hardware' | 'software' | 'access' | 'other'
+  category?: 'hardware' | 'software' | 'network' | 'access' | 'other'
   assigned_to?: string
   usuario_afectado?: string
   resolved_at?: string

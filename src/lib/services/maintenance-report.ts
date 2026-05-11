@@ -3,8 +3,9 @@ import { MaintenanceReportFilters, MaintenanceReportRow } from '@/types'
 import { getSoftwareDisplayName } from '@/lib/utils'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, BorderStyle } from 'docx'
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, BorderStyle, ImageRun } from 'docx'
 import { saveAs } from 'file-saver'
+import { getReportLogoForPdf, getReportLogoForWord } from '@/lib/services/report-logo'
 
 const supabase = createClient()
 
@@ -156,17 +157,33 @@ export class MaintenanceReportService {
       const doc = new jsPDF('landscape', 'mm', 'a4')
       const pageWidth = doc.internal.pageSize.getWidth()
       const margin = 10
+      const headerHeight = 48
+
+      const logo = await getReportLogoForPdf(38)
+      const logoHeight = logo?.height || 0
+
+      doc.setFillColor(41, 128, 185)
+      doc.rect(0, 0, pageWidth, headerHeight, 'F')
+
+      if (logo) {
+        doc.setFillColor(255, 255, 255)
+        doc.roundedRect(8, 5, logo.width + 4, logo.height + 4, 2, 2, 'F')
+        doc.addImage(logo.dataUrl, 'PNG', 10, 7, logo.width, logo.height)
+      }
 
       // Título
       doc.setFontSize(16)
       doc.setFont('helvetica', 'bold')
-      doc.text('REPORTE DE MANTENIMIENTO - HARDWARE', pageWidth / 2, 15, { align: 'center' })
+      doc.setTextColor(255, 255, 255)
+      doc.text('REPORTE DE MANTENIMIENTO - HARDWARE', pageWidth / 2, logoHeight + 22, { align: 'center' })
 
       doc.setFontSize(12)
       doc.setFont('helvetica', 'normal')
+      doc.setTextColor(255, 255, 255)
       const periodLabel = this.buildPeriodLabel(startDate, endDate)
-      doc.text(`Cliente: ${clientName}`, margin, 25)
-      doc.text(`Período: ${periodLabel}`, margin, 31)
+      doc.text(`Cliente: ${clientName}`, pageWidth / 2, logoHeight + 30, { align: 'center' })
+      doc.text(`Período: ${periodLabel}`, pageWidth / 2, logoHeight + 36, { align: 'center' })
+      doc.setTextColor(0, 0, 0)
 
       // Preparar datos para la tabla
       const tableData = rows.map(row => [
@@ -201,7 +218,7 @@ export class MaintenanceReportService {
           'Detalle Mantenimiento',
         ]],
         body: tableData,
-        startY: 38,
+        startY: headerHeight + 8,
         margin: { left: margin, right: margin },
         styles: {
           fontSize: 7,
@@ -236,6 +253,11 @@ export class MaintenanceReportService {
       const totalPages = (doc as any).internal.getNumberOfPages()
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i)
+        if (logo) {
+          doc.setFillColor(255, 255, 255)
+          doc.roundedRect(8, 5, logo.width + 4, logo.height + 4, 2, 2, 'F')
+          doc.addImage(logo.dataUrl, 'PNG', 10, 7, logo.width, logo.height)
+        }
         doc.setFontSize(8)
         doc.setTextColor(100, 100, 100)
         doc.text(
@@ -271,6 +293,7 @@ export class MaintenanceReportService {
   ): Promise<void> {
     try {
       const periodLabel = this.buildPeriodLabel(startDate, endDate)
+      const logo = await getReportLogoForWord(170)
 
       // TODO: Agregar logo cuando el usuario especifique la ruta
       // const logoPath = '/logos/silverlight-logo.png'
@@ -289,6 +312,24 @@ export class MaintenanceReportService {
             },
           },
           children: [
+            ...(logo
+              ? [
+                  new Paragraph({
+                    alignment: AlignmentType.LEFT,
+                    spacing: { after: 240 },
+                    children: [
+                      new ImageRun({
+                        data: logo.bytes.buffer as ArrayBuffer,
+                        type: 'png',
+                        transformation: {
+                          width: logo.width,
+                          height: logo.height,
+                        },
+                      }),
+                    ],
+                  }),
+                ]
+              : []),
             // TÍTULO PRINCIPAL
             new Paragraph({
               text: 'MANTENIMIENTO DE INFRAESTRUCTURA',

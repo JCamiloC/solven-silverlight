@@ -5,6 +5,7 @@ import {
   AlignmentType,
   Document,
   HeadingLevel,
+  ImageRun,
   Packer,
   Paragraph,
   Table,
@@ -14,6 +15,7 @@ import {
   WidthType,
 } from 'docx'
 import type { TicketWithRelations } from '@/lib/services/tickets'
+import { getReportLogoForWord } from '@/lib/services/report-logo'
 
 export class TicketReportWord {
   static async generateReport(
@@ -25,6 +27,7 @@ export class TicketReportWord {
   ): Promise<void> {
     try {
       const stats = this.calculateStats(tickets)
+      const logo = await getReportLogoForWord(170)
       const titleBase = isGeneralReport ? 'Reporte General' : clientName
       const title = reportPeriodLabel ? `${titleBase} - ${reportPeriodLabel}` : titleBase
 
@@ -34,7 +37,7 @@ export class TicketReportWord {
             this.createHeaderCell('N° Ticket'),
             this.createHeaderCell('Fecha'),
             this.createHeaderCell('Título'),
-            this.createHeaderCell('Categoría'),
+            this.createHeaderCell('Usuario afectado'),
             this.createHeaderCell('Prioridad'),
             this.createHeaderCell('Estado'),
           ],
@@ -45,7 +48,7 @@ export class TicketReportWord {
               this.createBodyCell(ticket.ticket_number || `#${ticket.id.slice(-8)}`),
               this.createBodyCell(format(new Date(ticket.created_at), 'dd/MM/yyyy', { locale: es })),
               this.createBodyCell(ticket.title),
-              this.createBodyCell(this.getCategoryLabel(ticket.category)),
+              this.createBodyCell(ticket.usuario_afectado?.trim() || 'No especificado'),
               this.createBodyCell(this.getPriorityLabel(ticket.priority)),
               this.createBodyCell(this.getStatusLabel(ticket.status as string)),
             ],
@@ -57,6 +60,21 @@ export class TicketReportWord {
         sections: [
           {
             children: [
+              ...(logo
+                ? [
+                    new Paragraph({
+                      alignment: AlignmentType.LEFT,
+                      spacing: { after: 220 },
+                      children: [
+                        new ImageRun({
+                          data: logo.bytes.buffer as ArrayBuffer,
+                          type: 'png',
+                          transformation: { width: logo.width, height: logo.height },
+                        }),
+                      ],
+                    }),
+                  ]
+                : []),
               new Paragraph({
                 text: 'REPORTE DE TICKETS',
                 heading: HeadingLevel.HEADING_1,
@@ -136,17 +154,6 @@ export class TicketReportWord {
       }).length,
       critical: tickets.filter((t) => t.priority === 'critical').length,
     }
-  }
-
-  private static getCategoryLabel(category: string): string {
-    const labels: Record<string, string> = {
-      hardware: 'Hardware',
-      software: 'Software',
-      network: 'Red',
-      access: 'Accesos',
-      other: 'Otro',
-    }
-    return labels[category] || category
   }
 
   private static getPriorityLabel(priority: string): string {

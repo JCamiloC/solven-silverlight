@@ -5,6 +5,7 @@ import {
   AlignmentType,
   Document,
   HeadingLevel,
+  ImageRun,
   Packer,
   Paragraph,
   Table,
@@ -14,6 +15,7 @@ import {
   WidthType,
 } from 'docx'
 import type { VisitReportRow } from '@/lib/services/visit-report-pdf'
+import { getReportLogoForWord } from '@/lib/services/report-logo'
 
 export class VisitReportWord {
   private static createHeaderCell(text: string) {
@@ -39,6 +41,7 @@ export class VisitReportWord {
     reportPeriodLabel?: string
   ): Promise<void> {
     const subtitle = reportPeriodLabel ? `${title} - ${reportPeriodLabel}` : title
+    const logo = await getReportLogoForWord(170)
 
     const tableRows = [
       new TableRow({
@@ -73,6 +76,21 @@ export class VisitReportWord {
       sections: [
         {
           children: [
+            ...(logo
+              ? [
+                  new Paragraph({
+                    alignment: AlignmentType.LEFT,
+                    spacing: { after: 220 },
+                    children: [
+                      new ImageRun({
+                        data: logo.bytes.buffer as ArrayBuffer,
+                        type: 'png',
+                        transformation: { width: logo.width, height: logo.height },
+                      }),
+                    ],
+                  }),
+                ]
+              : []),
             new Paragraph({
               text: 'REPORTE DE VISITAS',
               heading: HeadingLevel.HEADING_1,

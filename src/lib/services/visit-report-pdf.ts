@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { getReportLogoForPdf } from '@/lib/services/report-logo'
 
 export interface VisitReportRow {
   id: string
@@ -27,20 +28,29 @@ export class VisitReportPDF {
     const doc: any = new jsPDF('landscape', 'mm', 'a4')
     const margin = 12
     const pageWidth = doc.internal.pageSize.getWidth()
+    const logo = await getReportLogoForPdf(38)
+    const logoHeight = logo?.height || 0
+    const headerHeight = 48
 
     doc.setFillColor(41, 128, 185)
-    doc.rect(0, 0, pageWidth, 30, 'F')
+    doc.rect(0, 0, pageWidth, headerHeight, 'F')
+
+    if (logo) {
+      doc.setFillColor(255, 255, 255)
+      doc.roundedRect(8, 5, logo.width + 4, logo.height + 4, 2, 2, 'F')
+      doc.addImage(logo.dataUrl, 'PNG', 10, 7, logo.width, logo.height)
+    }
 
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(20)
     doc.setFont('helvetica', 'bold')
-    doc.text('REPORTE DE VISITAS', pageWidth / 2, 12, { align: 'center' })
+    doc.text('REPORTE DE VISITAS', pageWidth / 2, logoHeight + 22, { align: 'center' })
 
     doc.setFontSize(11)
     doc.setFont('helvetica', 'normal')
     const subtitle = reportPeriodLabel ? `${title} - ${reportPeriodLabel}` : title
-    doc.text(subtitle, pageWidth / 2, 20, { align: 'center' })
-    doc.text(`Generado: ${format(new Date(), "dd 'de' MMMM yyyy, HH:mm", { locale: es })}`, pageWidth / 2, 26, { align: 'center' })
+    doc.text(subtitle, pageWidth / 2, logoHeight + 30, { align: 'center' })
+    doc.text(`Generado: ${format(new Date(), "dd 'de' MMMM yyyy, HH:mm", { locale: es })}`, pageWidth / 2, logoHeight + 36, { align: 'center' })
 
     const body = rows.map((row) => [
       row.fecha,
@@ -54,7 +64,7 @@ export class VisitReportPDF {
     ])
 
     autoTable(doc, {
-      startY: 38,
+      startY: headerHeight + 8,
       head: [[
         'Fecha',
         'Cliente',
@@ -95,6 +105,11 @@ export class VisitReportPDF {
     const totalPages = (doc.internal as any).getNumberOfPages()
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i)
+      if (logo) {
+        doc.setFillColor(255, 255, 255)
+        doc.roundedRect(8, 5, logo.width + 4, logo.height + 4, 2, 2, 'F')
+        doc.addImage(logo.dataUrl, 'PNG', 10, 7, logo.width, logo.height)
+      }
       doc.setFontSize(8)
       doc.setTextColor(110, 110, 110)
       doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin, doc.internal.pageSize.getHeight() - 8, {

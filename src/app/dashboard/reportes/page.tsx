@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -15,6 +16,9 @@ import { useAssignableUsers } from '@/hooks/use-users'
 import { MaintenanceReportFilters } from '@/types'
 import { TicketReportPDF } from '@/lib/services/ticket-report-pdf'
 import { TicketReportWord } from '@/lib/services/ticket-report-word'
+import { TicketKpiReportPDF } from '@/lib/services/ticket-kpi-report-pdf'
+import { TicketKpiReportWord } from '@/lib/services/ticket-kpi-report-word'
+import { buildTicketKpiReportData } from '@/lib/services/ticket-kpi-report-utils'
 import { VisitReportPDF, VisitReportRow } from '@/lib/services/visit-report-pdf'
 import { VisitReportWord } from '@/lib/services/visit-report-word'
 import { VisitDetailPDF } from '@/lib/services/visit-detail-pdf'
@@ -35,10 +39,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 
-type ReportType = 'mantenimiento' | 'tickets' | 'visitas' | null
+type ReportType = 'mantenimiento' | 'tickets' | 'visitas' | 'kpis' | null
 
 interface SharedReportFilters {
   clientId: string
@@ -60,14 +63,6 @@ const accionEstadoLabels: Record<SharedReportFilters['accionEstado'], string> = 
   all: 'Todos',
   realizado: 'Realizado',
   no_realizado: 'No realizado',
-}
-
-const categoryLabels: Record<string, string> = {
-  hardware: 'Hardware',
-  software: 'Software',
-  network: 'Red',
-  access: 'Accesos',
-  other: 'Otro',
 }
 
 const priorityLabels: Record<string, string> = {
@@ -144,6 +139,7 @@ const getPeriodLabel = (filters: SharedReportFilters) => {
 }
 
 export default function ReportsPage() {
+  const router = useRouter()
   const currentDate = new Date()
   const pad = (value: number) => value.toString().padStart(2, '0')
   const defaultEndDate = `${currentDate.getFullYear()}-${pad(currentDate.getMonth() + 1)}-${pad(currentDate.getDate())}`
@@ -153,10 +149,10 @@ export default function ReportsPage() {
   const [isExportingTickets, setIsExportingTickets] = useState(false)
   const [isExportingVisits, setIsExportingVisits] = useState(false)
   const [isExportingVisitDetail, setIsExportingVisitDetail] = useState(false)
+  const [isExportingKpis, setIsExportingKpis] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailType, setDetailType] = useState<ReportType>(null)
   const [selectedMaintenanceRow, setSelectedMaintenanceRow] = useState<MaintenanceReportRow | null>(null)
-  const [selectedTicketRow, setSelectedTicketRow] = useState<TicketWithRelations | null>(null)
   const [selectedVisitRow, setSelectedVisitRow] = useState<ClientVisit | null>(null)
 
   const [filters, setFilters] = useState<SharedReportFilters>({
@@ -170,6 +166,7 @@ export default function ReportsPage() {
   const [shouldFetchMaintenance, setShouldFetchMaintenance] = useState(false)
   const [shouldFetchTickets, setShouldFetchTickets] = useState(false)
   const [shouldFetchVisits, setShouldFetchVisits] = useState(false)
+  const [shouldFetchKpis, setShouldFetchKpis] = useState(false)
 
   const { data: clients } = useClients()
   const { data: tickets = [], isLoading: ticketsLoading } = useTickets()
@@ -197,14 +194,27 @@ export default function ReportsPage() {
   const selectedClient = clients?.find((c) => c.id === filters.clientId)
 
   const ticketRows = useMemo(() => {
-    if (!shouldFetchTickets) return [] as TicketWithRelations[]
+    if (!shouldFetchTickets && !shouldFetchKpis) return [] as TicketWithRelations[]
 
     return tickets.filter((ticket) => {
       const byClient = filters.clientId === 'all' || ticket.client_id === filters.clientId
       const byDate = inDateRange(ticket.created_at, filters.startDate, filters.endDate)
       return byClient && byDate
     })
-  }, [tickets, filters, shouldFetchTickets])
+  }, [tickets, filters, shouldFetchTickets, shouldFetchKpis])
+
+  const assignedUserMap = useMemo(() => {
+    return assignableUsers.reduce<Record<string, string>>((acc, user) => {
+      const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
+      acc[user.id] = fullName || user.email || 'Sin asignar'
+      return acc
+    }, {})
+  }, [assignableUsers])
+
+  const kpiReportData = useMemo(() => {
+    if (!shouldFetchKpis) return null
+    return buildTicketKpiReportData(ticketRows, assignedUserMap)
+  }, [ticketRows, assignedUserMap, shouldFetchKpis])
 
   const visitRows = useMemo(() => {
     if (!shouldFetchVisits) return [] as typeof visits
@@ -255,6 +265,7 @@ export default function ReportsPage() {
     setShouldFetchMaintenance(false)
     setShouldFetchTickets(false)
     setShouldFetchVisits(false)
+    setShouldFetchKpis(false)
   }
 
   const handleGenerateReport = () => {
@@ -274,6 +285,11 @@ export default function ReportsPage() {
 
     if (selectedReport === 'visitas') {
       setShouldFetchVisits(true)
+      return
+    }
+
+    if (selectedReport === 'kpis') {
+      setShouldFetchKpis(true)
     }
   }
 
@@ -348,6 +364,47 @@ export default function ReportsPage() {
     }
   }
 
+  const handleExportKpiReport = async (format: 'pdf' | 'word') => {
+    if (!ticketRows.length) {
+      toast.error('No hay tickets para exportar en KPIs')
+      return
+    }
+
+    setIsExportingKpis(true)
+    const periodSlug = getPeriodSlug(filters)
+    const periodLabel = getPeriodLabel(filters)
+    const isGeneral = filters.clientId === 'all'
+
+    try {
+      if (format === 'pdf') {
+        await TicketKpiReportPDF.generateReport(ticketRows, {
+          clientName: reportTitleBase,
+          isGeneralReport: isGeneral,
+          reportPeriodSlug: periodSlug,
+          reportPeriodLabel: periodLabel,
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+          assignedUserNames: assignedUserMap,
+        })
+      } else {
+        await TicketKpiReportWord.generateReport(ticketRows, {
+          clientName: reportTitleBase,
+          isGeneralReport: isGeneral,
+          reportPeriodSlug: periodSlug,
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+          assignedUserNames: assignedUserMap,
+        })
+      }
+      toast.success(`Reporte KPI en ${format.toUpperCase()} generado`)
+    } catch (error) {
+      console.error('Error exportando reporte KPI:', error)
+      toast.error('No se pudo exportar el reporte KPI')
+    } finally {
+      setIsExportingKpis(false)
+    }
+  }
+
   const getAssignedUserName = (assignedTo?: string) => {
     if (!assignedTo) return 'Sin asignar'
     const assignedUser = assignableUsers.find((user) => user.id === assignedTo)
@@ -358,24 +415,18 @@ export default function ReportsPage() {
   const openMaintenanceDetail = (row: MaintenanceReportRow) => {
     setDetailType('mantenimiento')
     setSelectedMaintenanceRow(row)
-    setSelectedTicketRow(null)
     setSelectedVisitRow(null)
     setDetailOpen(true)
   }
 
   const openTicketDetail = (ticket: TicketWithRelations) => {
-    setDetailType('tickets')
-    setSelectedTicketRow(ticket)
-    setSelectedMaintenanceRow(null)
-    setSelectedVisitRow(null)
-    setDetailOpen(true)
+    router.push(`/dashboard/tickets/${ticket.id}?from=reportes`)
   }
 
   const openVisitDetail = (visit: ClientVisit) => {
     setDetailType('visitas')
     setSelectedVisitRow(visit)
     setSelectedMaintenanceRow(null)
-    setSelectedTicketRow(null)
     setDetailOpen(true)
   }
 
@@ -412,7 +463,7 @@ export default function ReportsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card 
                 className={`cursor-pointer transition-all hover:shadow-md ${selectedReport === 'mantenimiento' ? 'ring-2 ring-primary' : ''}`}
                 onClick={() => {
@@ -462,6 +513,24 @@ export default function ReportsPage() {
                     <h3 className="font-semibold text-lg">Reporte de Visitas</h3>
                     <p className="text-sm text-muted-foreground">
                       Seguimiento de visitas técnicas por cliente y periodo
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card
+                className={`cursor-pointer transition-all hover:shadow-md ${selectedReport === 'kpis' ? 'ring-2 ring-primary' : ''}`}
+                onClick={() => {
+                  setSelectedReport('kpis')
+                  setShouldFetchKpis(false)
+                }}
+              >
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center text-center space-y-2">
+                    <FileText className="h-12 w-12 text-primary" />
+                    <h3 className="font-semibold text-lg">Reporte de KPIs</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Indicadores SLA por prioridad, tiempos y cumplimiento
                     </p>
                   </div>
                 </CardContent>
@@ -655,6 +724,35 @@ export default function ReportsPage() {
                       </Button>
                     </>
                   )}
+
+                  {selectedReport === 'kpis' && shouldFetchKpis && (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleExportKpiReport('word')}
+                        disabled={isExportingKpis || ticketRows.length === 0}
+                      >
+                        {isExportingKpis ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileText className="mr-2 h-4 w-4" />
+                        )}
+                        Exportar Word
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleExportKpiReport('pdf')}
+                        disabled={isExportingKpis || ticketRows.length === 0}
+                      >
+                        {isExportingKpis ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileText className="mr-2 h-4 w-4" />
+                        )}
+                        Exportar PDF
+                      </Button>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -743,7 +841,7 @@ export default function ReportsPage() {
                           <TableHead>ID</TableHead>
                           <TableHead>Cliente</TableHead>
                           <TableHead className="min-w-[240px]">Título</TableHead>
-                          <TableHead>Categoría</TableHead>
+                          <TableHead>Usuario afectado</TableHead>
                           <TableHead>Prioridad</TableHead>
                           <TableHead>Estado</TableHead>
                           <TableHead>Responsable</TableHead>
@@ -762,7 +860,7 @@ export default function ReportsPage() {
                               <TableCell className="max-w-[280px] whitespace-normal break-words" title={ticket.title}>
                                 {ticket.title}
                               </TableCell>
-                              <TableCell>{categoryLabels[ticket.category] || ticket.category}</TableCell>
+                              <TableCell>{ticket.usuario_afectado?.trim() || 'No especificado'}</TableCell>
                               <TableCell>{priorityLabels[ticket.priority] || ticket.priority}</TableCell>
                               <TableCell>{statusLabels[ticket.status as string] || ticket.status}</TableCell>
                               <TableCell>{getAssignedUserName(ticket.assigned_to)}</TableCell>
@@ -859,6 +957,49 @@ export default function ReportsPage() {
               </Card>
             )}
 
+            {selectedReport === 'kpis' && shouldFetchKpis && kpiReportData && kpiReportData.rows.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Resultados del Reporte KPI</CardTitle>
+                  <CardDescription>
+                    {kpiReportData.rows.length} ticket(s) incluido(s) entre {filters.startDate} y {filters.endDate}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>FECHA</TableHead>
+                          <TableHead className="min-w-[240px]">ACTIVIDAD</TableHead>
+                          <TableHead>T.RTA</TableHead>
+                          <TableHead>T.RES</TableHead>
+                          <TableHead>Criticidad</TableHead>
+                          <TableHead>Cumple</TableHead>
+                          <TableHead>PERSONA QUE RECIBE</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {kpiReportData.rows.map((row) => (
+                          <TableRow key={row.id}>
+                            <TableCell>{row.fecha}</TableCell>
+                            <TableCell className="max-w-[340px] whitespace-normal break-words" title={row.actividad}>
+                              {row.actividad}
+                            </TableCell>
+                            <TableCell>{row.tiempoRespuesta}</TableCell>
+                            <TableCell>{row.tiempoSolucion}</TableCell>
+                            <TableCell>{row.criticidad}</TableCell>
+                            <TableCell>{row.cumple}</TableCell>
+                            <TableCell>{row.personaQueRecibe}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {selectedReport === 'mantenimiento' &&
               maintenanceRows &&
               maintenanceRows.length === 0 &&
@@ -894,6 +1035,16 @@ export default function ReportsPage() {
               </Card>
             )}
 
+            {selectedReport === 'kpis' && shouldFetchKpis && ticketRows.length === 0 && !ticketsLoading && (
+              <Card>
+                <CardContent className="py-10">
+                  <div className="text-center text-muted-foreground">
+                    <p>No se encontraron tickets para construir el reporte KPI en el rango de fechas seleccionado.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
@@ -924,31 +1075,6 @@ export default function ReportsPage() {
                     <div>
                       <p className="font-semibold mb-1">Acción recomendada</p>
                       <p className="rounded-md border bg-muted/30 p-3 whitespace-pre-wrap break-words">{selectedMaintenanceRow.accionRecomendada}</p>
-                    </div>
-                  </div>
-                )}
-
-                {detailType === 'tickets' && selectedTicketRow && (
-                  <div className="space-y-4 text-sm">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div><span className="font-semibold">Ticket:</span> {selectedTicketRow.ticket_number || `#${selectedTicketRow.id.slice(-8)}`}</div>
-                      <div><span className="font-semibold">Fecha:</span> {new Date(selectedTicketRow.created_at).toLocaleString('es-CO')}</div>
-                      <div><span className="font-semibold">Cliente:</span> {clients?.find((client) => client.id === selectedTicketRow.client_id)?.name || 'N/A'}</div>
-                      <div><span className="font-semibold">Responsable:</span> {getAssignedUserName(selectedTicketRow.assigned_to)}</div>
-                      <div><span className="font-semibold">Categoría:</span> {categoryLabels[selectedTicketRow.category] || selectedTicketRow.category}</div>
-                      <div><span className="font-semibold">Prioridad:</span> {priorityLabels[selectedTicketRow.priority] || selectedTicketRow.priority}</div>
-                    </div>
-                    <div>
-                      <p className="font-semibold mb-1">Estado</p>
-                      <Badge variant="secondary">{statusLabels[selectedTicketRow.status as string] || selectedTicketRow.status}</Badge>
-                    </div>
-                    <div>
-                      <p className="font-semibold mb-1">Título</p>
-                      <p className="rounded-md border bg-muted/30 p-3 whitespace-pre-wrap break-words">{selectedTicketRow.title}</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold mb-1">Descripción</p>
-                      <p className="rounded-md border bg-muted/30 p-3 whitespace-pre-wrap break-words">{selectedTicketRow.description}</p>
                     </div>
                   </div>
                 )}

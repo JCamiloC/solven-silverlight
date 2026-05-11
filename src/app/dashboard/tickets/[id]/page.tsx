@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -47,9 +47,11 @@ import { useTicketComments, useCreateTicketComment, useUpdateTicketComment, useD
 import { useAssignableUsers } from '@/hooks/use-users'
 import { useClients } from '@/hooks/use-clients'
 import { useHardwareAsset } from '@/hooks/use-hardware'
+import { useHardwareAssetsByClient } from '@/hooks/use-hardware'
 import { useSoftwareLicense } from '@/hooks/use-software'
 import { useCustomApplication } from '@/hooks/use-custom-applications'
 import { useAccessCredential } from '@/hooks/use-access-credentials'
+import { ClientSearchCombobox } from '@/components/ui/client-search-combobox'
 import { TicketCommentInsert } from '@/lib/services/ticket-comments'
 import { TicketDetailPDF } from '@/lib/services/ticket-detail-pdf'
 import { toast } from 'sonner'
@@ -57,7 +59,10 @@ import { toast } from 'sonner'
 export default function TicketDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const ticketId = params.id as string
+  const backPath = searchParams.get('from') === 'reportes' ? '/dashboard/reportes' : '/dashboard/tickets'
+  const backLabel = searchParams.get('from') === 'reportes' ? 'Volver a Reportes' : 'Volver a Tickets'
   
   const [newComment, setNewComment] = useState('')
   const [isInternal, setIsInternal] = useState(false)
@@ -66,6 +71,8 @@ export default function TicketDetailPage() {
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const [tiempoRespuesta, setTiempoRespuesta] = useState('')
   const [tiempoSolucion, setTiempoSolucion] = useState('')
+  const [editableCategory, setEditableCategory] = useState<'hardware' | 'software' | 'network' | 'access' | 'other'>('other')
+  const [editableHardwareId, setEditableHardwareId] = useState<string>('')
   
   const { user, profile } = useAuth()
   const { data: ticket, isLoading: ticketLoading } = useTicket(ticketId)
@@ -74,9 +81,11 @@ export default function TicketDetailPage() {
   const { data: clients = [] } = useClients()
   const isCustomApplication = ticket?.software_source === 'custom_app'
   const relatedSoftwareId = ticket?.software_id || ''
+  const canEditCategoryAndHardware = profile?.role === 'administrador' || profile?.role === 'lider_soporte' || profile?.role === 'agente_soporte'
   
   // Obtener datos relacionados según categoría
   const { data: relatedHardware } = useHardwareAsset(ticket?.hardware_id || '')
+  const { data: clientHardwareList = [], isLoading: loadingClientHardware } = useHardwareAssetsByClient(ticket?.client_id || '')
   const { data: relatedSoftware } = useSoftwareLicense(isCustomApplication ? '' : relatedSoftwareId)
   const { data: relatedCustomApplication } = useCustomApplication(isCustomApplication ? relatedSoftwareId : '')
   const { data: relatedAccess } = useAccessCredential(ticket?.access_credential_id || '')
@@ -92,6 +101,8 @@ export default function TicketDetailPage() {
     if (ticket) {
       setTiempoRespuesta(ticket.tiempo_respuesta || '')
       setTiempoSolucion(ticket.tiempo_solucion || '')
+      setEditableCategory(ticket.category)
+      setEditableHardwareId(ticket.hardware_id || '')
     }
   }, [ticket])
 
@@ -219,6 +230,46 @@ export default function TicketDetailPage() {
     })
   }
 
+  const handleCategoryChange = (newCategory: string) => {
+    if (!ticket || !canEditCategoryAndHardware) return
+
+    const nextCategory = newCategory as 'hardware' | 'software' | 'network' | 'access' | 'other'
+    setEditableCategory(nextCategory)
+
+    if (nextCategory !== 'hardware') {
+      setEditableHardwareId('')
+    }
+
+    updateTicketMutation.mutate({
+      id: ticketId,
+      data: {
+        category: nextCategory,
+        hardware_id: nextCategory === 'hardware' ? (editableHardwareId || ticket.hardware_id || undefined) : undefined,
+        software_id: nextCategory === 'software' ? ticket.software_id : undefined,
+        software_source: nextCategory === 'software' ? ticket.software_source : undefined,
+        access_credential_id: nextCategory === 'access' ? ticket.access_credential_id : undefined,
+      }
+    })
+  }
+
+  const handleHardwareAssociationChange = (hardwareId?: string) => {
+    if (!ticket || !canEditCategoryAndHardware) return
+
+    const nextHardwareId = hardwareId || ''
+    setEditableHardwareId(nextHardwareId)
+
+    updateTicketMutation.mutate({
+      id: ticketId,
+      data: {
+        category: 'hardware',
+        hardware_id: hardwareId || undefined,
+        software_id: undefined,
+        software_source: undefined,
+        access_credential_id: undefined,
+      }
+    })
+  }
+
   const handleSubmitComment = () => {
     if (!newComment.trim() || !user) return
     
@@ -286,9 +337,9 @@ export default function TicketDetailPage() {
           <h2 className="text-xl font-semibold">Ticket no encontrado</h2>
           <p className="text-muted-foreground">El ticket solicitado no existe o no tienes permisos para verlo.</p>
         </div>
-        <Button onClick={() => router.push('/dashboard/tickets')}>
+        <Button onClick={() => router.push(backPath)}>
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Volver a Tickets
+          {backLabel}
         </Button>
       </div>
     )
@@ -305,10 +356,11 @@ export default function TicketDetailPage() {
           <Button 
             variant="ghost" 
             size="sm"
-            onClick={() => router.push('/dashboard/tickets')}
+            onClick={() => router.push(backPath)}
           >
-            <ArrowLeft className="mr-1 md:mr-2 h-4 w-4" />
-            <span className="hidden sm:inline">Volver</span>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            <span className="hidden sm:inline">{backLabel}</span>
+            <span className="sm:hidden">Volver</span>
           </Button>
           <div className="min-w-0 flex-1">
             <h1 className="text-lg md:text-2xl font-bold truncate">{ticket.ticket_number || `Ticket #${ticket.id.slice(-8)}`}</h1>
@@ -534,7 +586,7 @@ export default function TicketDetailPage() {
                     {(profile?.role === 'administrador' || profile?.role === 'lider_soporte' || profile?.role === 'agente_soporte') && (
                       <div className="border-t pt-4 mt-4">
                         <h4 className="text-sm font-semibold mb-3">Acciones Rápidas</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                           <div className="space-y-2">
                             <Label className="text-sm">Estado del Ticket</Label>
                             <Select 
@@ -573,6 +625,26 @@ export default function TicketDetailPage() {
                           </div>
 
                           <div className="space-y-2">
+                            <Label className="text-sm">Categoría</Label>
+                            <Select
+                              value={editableCategory}
+                              onValueChange={handleCategoryChange}
+                              disabled={updateTicketMutation.isPending}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Seleccionar categoría" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="hardware">Hardware</SelectItem>
+                                <SelectItem value="software">Software</SelectItem>
+                                <SelectItem value="network">Red</SelectItem>
+                                <SelectItem value="access">Accesos</SelectItem>
+                                <SelectItem value="other">Otro</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
                             <Label className="text-sm">Asignar a</Label>
                             <Select 
                               value={ticket.assigned_to || 'unassigned'} 
@@ -592,6 +664,33 @@ export default function TicketDetailPage() {
                               </SelectContent>
                             </Select>
                           </div>
+
+                          {editableCategory === 'hardware' && (
+                            <div className="space-y-2 md:col-span-2">
+                              <Label className="text-sm">Hardware asociado</Label>
+                              <ClientSearchCombobox
+                                options={[
+                                  {
+                                    value: 'none',
+                                    label: 'Sin hardware asociado',
+                                  },
+                                  ...clientHardwareList.map((hw) => ({
+                                    value: hw.id,
+                                    label: `${hw.persona_responsable || 'Sin responsable'} - ${hw.brand} ${hw.model}`,
+                                  })),
+                                ]}
+                                value={editableHardwareId || 'none'}
+                                onValueChange={(value) => {
+                                  handleHardwareAssociationChange(value === 'none' ? undefined : value)
+                                }}
+                                placeholder={loadingClientHardware ? 'Cargando hardware...' : 'Seleccione hardware del cliente'}
+                                searchPlaceholder="Buscar por responsable, marca, modelo o serial..."
+                                emptyMessage="No se encontró hardware para este cliente"
+                                disabled={loadingClientHardware || updateTicketMutation.isPending}
+                                minSearchChars={1}
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
