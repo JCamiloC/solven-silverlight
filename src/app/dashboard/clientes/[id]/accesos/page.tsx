@@ -568,7 +568,7 @@ interface AccessCredentialFormProps {
 }
 
 function AccessCredentialForm({ credential, onSubmit, onCancel, isLoading }: AccessCredentialFormProps) {
-  const { profile, user } = useAuth()
+  const { profile } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
     system_name: credential?.system_name || '',
@@ -590,13 +590,12 @@ function AccessCredentialForm({ credential, onSubmit, onCancel, isLoading }: Acc
       status: formData.status,
     }
 
-    // Only include password if it's been changed
-    if (formData.password) {
-      submitData.password = formData.password
-    }
-
     if (!credential) {
-      submitData.created_by = user?.id || profile!.id
+      if (!formData.password.trim()) {
+        return
+      }
+      submitData.password = formData.password
+      submitData.created_by = profile!.id
     }
 
     onSubmit(submitData)

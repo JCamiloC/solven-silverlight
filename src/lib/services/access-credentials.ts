@@ -99,6 +99,24 @@ export interface AccessStats {
 }
 
 export class AccessCredentialsService {
+  private async getCreatorProfile(createdBy: string) {
+    const byId = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .eq('id', createdBy)
+      .maybeSingle()
+
+    if (byId.data) return byId.data
+
+    const byUserId = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name')
+      .eq('user_id', createdBy)
+      .maybeSingle()
+
+    return byUserId.data
+  }
+
   /**
    * Get all credentials (without passwords)
    */
@@ -132,12 +150,7 @@ export class AccessCredentialsService {
             .eq('id', credential.client_id)
             .single()
             .then(result => result.data) : null,
-          supabase
-            .from('profiles')
-            .select('id, first_name, last_name')
-            .eq('user_id', credential.created_by)
-            .single()
-            .then(result => result.data)
+          this.getCreatorProfile(credential.created_by)
         ])
 
         return {
@@ -184,12 +197,7 @@ export class AccessCredentialsService {
         .eq('id', data.client_id)
         .single()
         .then(result => result.data) : null,
-      supabase
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .eq('user_id', data.created_by)
-        .single()
-        .then(result => result.data)
+      this.getCreatorProfile(data.created_by)
     ])
 
     return {
@@ -263,7 +271,10 @@ export class AccessCredentialsService {
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        const message = (error as { message?: string; code?: string }).message || 'Error desconocido'
+        throw new Error(message)
+      }
 
       await this.logAudit({
         action: 'create',
@@ -277,7 +288,8 @@ export class AccessCredentialsService {
       return data
     } catch (error) {
       console.error('Error creating credential:', error)
-      throw new Error('Failed to create credential')
+      const message = error instanceof Error ? error.message : 'Failed to create credential'
+      throw new Error(message)
     }
   }
 
@@ -400,12 +412,7 @@ export class AccessCredentialsService {
             .eq('id', credential.client_id)
             .single()
             .then(result => result.data),
-          supabase
-            .from('profiles')
-            .select('id, first_name, last_name')
-            .eq('user_id', credential.created_by)
-            .single()
-            .then(result => result.data)
+          this.getCreatorProfile(credential.created_by)
         ])
 
         return {
@@ -552,21 +559,36 @@ export class AccessCredentialsService {
     ipAddress?: string
   }): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('access_logs')
-        .insert([{
-          credential_id: credentialId ?? null,
-          accessed_by: performedBy,
-          purpose,
-          ip_address: ipAddress,
-          accessed_at: new Date().toISOString(),
-          action,
-          credential_system_name: systemName ?? null,
-          credential_username: username ?? null,
-          details: details ?? null,
-        }])
+      const extendedPayload = {
+        credential_id: credentialId ?? null,
+        accessed_by: performedBy,
+        purpose,
+        ip_address: ipAddress,
+        accessed_at: new Date().toISOString(),
+        action,
+        credential_system_name: systemName ?? null,
+        credential_username: username ?? null,
+        details: details ?? null,
+      }
 
-      if (error) throw error
+      const { error: extendedError } = await supabase
+        .from('access_logs')
+        .insert([extendedPayload])
+
+      if (extendedError) {
+        // Fallback if audit migration has not been applied yet
+        const { error: legacyError } = await supabase
+          .from('access_logs')
+          .insert([{
+            credential_id: credentialId ?? null,
+            accessed_by: performedBy,
+            purpose,
+            ip_address: ipAddress,
+            accessed_at: new Date().toISOString(),
+          }])
+
+        if (legacyError) throw legacyError
+      }
     } catch (error) {
       console.error('Error logging audit action:', error)
       // Don't throw error for logging failures to avoid breaking main operations

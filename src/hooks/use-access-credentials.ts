@@ -66,12 +66,12 @@ export function useAccessCredential(id: string) {
 // Hook para obtener una credencial CON contraseña (requiere verificación adicional)
 export function useAccessCredentialWithPassword(id: string, purpose: string) {
   const { requireVerification } = useSecurityContext()
-  const { user } = useAuth()
+  const { profile } = useAuth()
 
   return useQuery({
     queryKey: accessKeys.detailWithPassword(id),
     queryFn: async (): Promise<AccessCredentialDecrypted | null> => {
-      if (!id || !user?.id) return null
+      if (!id || !profile?.id) return null
       
       // Always require fresh 2FA verification for password access
       const verified = await requireVerification()
@@ -79,7 +79,7 @@ export function useAccessCredentialWithPassword(id: string, purpose: string) {
         throw new Error('2FA verification required for password access')
       }
       
-      return accessCredentialsService.getWithPassword(id, user.id, purpose)
+      return accessCredentialsService.getWithPassword(id, profile.id, purpose)
     },
     enabled: false, // Never auto-fetch, must be manually triggered
     staleTime: 0, // Never cache passwords
@@ -178,12 +178,12 @@ export function useCreateAccessCredential() {
         throw new Error('La contraseña es obligatoria')
       }
 
-      const performedBy = profile?.id || user?.id
+      const performedBy = profile?.id
       if (!performedBy) {
         throw new Error('Usuario no autenticado')
       }
 
-      return accessCredentialsService.create(data, performedBy)
+      return accessCredentialsService.create({ ...data, created_by: performedBy }, performedBy)
     },
     onMutate: async (newCredential) => {
       // Cancel any outgoing refetches
@@ -243,7 +243,7 @@ export function useUpdateAccessCredential() {
         throw new Error('2FA verification required')
       }
 
-      const performedBy = profile?.id || user?.id
+      const performedBy = profile?.id
       if (!performedBy) {
         throw new Error('Usuario no autenticado')
       }
@@ -317,7 +317,7 @@ export function useDeleteAccessCredential() {
         throw new Error('2FA verification required')
       }
 
-      const performedBy = profile?.id || user?.id
+      const performedBy = profile?.id
       if (!performedBy) {
         throw new Error('Usuario no autenticado')
       }
@@ -362,11 +362,11 @@ export function useDeleteAccessCredential() {
 export function useRevealPassword() {
   const queryClient = useQueryClient()
   const { requireVerification } = useSecurityContext()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
 
   return useMutation({
     mutationFn: async ({ id, purpose }: { id: string; purpose: string }) => {
-      if (!user?.id) throw new Error('Usuario no autenticado')
+      if (!user?.id || !profile?.id) throw new Error('Usuario no autenticado')
 
       // Always require fresh 2FA verification for password reveal
       const verified = await requireVerification()
@@ -374,7 +374,7 @@ export function useRevealPassword() {
         throw new Error('2FA verification required')
       }
 
-      const credential = await accessCredentialsService.getWithPassword(id, user.id, purpose)
+      const credential = await accessCredentialsService.getWithPassword(id, profile.id, purpose)
       
       // Clear the password from memory after a short time
       setTimeout(() => {
