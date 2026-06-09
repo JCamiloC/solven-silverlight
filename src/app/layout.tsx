@@ -38,10 +38,7 @@ export default function RootLayout({
           <AuthProvider>
             <InteractionLockProvider>
               <ReactQueryProvider>
-                <SessionTimeoutProvider
-                  timeoutMinutes={5}
-                  enabled={true}
-                >
+                <SessionTimeoutProvider enabled={true}>
                   {children}
                   <FloatingChat />
                   <Toaster />

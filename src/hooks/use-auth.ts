@@ -247,6 +247,41 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [getProfile, router, setAndCacheAuthState, supabase])
 
+  // Renovar JWT antes de expirar y al volver a la pestaña
+  useEffect(() => {
+    if (!authState.user) return
+
+    const refreshIfNeeded = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.expires_at) return
+
+        const expiresIn = session.expires_at - Math.floor(Date.now() / 1000)
+        if (expiresIn < 10 * 60) {
+          await supabase.auth.refreshSession()
+        }
+      } catch (error) {
+        console.warn('[useAuth] Token refresh skipped:', error)
+      }
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshIfNeeded()
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    const interval = setInterval(() => {
+      void refreshIfNeeded()
+    }, 50 * 60 * 1000)
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      clearInterval(interval)
+    }
+  }, [authState.user, supabase])
+
   const signOut = async () => {
     const clearLocalAuthState = () => {
       setAndCacheAuthState({

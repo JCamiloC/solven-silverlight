@@ -1,8 +1,10 @@
 'use client'
 
-import { createContext, useContext, ReactNode } from 'react'
+import { createContext, useContext, ReactNode, useMemo } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { useSessionTimeout } from '@/hooks/use-session-timeout'
+import { SessionWarningDialog } from '@/components/auth/session-warning-dialog'
+import { getSessionTimeoutMinutes, SESSION_CONFIG } from '@/lib/session-config'
 
 interface SessionTimeoutContextType {
   resetTimeout: () => void
@@ -13,28 +15,41 @@ const SessionTimeoutContext = createContext<SessionTimeoutContextType | undefine
 
 interface SessionTimeoutProviderProps {
   children: ReactNode
-  timeoutMinutes?: number
   enabled?: boolean
 }
 
-export function SessionTimeoutProvider({ 
-  children, 
-  timeoutMinutes = 5,
-  enabled = true
+export function SessionTimeoutProvider({
+  children,
+  enabled = true,
 }: SessionTimeoutProviderProps) {
-  const { user } = useAuth()
-  
-  const { 
+  const { user, profile } = useAuth()
+
+  const timeoutMinutes = useMemo(
+    () => getSessionTimeoutMinutes(profile?.role),
+    [profile?.role]
+  )
+
+  const {
     resetTimeout,
-    forceLogout
-  } = useSessionTimeout({ 
-    timeoutMinutes, 
-    enabled: enabled && !!user // Solo activo si hay usuario logueado
+    forceLogout,
+    extendSession,
+    showWarning,
+    remainingSeconds,
+  } = useSessionTimeout({
+    timeoutMinutes,
+    warningMinutes: SESSION_CONFIG.WARNING_MINUTES,
+    enabled: enabled && !!user,
   })
 
   return (
     <SessionTimeoutContext.Provider value={{ resetTimeout, forceLogout }}>
       {children}
+      <SessionWarningDialog
+        isOpen={showWarning}
+        remainingTime={remainingSeconds}
+        onExtend={extendSession}
+        onLogout={forceLogout}
+      />
     </SessionTimeoutContext.Provider>
   )
 }

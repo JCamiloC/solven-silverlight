@@ -1,5 +1,6 @@
 import { createBrowserClient } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { notifySessionActivity } from '@/lib/session-activity'
 
 // Timeout para queries de Supabase (15 segundos)
 const QUERY_TIMEOUT = 15000
@@ -91,11 +92,24 @@ export function createClient() {
       fetch: (url, options = {}) => {
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), QUERY_TIMEOUT)
-        
+        const requestUrl = typeof url === 'string' ? url : url.toString()
+        const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
+
         return fetch(url, {
           ...options,
           signal: controller.signal,
-        }).finally(() => clearTimeout(timeoutId))
+        })
+          .then((response) => {
+            if (
+              response.ok &&
+              supabaseHost &&
+              requestUrl.startsWith(supabaseHost)
+            ) {
+              notifySessionActivity()
+            }
+            return response
+          })
+          .finally(() => clearTimeout(timeoutId))
       },
     },
   })
