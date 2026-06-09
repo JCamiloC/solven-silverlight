@@ -109,7 +109,7 @@ const allNavigationItems: NavigationItem[] = [
     name: 'Usuarios',
     href: '/dashboard/usuarios',
     icon: Users,
-    roles: ['administrador'],
+    roles: ['administrador', 'lider_soporte'],
   },
   {
     name: 'Tickets',
@@ -190,7 +190,10 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
             <NavButton
               key={item.name}
               item={item}
-              isActive={pathname === item.href}
+              isActive={
+                pathname === item.href ||
+                (item.href !== '/dashboard' && pathname.startsWith(`${item.href}/`))
+              }
               showText={showText}
               isCollapsed={isCollapsed}
               isHovered={isHovered}
@@ -203,21 +206,22 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
       {/* Bottom Section - Settings & Logout */}
       <div className={`py-4 flex-shrink-0 border-t border-border/50 ${showText ? 'px-3' : 'px-1'}`}>
         <div className="space-y-1">
-          {(profile?.role === 'administrador' || profile?.role === 'lider_soporte') && (
-            <NavButton
+          <NavButton
               item={{
                 name: 'Configuración',
                 href: '/dashboard/configuracion',
                 icon: Settings,
-                roles: ['administrador', 'lider_soporte']
+                roles: ['administrador', 'lider_soporte', 'agente_soporte', 'cliente']
               }}
-              isActive={pathname === '/dashboard/configuracion'}
+              isActive={
+                pathname === '/dashboard/configuracion' ||
+                pathname.startsWith('/dashboard/configuracion/')
+              }
               showText={showText}
               isCollapsed={isCollapsed}
               isHovered={isHovered}
               onNavigate={onNavigate}
             />
-          )}
           
           {/* Logout button with tooltip when collapsed */}
           {isCollapsed && !isHovered ? (

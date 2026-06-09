@@ -17,7 +17,7 @@ export default function ClienteTicketsPage() {
   const params = useParams()
   const router = useRouter()
   const clientId = params.id as string
-  const { readOnly } = useClientPermissions()
+  const { readOnly, isClientUser } = useClientPermissions()
 
   const { data: client, isLoading: loadingClient } = useClient(clientId)
   const { data: tickets, isLoading: loadingTickets } = useClientTickets(clientId)
@@ -127,7 +127,13 @@ export default function ClienteTicketsPage() {
               </Button>
             )}
             <Button
-              onClick={() => router.push(`/dashboard/clientes/${clientId}/tickets/nuevo`)}
+              onClick={() => {
+                if (isClientUser) {
+                  router.push(`/dashboard/tickets/nuevo?clientId=${clientId}`)
+                } else {
+                  router.push(`/dashboard/clientes/${clientId}/tickets/nuevo`)
+                }
+              }}
               className="w-full sm:w-auto"
             >
               <Plus className="mr-2 h-4 w-4" />

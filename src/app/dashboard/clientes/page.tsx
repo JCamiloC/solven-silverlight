@@ -32,6 +32,7 @@ import { Client, ClientType } from '@/types'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { getClientTypeLabel } from '@/lib/utils/user-type-labels'
+import { TablePagination } from '@/components/ui/table-pagination'
 
 export default function ClientesPage() {
   const router = useRouter()
@@ -39,6 +40,8 @@ export default function ClientesPage() {
   const { mutateAsync: createClient, isPending: isCreating } = useCreateClient()
   const { runWithLock, isLocked } = useActionLock()
   const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
@@ -61,6 +64,12 @@ export default function ClientesPage() {
       (client.phone && client.phone.includes(search))
     )
   }) || []
+
+  const totalPages = Math.max(1, Math.ceil(filteredClients.length / itemsPerPage))
+  const paginatedClients = filteredClients.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
 
   const columns: Array<{
     key: keyof Client
@@ -209,7 +218,7 @@ export default function ClientesPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredClients.map((client) => (
+                      {paginatedClients.map((client) => (
                         <tr
                           key={client.id}
                           className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
@@ -234,6 +243,13 @@ export default function ClientesPage() {
                     </tbody>
                   </table>
                 </div>
+                <TablePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={filteredClients.length}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={setCurrentPage}
+                />
               </div>
             )}
           </CardContent>

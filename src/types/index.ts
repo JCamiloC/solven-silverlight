@@ -467,13 +467,19 @@ export interface AccessCredential {
   updated_at: string
 }
 
+export type AccessLogAction = 'view' | 'create' | 'update' | 'delete'
+
 export interface AccessLog {
   id: string
-  credential_id: string
+  credential_id?: string | null
   accessed_by: string
   accessed_at: string
   purpose: string
   ip_address?: string
+  action?: AccessLogAction
+  credential_system_name?: string | null
+  credential_username?: string | null
+  details?: Record<string, unknown> | null
 }
 
 export interface Ticket {

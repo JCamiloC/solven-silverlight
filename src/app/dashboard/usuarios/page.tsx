@@ -39,6 +39,17 @@ import { useClients } from '@/hooks/use-clients'
 import { useInviteUser, usePendingUsers } from '@/hooks/use-user-invitations'
 import { User, UserInsert, UserUpdate } from '@/lib/services/users'
 import { ProtectedRoute } from '@/components/auth/protected-route'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { TablePagination } from '@/components/ui/table-pagination'
 
 export default function UsersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -46,6 +57,8 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
   const [showPassword, setShowPassword] = useState(false)
   const [selectedRole, setSelectedRole] = useState<User['role']>('cliente')
   const [selectedClientId, setSelectedClientId] = useState<string>('')
@@ -53,16 +66,6 @@ export default function UsersPage() {
   const { user: currentUser, hasRole, loading } = useAuth()
   const { data: users = [], isLoading: usersLoading } = useUsers()
   const { data: clients = [] } = useClients()
-  // Log para depuración de clientes
-  console.log('[Usuarios Debug] Clientes recibidos:', clients)
-
-  // Consulta directa a Supabase para depuración
-  import('@/lib/supabase/client').then(({ createClient }) => {
-    const supabase = createClient();
-    supabase.from('clients').select('*').then((res) => {
-      console.log('[Usuarios Debug] Consulta directa a clients:', res);
-    });
-  });
   
   const createUserMutation = useCreateUser()
   const updateUserMutation = useUpdateUser()
@@ -70,12 +73,14 @@ export default function UsersPage() {
   const inviteUserMutation = useInviteUser()
   const { data: pendingUsers = [] } = usePendingUsers()
 
+  const [userToDelete, setUserToDelete] = useState<User | null>(null)
+
   // Permisos
-  const canManageUsers = hasRole(['administrador'])
+  const canManageUsers = hasRole(['administrador', 'lider_soporte'])
   const canViewUsers = hasRole(['administrador', 'lider_soporte'])
-  const canCreateUsers = hasRole(['administrador'])
-  const canEditUsers = hasRole(['administrador'])
-  const canDeleteUsers = hasRole(['administrador'])
+  const canCreateUsers = hasRole(['administrador', 'lider_soporte'])
+  const canEditUsers = hasRole(['administrador', 'lider_soporte'])
+  const canDeleteUsers = hasRole(['administrador', 'lider_soporte'])
 
   // Mostrar loading mientras se verifica autenticación
   if (loading) {
@@ -147,6 +152,12 @@ export default function UsersPage() {
     return matchesSearch && matchesRole
   })
 
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage))
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
+
   const columns = [
     {
       key: 'first_name' as keyof User,
@@ -217,10 +228,14 @@ export default function UsersPage() {
       alert('No puedes eliminar tu propio usuario')
       return
     }
-    
-    if (confirm(`¿Estás seguro de que deseas eliminar a ${user.first_name} ${user.last_name}?`)) {
-      deleteUserMutation.mutate(user.id)
-    }
+    setUserToDelete(user)
+  }
+
+  const confirmDelete = () => {
+    if (!userToDelete) return
+    deleteUserMutation.mutate(userToDelete.id, {
+      onSettled: () => setUserToDelete(null),
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -238,8 +253,6 @@ export default function UsersPage() {
       password: formData.get('password') as string,
       client_id: selectedRole === 'cliente' ? selectedClientId : '',
     }
-
-    console.log('[Usuarios Debug] userData antes de enviar:', userData)
 
     if (selectedUser) {
       // Actualizar usuario existente (sin password)
@@ -319,7 +332,7 @@ export default function UsersPage() {
   }
 
   return (
-    <ProtectedRoute allowedRoles={['administrador']}>
+    <ProtectedRoute allowedRoles={['administrador', 'lider_soporte']}>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -410,13 +423,20 @@ export default function UsersPage() {
 
       {/* Users Table */}
       <DataTable
-        data={filteredUsers}
+        data={paginatedUsers}
         columns={columns}
         title="Lista de Usuarios"
         onAdd={canCreateUsers ? handleAdd : undefined}
         onEdit={canEditUsers ? handleEdit : undefined}
         onDelete={canDeleteUsers ? handleDelete : undefined}
         addButtonText="Crear Usuario"
+      />
+      <TablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={filteredUsers.length}
+        itemsPerPage={itemsPerPage}
+        onPageChange={setCurrentPage}
       />
 
       {/* Add/Edit User Dialog */}
@@ -707,6 +727,27 @@ export default function UsersPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente a{' '}
+              {userToDelete ? `${userToDelete.first_name} ${userToDelete.last_name}` : 'este usuario'}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       </div>
     </ProtectedRoute>
   )

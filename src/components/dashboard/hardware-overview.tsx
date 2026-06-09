@@ -7,6 +7,7 @@ import { useHardwareAssets } from '@/hooks/use-hardware'
 import { useSoftwareStats } from '@/hooks/use-software'
 import { useAccessStats } from '@/hooks/use-access-credentials'
 import { useAuth } from '@/hooks/use-auth'
+import { useUsers } from '@/hooks/use-users'
 import { 
   HardDrive, 
   Monitor, 
@@ -22,6 +23,9 @@ export function HardwareOverview() {
   const { data: accessStats, error: accessError } = useAccessStats()
   const { hasRole } = useAuth()
   const isAdmin = hasRole(['administrador'])
+
+  const { data: users = [] } = useUsers()
+  const activeUsersCount = users.length
 
   // Get system status overview
   const systemStatus = [
@@ -49,8 +53,8 @@ export function HardwareOverview() {
     {
       name: 'Usuarios',
       icon: Users,
-      status: '45 activos',
-      count: 45, // TODO: Connect to user data
+      status: `${activeUsersCount} registrados`,
+      count: activeUsersCount,
       variant: 'secondary' as const,
     },
   ]
@@ -66,8 +70,8 @@ export function HardwareOverview() {
             </CardDescription>
           </div>
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/dashboard/hardware">
-              Ver hardware
+            <Link href="/dashboard/clientes">
+              Ver clientes
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>

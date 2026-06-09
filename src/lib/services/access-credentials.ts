@@ -56,13 +56,38 @@ export interface AccessCredentialDecrypted extends AccessCredentialWithRelations
   password: string // Decrypted password - only returned when explicitly requested
 }
 
+export type AccessLogAction = 'view' | 'create' | 'update' | 'delete'
+
 export interface AccessLog {
   id: string
-  credential_id: string
+  credential_id?: string | null
   accessed_by: string
   accessed_at: string
   purpose: string
   ip_address?: string
+  action?: AccessLogAction
+  credential_system_name?: string | null
+  credential_username?: string | null
+  details?: Record<string, unknown> | null
+  credential?: {
+    id: string
+    system_name: string
+  } | null
+  accessed_by_profile?: {
+    id: string
+    first_name: string
+    last_name: string
+  } | null
+}
+
+const AUDIT_FIELD_LABELS: Record<string, string> = {
+  system_name: 'sistema',
+  username: 'usuario',
+  url: 'URL',
+  notes: 'notas',
+  status: 'estado',
+  client_id: 'cliente',
+  password: 'contraseña',
 }
 
 export interface AccessStats {
@@ -220,7 +245,7 @@ export class AccessCredentialsService {
   /**
    * Create new credential with encrypted password
    */
-  async create(credential: AccessCredentialInsert): Promise<AccessCredential> {
+  async create(credential: AccessCredentialInsert, performedBy: string): Promise<AccessCredential> {
     try {
       // Encrypt the password
       const encryptedPassword = CryptoService.encrypt(credential.password)
@@ -239,6 +264,16 @@ export class AccessCredentialsService {
         .single()
 
       if (error) throw error
+
+      await this.logAudit({
+        action: 'create',
+        credentialId: data.id,
+        performedBy,
+        systemName: data.system_name,
+        username: data.username,
+        purpose: `Credencial creada: ${data.system_name}`,
+      })
+
       return data
     } catch (error) {
       console.error('Error creating credential:', error)
@@ -249,8 +284,17 @@ export class AccessCredentialsService {
   /**
    * Update credential (password will be re-encrypted if provided)
    */
-  async update(id: string, updates: AccessCredentialUpdate): Promise<AccessCredential> {
+  async update(id: string, updates: AccessCredentialUpdate, performedBy: string): Promise<AccessCredential> {
     try {
+      const { data: existing, error: fetchError } = await supabase
+        .from('access_credentials')
+        .select('id, system_name, username, url, notes, status, client_id')
+        .eq('id', id)
+        .single()
+
+      if (fetchError) throw fetchError
+      if (!existing) throw new Error('Credential not found')
+
       const updateData: any = { ...updates }
 
       // If password is being updated, encrypt it
@@ -267,6 +311,24 @@ export class AccessCredentialsService {
         .single()
 
       if (error) throw error
+
+      const changes = this.getUpdateChanges(existing, updates)
+      if (Object.keys(changes).length > 0) {
+        const changedFields = Object.keys(changes)
+          .map((field) => AUDIT_FIELD_LABELS[field] || field)
+          .join(', ')
+
+        await this.logAudit({
+          action: 'update',
+          credentialId: id,
+          performedBy,
+          systemName: data.system_name,
+          username: data.username,
+          purpose: `Credencial editada (${data.system_name}): ${changedFields}`,
+          details: { changes },
+        })
+      }
+
       return data
     } catch (error) {
       console.error('Error updating credential:', error)
@@ -277,7 +339,25 @@ export class AccessCredentialsService {
   /**
    * Delete credential
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, performedBy: string): Promise<void> {
+    const { data: existing, error: fetchError } = await supabase
+      .from('access_credentials')
+      .select('id, system_name, username')
+      .eq('id', id)
+      .single()
+
+    if (fetchError) throw fetchError
+    if (!existing) throw new Error('Credential not found')
+
+    await this.logAudit({
+      action: 'delete',
+      credentialId: id,
+      performedBy,
+      systemName: existing.system_name,
+      username: existing.username,
+      purpose: `Credencial eliminada: ${existing.system_name} (${existing.username})`,
+    })
+
     const { error } = await supabase
       .from('access_credentials')
       .delete()
@@ -412,20 +492,83 @@ export class AccessCredentialsService {
    * Log credential access for audit trail
    */
   async logAccess(credentialId: string, userId: string, purpose: string, ipAddress?: string): Promise<void> {
+    const { data: credential } = await supabase
+      .from('access_credentials')
+      .select('system_name, username')
+      .eq('id', credentialId)
+      .single()
+
+    await this.logAudit({
+      action: 'view',
+      credentialId,
+      performedBy: userId,
+      systemName: credential?.system_name,
+      username: credential?.username,
+      purpose,
+      ipAddress,
+    })
+  }
+
+  private getUpdateChanges(
+    existing: Pick<AccessCredential, 'system_name' | 'username' | 'url' | 'notes' | 'status' | 'client_id'>,
+    updates: AccessCredentialUpdate
+  ): Record<string, { from: string; to: string }> {
+    const changes: Record<string, { from: string; to: string }> = {}
+    const fields = ['system_name', 'username', 'url', 'notes', 'status', 'client_id'] as const
+
+    for (const field of fields) {
+      if (updates[field] !== undefined && updates[field] !== existing[field]) {
+        changes[field] = {
+          from: String(existing[field] ?? ''),
+          to: String(updates[field] ?? ''),
+        }
+      }
+    }
+
+    if (updates.password) {
+      changes.password = { from: '***', to: '*** (actualizada)' }
+    }
+
+    return changes
+  }
+
+  private async logAudit({
+    action,
+    credentialId,
+    performedBy,
+    systemName,
+    username,
+    purpose,
+    details,
+    ipAddress,
+  }: {
+    action: AccessLogAction
+    credentialId?: string | null
+    performedBy: string
+    systemName?: string | null
+    username?: string | null
+    purpose: string
+    details?: Record<string, unknown>
+    ipAddress?: string
+  }): Promise<void> {
     try {
       const { error } = await supabase
         .from('access_logs')
         .insert([{
-          credential_id: credentialId,
-          accessed_by: userId,
+          credential_id: credentialId ?? null,
+          accessed_by: performedBy,
           purpose,
           ip_address: ipAddress,
-          accessed_at: new Date().toISOString()
+          accessed_at: new Date().toISOString(),
+          action,
+          credential_system_name: systemName ?? null,
+          credential_username: username ?? null,
+          details: details ?? null,
         }])
 
       if (error) throw error
     } catch (error) {
-      console.error('Error logging access:', error)
+      console.error('Error logging audit action:', error)
       // Don't throw error for logging failures to avoid breaking main operations
     }
   }

@@ -74,9 +74,13 @@ export default function TicketDetailPage() {
   const [editableCategory, setEditableCategory] = useState<'hardware' | 'software' | 'network' | 'access' | 'other'>('other')
   const [editableHardwareId, setEditableHardwareId] = useState<string>('')
   
-  const { user, profile } = useAuth()
+  const { user, profile, isClient } = useAuth()
+  const isClientUser = isClient()
   const { data: ticket, isLoading: ticketLoading } = useTicket(ticketId)
   const { data: comments = [], isLoading: commentsLoading } = useTicketComments(ticketId)
+  const visibleComments = isClientUser
+    ? comments.filter((comment) => !comment.is_internal)
+    : comments
   const { data: assignableUsers = [] } = useAssignableUsers()
   const { data: clients = [] } = useClients()
   const isCustomApplication = ticket?.software_source === 'custom_app'
@@ -112,7 +116,7 @@ export default function TicketDetailPage() {
       // Verificar que el ticket pertenece al cliente
       if (ticket.client_id !== profile.client_id) {
         toast.error('No tienes permiso para ver este ticket')
-        router.push('/dashboard/tickets')
+        router.push(profile?.client_id ? `/dashboard/clientes/${profile.client_id}/tickets` : '/dashboard/tickets')
       }
     }
   }, [ticket, profile, router])
@@ -277,7 +281,7 @@ export default function TicketDetailPage() {
       ticket_id: ticketId,
       comment: newComment.trim(),
       created_by: user.id,
-      is_internal: isInternal
+      is_internal: isClientUser ? false : isInternal
     }
     
     createCommentMutation.mutate(commentData, {
@@ -451,7 +455,7 @@ export default function TicketDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center">
                 <MessageSquare className="mr-2 h-5 w-5" />
-                Comentarios ({comments.length})
+                Comentarios ({visibleComments.length})
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -460,7 +464,7 @@ export default function TicketDetailPage() {
                 <div className="flex justify-center py-4">
                   <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
-              ) : comments.length === 0 ? (
+              ) : visibleComments.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
                   <p>No hay comentarios aún</p>
@@ -468,7 +472,7 @@ export default function TicketDetailPage() {
                 </div>
               ) : (
                 <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {comments.map((comment) => (
+                  {visibleComments.map((comment) => (
                     <div 
                       key={comment.id} 
                       className={`p-4 rounded-lg border ${
@@ -555,6 +559,7 @@ export default function TicketDetailPage() {
                     />
                     
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      {!isClientUser && (
                       <div className="flex items-center space-x-2">
                         <input
                           type="checkbox"
@@ -568,6 +573,7 @@ export default function TicketDetailPage() {
                           Comentario interno
                         </Label>
                       </div>
+                      )}
                       <Button 
                         onClick={handleSubmitComment}
                         disabled={!newComment.trim() || createCommentMutation.isPending}

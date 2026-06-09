@@ -37,6 +37,7 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { TablePagination } from '@/components/ui/table-pagination'
 
 export default function ClienteAccesosPage() {
   const { profile } = useAuth()
@@ -65,6 +66,8 @@ function ClienteAccesosContent() {
   
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingCredential, setEditingCredential] = useState<AccessCredentialWithRelations | null>(null)
@@ -95,6 +98,12 @@ function ClienteAccesosContent() {
     return matchesSearch && matchesStatus
   }) || []
 
+  const totalPages = Math.max(1, Math.ceil(filteredCredentials.length / itemsPerPage))
+  const paginatedCredentials = filteredCredentials.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
+
   // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-CO', {
@@ -106,12 +115,16 @@ function ClienteAccesosContent() {
     })
   }
 
-  // Reveal password
-  const handleRevealPassword = async (credentialId: string) => {
+  // Reveal password — logged in audit trail with role context
+  const handleRevealPassword = async (credentialId: string, systemName: string) => {
+    const purpose = readOnly
+      ? `[Consulta cliente - solo lectura] Visualización de credencial: ${systemName}`
+      : `Visualización de credencial: ${systemName}`
+
     try {
       const result = await runWithLock(async () => revealMutation.mutateAsync({
         id: credentialId,
-        purpose: 'Visualización desde módulo de cliente'
+        purpose,
       }), {
         message: 'Revelando contraseña...'
       })
@@ -253,7 +266,7 @@ function ClienteAccesosContent() {
         <Shield className="h-4 w-4" />
         <AlertDescription>
           Las contraseñas están encriptadas. Solo usuarios con 2FA habilitado pueden ver las credenciales.
-          Todos los accesos son registrados con fines de auditoría.
+          Todas las acciones sobre credenciales quedan registradas con fines de auditoría.
         </AlertDescription>
       </Alert>
 
@@ -371,7 +384,7 @@ function ClienteAccesosContent() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCredentials.map((credential) => (
+                  {paginatedCredentials.map((credential) => (
                     <TableRow key={credential.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
@@ -427,7 +440,7 @@ function ClienteAccesosContent() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-6 w-6"
-                                onClick={() => handleRevealPassword(credential.id)}
+                                onClick={() => handleRevealPassword(credential.id, credential.system_name)}
                                 disabled={revealMutation.isPending || isLocked}
                               >
                                 <Eye className="h-3 w-3" />
@@ -508,6 +521,13 @@ function ClienteAccesosContent() {
                   ))}
                 </TableBody>
               </Table>
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredCredentials.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+              />
             </div>
           )}
         </CardContent>
@@ -548,7 +568,8 @@ interface AccessCredentialFormProps {
 }
 
 function AccessCredentialForm({ credential, onSubmit, onCancel, isLoading }: AccessCredentialFormProps) {
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
+  const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
     system_name: credential?.system_name || '',
     username: credential?.username || '',
@@ -575,7 +596,7 @@ function AccessCredentialForm({ credential, onSubmit, onCancel, isLoading }: Acc
     }
 
     if (!credential) {
-      submitData.created_by = profile!.id
+      submitData.created_by = user?.id || profile!.id
     }
 
     onSubmit(submitData)
@@ -606,12 +627,22 @@ function AccessCredentialForm({ credential, onSubmit, onCancel, isLoading }: Acc
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">
-          Contraseña {credential ? '(dejar en blanco para no cambiar)' : '*'}
-        </Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">
+            Contraseña {credential ? '(dejar en blanco para no cambiar)' : '*'}
+          </Label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowPassword(!showPassword)}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
+        </div>
         <Input
           id="password"
-          type="password"
+          type={showPassword ? 'text' : 'password'}
           value={formData.password}
           onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
           placeholder="Contraseña"

@@ -77,13 +77,17 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
       const isAdmin = userRole === 'administrador'
       
       if (isAdmin) {
-        // For admins without 2FA, allow access but encourage setup
         toast.info('Recomendamos configurar 2FA para mayor seguridad')
         return true
-      } else {
-        toast.error('2FA no está configurado. Contacta al administrador.')
+      }
+
+      if (userRole === 'cliente' || userRole === 'lider_soporte') {
+        toast.error('Debes configurar 2FA en Configuración para acceder a credenciales.')
         return false
       }
+
+      toast.error('2FA no está configurado. Contacta al administrador.')
+      return false
     }
 
     // Check if recently verified

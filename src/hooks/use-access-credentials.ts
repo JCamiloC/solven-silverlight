@@ -164,6 +164,7 @@ export function useAccessLogs(credentialId?: string) {
 export function useCreateAccessCredential() {
   const queryClient = useQueryClient()
   const { requireVerification } = useSecurityContext()
+  const { profile, user } = useAuth()
 
   return useMutation({
     mutationFn: async (data: AccessCredentialInsert) => {
@@ -173,13 +174,16 @@ export function useCreateAccessCredential() {
         throw new Error('2FA verification required')
       }
 
-      // Validate password strength
-      const validation = accessCredentialsService.validatePasswordStrength(data.password)
-      if (!validation.isStrong) {
-        throw new Error(`Contraseña débil: ${validation.feedback.join(', ')}`)
+      if (!data.password?.trim()) {
+        throw new Error('La contraseña es obligatoria')
       }
 
-      return accessCredentialsService.create(data)
+      const performedBy = profile?.id || user?.id
+      if (!performedBy) {
+        throw new Error('Usuario no autenticado')
+      }
+
+      return accessCredentialsService.create(data, performedBy)
     },
     onMutate: async (newCredential) => {
       // Cancel any outgoing refetches
@@ -217,6 +221,7 @@ export function useCreateAccessCredential() {
       // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: accessKeys.lists() })
       queryClient.invalidateQueries({ queryKey: accessKeys.stats() })
+      queryClient.invalidateQueries({ queryKey: accessKeys.logs() })
       // Invalidate by client queries
       queryClient.invalidateQueries({ queryKey: accessKeys.all })
       toast.success('Credencial creada exitosamente')
@@ -228,6 +233,7 @@ export function useCreateAccessCredential() {
 export function useUpdateAccessCredential() {
   const queryClient = useQueryClient()
   const { requireVerification } = useSecurityContext()
+  const { profile, user } = useAuth()
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: AccessCredentialUpdate }) => {
@@ -237,15 +243,12 @@ export function useUpdateAccessCredential() {
         throw new Error('2FA verification required')
       }
 
-      // Validate password strength if password is being updated
-      if (data.password) {
-        const validation = accessCredentialsService.validatePasswordStrength(data.password)
-        if (!validation.isStrong) {
-          throw new Error(`Contraseña débil: ${validation.feedback.join(', ')}`)
-        }
+      const performedBy = profile?.id || user?.id
+      if (!performedBy) {
+        throw new Error('Usuario no autenticado')
       }
 
-      return accessCredentialsService.update(id, data)
+      return accessCredentialsService.update(id, data, performedBy)
     },
     onMutate: async ({ id, data }) => {
       // Cancel any outgoing refetches
@@ -292,6 +295,7 @@ export function useUpdateAccessCredential() {
       queryClient.invalidateQueries({ queryKey: accessKeys.lists() })
       queryClient.invalidateQueries({ queryKey: accessKeys.detail(data.id) })
       queryClient.invalidateQueries({ queryKey: accessKeys.stats() })
+      queryClient.invalidateQueries({ queryKey: accessKeys.logs() })
       // Invalidate by client queries
       queryClient.invalidateQueries({ queryKey: accessKeys.all })
       toast.success('Credencial actualizada exitosamente')
@@ -303,6 +307,7 @@ export function useUpdateAccessCredential() {
 export function useDeleteAccessCredential() {
   const queryClient = useQueryClient()
   const { requireVerification } = useSecurityContext()
+  const { profile, user } = useAuth()
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -312,7 +317,12 @@ export function useDeleteAccessCredential() {
         throw new Error('2FA verification required')
       }
 
-      return accessCredentialsService.delete(id)
+      const performedBy = profile?.id || user?.id
+      if (!performedBy) {
+        throw new Error('Usuario no autenticado')
+      }
+
+      return accessCredentialsService.delete(id, performedBy)
     },
     onMutate: async (id) => {
       // Cancel any outgoing refetches
@@ -340,6 +350,7 @@ export function useDeleteAccessCredential() {
       // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: accessKeys.lists() })
       queryClient.invalidateQueries({ queryKey: accessKeys.stats() })
+      queryClient.invalidateQueries({ queryKey: accessKeys.logs() })
       // Invalidate by client queries
       queryClient.invalidateQueries({ queryKey: accessKeys.all })
       toast.success('Credencial eliminada exitosamente')

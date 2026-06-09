@@ -54,6 +54,7 @@ import {
   Search,
   Loader2,
 } from 'lucide-react'
+import { TablePagination } from '@/components/ui/table-pagination'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -79,6 +80,8 @@ export function CustomAppTable({ clientId, onEdit, readOnly = false }: CustomApp
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [appToDelete, setAppToDelete] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   const filteredApps = applications?.filter((app) => {
     const matchesSearch =
@@ -91,6 +94,12 @@ export function CustomAppTable({ clientId, onEdit, readOnly = false }: CustomApp
 
     return matchesSearch && matchesStatus && matchesClient
   })
+
+  const totalPages = Math.max(1, Math.ceil((filteredApps?.length || 0) / itemsPerPage))
+  const paginatedApps = (filteredApps || []).slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
 
   const handleDelete = async () => {
     if (!appToDelete) return
@@ -157,8 +166,8 @@ export function CustomAppTable({ clientId, onEdit, readOnly = false }: CustomApp
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredApps && filteredApps.length > 0 ? (
-              filteredApps.map((app) => {
+            {paginatedApps.length > 0 ? (
+              paginatedApps.map((app) => {
                 const status = statusConfig[app.status as keyof typeof statusConfig]
                 const domainExpiring = isExpiringSoon(app.domain_expiry_date)
                 const hostingExpiring = isExpiringSoon(app.hosting_renewal_date)
@@ -251,10 +260,6 @@ export function CustomAppTable({ clientId, onEdit, readOnly = false }: CustomApp
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => router.push(`/dashboard/software/${app.id}`)}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            Ver detalle
-                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => onEdit?.(app.id)}>
                             <Pencil className="h-4 w-4 mr-2" />
                             Editar
@@ -309,6 +314,13 @@ export function CustomAppTable({ clientId, onEdit, readOnly = false }: CustomApp
             )}
           </TableBody>
         </Table>
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredApps?.length || 0}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       {/* Delete Dialog */}

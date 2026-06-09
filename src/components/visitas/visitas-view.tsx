@@ -26,6 +26,7 @@ import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { LoadingButton } from '@/components/ui/loading-button'
+import { TablePagination } from '@/components/ui/table-pagination'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -150,6 +151,14 @@ export function VisitasView({ clientId, clientName, readOnly = false }: VisitasV
   const [recommendations, setRecommendations] = useState('')
   const [activities, setActivities] = useState<string[]>([])
   const [equipmentRows, setEquipmentRows] = useState<EquipmentFormRow[]>([createEquipmentRow()])
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+
+  const totalPages = Math.max(1, Math.ceil(visits.length / itemsPerPage))
+  const paginatedVisits = visits.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
 
   const selectedHardwareIds = useMemo(() => {
     return new Set(
@@ -665,7 +674,7 @@ export function VisitasView({ clientId, clientName, readOnly = false }: VisitasV
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {visits.map((visit) => {
+                  {paginatedVisits.map((visit) => {
                     const equipmentSummary = visit.equipos
                       .slice(0, 2)
                       .map((equipment) => equipment.hardware?.name || equipment.hardware_nombre_manual || 'Sin especificar')
@@ -709,6 +718,13 @@ export function VisitasView({ clientId, clientName, readOnly = false }: VisitasV
                   })}
                 </TableBody>
               </Table>
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={visits.length}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+              />
             </div>
           )}
         </CardContent>

@@ -52,6 +52,7 @@ import {
   Search,
   Loader2,
 } from 'lucide-react'
+import { TablePagination } from '@/components/ui/table-pagination'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -86,6 +87,8 @@ export function SoftwareLicenseTable({ clientId, onEdit, readOnly = false }: Sof
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [licenseToDelete, setLicenseToDelete] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   const filteredLicenses = licenses?.filter((license) => {
     const matchesSearch =
@@ -97,6 +100,12 @@ export function SoftwareLicenseTable({ clientId, onEdit, readOnly = false }: Sof
 
     return matchesSearch && matchesStatus
   })
+
+  const totalPages = Math.max(1, Math.ceil((filteredLicenses?.length || 0) / itemsPerPage))
+  const paginatedLicenses = (filteredLicenses || []).slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
 
   const handleDelete = async () => {
     if (!licenseToDelete) return
@@ -164,7 +173,7 @@ export function SoftwareLicenseTable({ clientId, onEdit, readOnly = false }: Sof
           </TableHeader>
           <TableBody>
             {filteredLicenses && filteredLicenses.length > 0 ? (
-              filteredLicenses.map((license) => {
+              paginatedLicenses.map((license) => {
                 const status = statusConfig[license.status as keyof typeof statusConfig]
                 const expiring = isExpiringSoon(license.expiry_date)
 
@@ -255,6 +264,13 @@ export function SoftwareLicenseTable({ clientId, onEdit, readOnly = false }: Sof
             )}
           </TableBody>
         </Table>
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredLicenses?.length || 0}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+        />
       </div>
 
       {/* Delete Dialog */}

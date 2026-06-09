@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, CalendarClock, CheckCircle2, ClipboardCheck } from 'lucide-react'
+import { ArrowLeft, CalendarClock, CheckCircle2, ClipboardCheck, Download } from 'lucide-react'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { Button } from '@/components/ui/button'
 import { LoadingButton } from '@/components/ui/loading-button'
@@ -96,6 +96,28 @@ export default function ClienteMantenimientosPage() {
     }
   }
 
+  const handleExportCsv = () => {
+    if (schedules.length === 0) return
+    const header = ['Numero', 'Fecha esperada', 'Estado', 'Fecha realizada', 'Notas']
+    const rows = schedules.map((row) => [
+      row.slot_number,
+      row.expected_date,
+      statusLabels[row.status],
+      row.completed_at || '',
+      (row.notes || '').replace(/"/g, '""'),
+    ])
+    const csv = [header, ...rows]
+      .map((line) => line.map((cell) => `"${cell}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `mantenimientos-${client?.name || clientId}-${year}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (clientLoading) {
     return (
       <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}>
@@ -170,6 +192,12 @@ export default function ClienteMantenimientosPage() {
                   <ClipboardCheck className="mr-2 h-4 w-4" />
                   Generar / Completar agenda
                 </LoadingButton>
+              )}
+              {schedules.length > 0 && (
+                <Button variant="outline" onClick={handleExportCsv} className="w-full sm:w-auto">
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar CSV
+                </Button>
               )}
             </div>
 

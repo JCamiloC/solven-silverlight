@@ -21,7 +21,10 @@ import { useActionLock } from '@/hooks/use-action-lock'
 import { useRouter } from 'next/navigation'
 
 export function Header() {
-  const [notifications] = useState(0) // Real notification count will be implemented later
+  const notifications = [
+    { id: '1', title: 'Módulo de accesos', message: 'Recuerda habilitar 2FA para consultar credenciales.' },
+    { id: '2', title: 'Portal de clientes', message: 'Los clientes pueden crear tickets desde su sección de tickets.' },
+  ]
   const [mounted, setMounted] = useState(false)
   const { profile, signOut } = useAuth()
   const { runWithLock, runNavigationLock, isLocked } = useActionLock()
@@ -91,17 +94,31 @@ export function Header() {
           {/* Right side items */}
           <div className="flex items-center space-x-2">
             {/* Notifications */}
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-4 w-4" />
-              {notifications > 0 && (
-                <Badge 
-                  variant="destructive" 
-                  className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center text-xs p-0"
-                >
-                  {notifications}
-                </Badge>
-              )}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell className="h-4 w-4" />
+                  {notifications.length > 0 && (
+                    <Badge 
+                      variant="destructive" 
+                      className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center text-xs p-0"
+                    >
+                      {notifications.length}
+                    </Badge>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80">
+                <DropdownMenuLabel>Notificaciones</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {notifications.map((notification) => (
+                  <DropdownMenuItem key={notification.id} className="flex flex-col items-start gap-1 py-3">
+                    <span className="font-medium text-sm">{notification.title}</span>
+                    <span className="text-xs text-muted-foreground">{notification.message}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             
             {/* User menu */}
             {mounted ? (

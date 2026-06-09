@@ -5,8 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import Link from 'next/link'
+import { useAuth } from '@/hooks/use-auth'
 
 export function TwoFactorRequiredNotice() {
+  const { profile } = useAuth()
+  const isClient = profile?.role === 'cliente'
+  const backHref = isClient && profile?.client_id
+    ? `/dashboard/clientes/${profile.client_id}`
+    : '/dashboard/clientes'
+
   return (
     <div className="container mx-auto py-12 px-4">
       <div className="max-w-2xl mx-auto">
@@ -63,8 +70,8 @@ export function TwoFactorRequiredNotice() {
               </Button>
               
               <Button asChild variant="outline" className="w-full">
-                <Link href="/dashboard">
-                  Volver al Dashboard
+                <Link href={backHref}>
+                  {isClient ? 'Volver a Mi Empresa' : 'Volver a Clientes'}
                 </Link>
               </Button>
             </div>

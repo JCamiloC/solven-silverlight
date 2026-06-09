@@ -4,64 +4,57 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/use-auth'
 import { 
-  Plus, 
   FileText, 
-  Download, 
   Settings,
   Ticket,
-  HardDrive,
-  Monitor,
-  Key
+  Building2,
 } from 'lucide-react'
 import Link from 'next/link'
 
 export function QuickActions() {
-  const { hasRole } = useAuth()
+  const { hasRole, profile } = useAuth()
 
   const clientActions = [
     {
       title: 'Crear Ticket',
       description: 'Crear nuevo ticket de soporte',
       icon: Ticket,
-      href: '/dashboard/tickets/new',
+      href: profile?.client_id
+        ? `/dashboard/tickets/nuevo?clientId=${profile.client_id}`
+        : '/dashboard/tickets/nuevo',
       variant: 'default' as const,
     },
     {
       title: 'Ver Mis Tickets',
       description: 'Ver todos mis tickets',
       icon: FileText,
-      href: '/dashboard/tickets',
-      variant: 'outline' as const,
-    },
-    {
-      title: 'Descargar Reportes',
-      description: 'Descargar reportes del sistema',
-      icon: Download,
-      href: '/dashboard/reportes',
+      href: profile?.client_id
+        ? `/dashboard/clientes/${profile.client_id}/tickets`
+        : '/dashboard/tickets',
       variant: 'outline' as const,
     },
   ]
 
   const supportActions = [
     {
-      title: 'Agregar Hardware',
-      description: 'Registrar nuevo equipo',
-      icon: HardDrive,
-      href: '/dashboard/hardware',
+      title: 'Clientes',
+      description: 'Gestionar clientes y sus módulos',
+      icon: Building2,
+      href: '/dashboard/clientes',
       variant: 'default' as const,
     },
     {
-      title: 'Gestionar Software',
-      description: 'Administrar licencias',
-      icon: Monitor,
-      href: '/dashboard/software',
+      title: 'Tickets',
+      description: 'Ver y gestionar tickets',
+      icon: Ticket,
+      href: '/dashboard/tickets',
       variant: 'outline' as const,
     },
     {
-      title: 'Configurar Accesos',
-      description: 'Gestionar credenciales',
-      icon: Key,
-      href: '/dashboard/accesos',
+      title: 'Reportes',
+      description: 'Generar reportes del sistema',
+      icon: FileText,
+      href: '/dashboard/reportes',
       variant: 'outline' as const,
     },
   ]
@@ -72,30 +65,23 @@ export function QuickActions() {
       description: 'Configurar el sistema',
       icon: Settings,
       href: '/dashboard/configuracion',
-      variant: 'default' as const,
-    },
-    {
-      title: 'Generar Reportes',
-      description: 'Crear reportes avanzados',
-      icon: FileText,
-      href: '/dashboard/reportes',
       variant: 'outline' as const,
     },
     {
       title: 'Gestión de Usuarios',
       description: 'Administrar usuarios',
-      icon: Plus,
+      icon: Ticket,
       href: '/dashboard/usuarios',
       variant: 'outline' as const,
     },
   ]
 
   const getActions = () => {
-    if (hasRole(['administrador'])) {
+    if (hasRole(['administrador', 'lider_soporte'])) {
       return [...supportActions, ...adminActions]
     }
-    if (hasRole(['lider_soporte']) || hasRole(['agente_soporte'])) {
-      return [...supportActions, ...clientActions.slice(1)] // Exclude "Create Ticket" for support
+    if (hasRole(['agente_soporte'])) {
+      return supportActions
     }
     return clientActions
   }
