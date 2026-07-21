@@ -12,16 +12,26 @@ interface ProtectedRouteProps {
   requireAuth?: boolean
 }
 
-export function ProtectedRoute({ 
-  children, 
-  allowedRoles = [], 
-  requireAuth = true 
+function hasAuthCookieHint(): boolean {
+  if (typeof document === 'undefined') return false
+  return document.cookie.split(';').some((entry) => {
+    const name = entry.trim().split('=')[0] || ''
+    return name.startsWith('sb-') && name.includes('auth-token')
+  })
+}
+
+export function ProtectedRoute({
+  children,
+  allowedRoles = [],
+  requireAuth = true,
 }: ProtectedRouteProps) {
   const { user, profile, loading, hasRole } = useAuth()
   const router = useRouter()
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [loadingGuardTriggered, setLoadingGuardTriggered] = useState(false)
+  const [authGraceExpired, setAuthGraceExpired] = useState(false)
 
+  // Esperar más tiempo antes de considerar "sin sesión" (evita bounce post-login)
   useEffect(() => {
     if (!loading) {
       setLoadingGuardTriggered(false)
@@ -30,43 +40,71 @@ export function ProtectedRoute({
 
     const timeout = setTimeout(() => {
       setLoadingGuardTriggered(true)
-    }, 3500)
+    }, 10000)
 
     return () => clearTimeout(timeout)
   }, [loading])
 
-  const isCheckingAuth = loading && !loadingGuardTriggered
+  // Gracia adicional si hay cookie pero user aún no hidratado
+  useEffect(() => {
+    if (user || !requireAuth) {
+      setAuthGraceExpired(false)
+      return
+    }
+
+    if (!hasAuthCookieHint()) {
+      setAuthGraceExpired(true)
+      return
+    }
+
+    setAuthGraceExpired(false)
+    const timeout = setTimeout(() => {
+      setAuthGraceExpired(true)
+    }, 8000)
+
+    return () => clearTimeout(timeout)
+  }, [user, requireAuth])
+
+  const isCheckingAuth = (loading && !loadingGuardTriggered) || (!user && !authGraceExpired && hasAuthCookieHint())
 
   useEffect(() => {
     if (isCheckingAuth || isRedirecting) return
 
-    // Check if authentication is required and user is not logged in
     if (requireAuth && !user) {
+      // Última salvaguarda: si aún hay cookie, no redirigir (middleware/cliente aún sincronizando)
+      if (hasAuthCookieHint() && !authGraceExpired) {
+        return
+      }
+
       setIsRedirecting(true)
-      router.push('/auth/login')
+      router.replace('/auth/login')
       return
     }
 
-    // Check if specific roles are required
-    if (allowedRoles.length > 0 && !hasRole(allowedRoles)) {
+    if (allowedRoles.length > 0 && user && profile && !hasRole(allowedRoles)) {
       setIsRedirecting(true)
-      // Redirect based on user role
-      if (profile?.role === 'cliente') {
-        // Clientes van a su página de empresa si tienen client_id asignado
+      if (profile.role === 'cliente') {
         if (profile.client_id) {
-          router.push(`/dashboard/clientes/${profile.client_id}`)
+          router.replace(`/dashboard/clientes/${profile.client_id}`)
         } else {
-          // Si no tiene client_id, ir a tickets por seguridad
-          router.push('/dashboard/tickets')
+          router.replace('/dashboard/tickets')
         }
       } else {
-        router.push('/dashboard') // Staff va al dashboard principal
+        router.replace('/dashboard')
       }
-      return
     }
-  }, [user, profile, hasRole, allowedRoles, requireAuth, router, isRedirecting, isCheckingAuth])
+  }, [
+    user,
+    profile,
+    hasRole,
+    allowedRoles,
+    requireAuth,
+    router,
+    isRedirecting,
+    isCheckingAuth,
+    authGraceExpired,
+  ])
 
-  // Show loading while checking authentication
   if (isCheckingAuth) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -79,12 +117,10 @@ export function ProtectedRoute({
     return null
   }
 
-  // Show nothing while redirecting (user/profile requirements not met)
   if (requireAuth && !user) {
     return null
   }
 
-  // Check role permissions
   if (allowedRoles.length > 0 && !hasRole(allowedRoles)) {
     return null
   }

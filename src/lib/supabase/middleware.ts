@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 
-const MIDDLEWARE_AUTH_TIMEOUT_MS = 20000
+const MIDDLEWARE_AUTH_TIMEOUT_MS = 25000
 
 function isDefinitiveAuthError(message: string): boolean {
   const normalized = message.toLowerCase()
@@ -9,11 +9,18 @@ function isDefinitiveAuthError(message: string): boolean {
     normalized.includes('jwt expired') ||
     normalized.includes('invalid jwt') ||
     normalized.includes('invalid claim') ||
-    normalized.includes('refresh token') ||
+    normalized.includes('refresh token not found') ||
+    normalized.includes('invalid refresh token') ||
     normalized.includes('session missing') ||
     normalized.includes('session not found') ||
     normalized.includes('user not found')
   )
+}
+
+function hasSupabaseAuthCookie(request: NextRequest): boolean {
+  return request.cookies
+    .getAll()
+    .some(({ name }) => name.startsWith('sb-') && name.includes('auth-token'))
 }
 
 export async function updateSession(request: NextRequest) {
@@ -46,33 +53,61 @@ export async function updateSession(request: NextRequest) {
   )
 
   try {
-    const getUserPromise = supabase.auth.getUser()
+    // getSession refresca/propaga cookies; getUser valida contra Auth API.
+    const getSessionPromise = supabase.auth.getSession()
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('Middleware timeout')), MIDDLEWARE_AUTH_TIMEOUT_MS)
     )
 
-    const { data: { user }, error } = await Promise.race([
-      getUserPromise,
-      timeoutPromise,
-    ])
+    const {
+      data: { session },
+      error: sessionError,
+    } = await Promise.race([getSessionPromise, timeoutPromise])
 
-    if (error && isProtectedRoute) {
-      if (isDefinitiveAuthError(error.message)) {
-        console.log('[Middleware] Definitive auth error:', error.message)
-        const redirectUrl = new URL('/auth/login?reason=expired', request.url)
-        return NextResponse.redirect(redirectUrl)
+    if (sessionError && isProtectedRoute && isDefinitiveAuthError(sessionError.message)) {
+      console.log('[Middleware] Definitive session error:', sessionError.message)
+      const redirectUrl = new URL('/auth/login?reason=expired', request.url)
+      return NextResponse.redirect(redirectUrl)
+    }
+
+    let user = session?.user ?? null
+
+    // Validar usuario solo si hay sesión local (evita falsos negativos por red)
+    if (user) {
+      try {
+        const {
+          data: { user: verifiedUser },
+          error: userError,
+        } = await Promise.race([
+          supabase.auth.getUser(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Middleware timeout')), MIDDLEWARE_AUTH_TIMEOUT_MS)
+          ),
+        ])
+
+        if (userError && isDefinitiveAuthError(userError.message)) {
+          console.log('[Middleware] Definitive user error:', userError.message)
+          if (isProtectedRoute) {
+            const redirectUrl = new URL('/auth/login?reason=expired', request.url)
+            return NextResponse.redirect(redirectUrl)
+          }
+        } else if (verifiedUser) {
+          user = verifiedUser
+        }
+        // Errores transitorios: mantener user de session
+      } catch (verifyError) {
+        const message = verifyError instanceof Error ? verifyError.message : String(verifyError)
+        if (message === 'Middleware timeout') {
+          console.warn('[Middleware] getUser timed out, keeping session user')
+        } else {
+          console.warn('[Middleware] getUser failed transiently, keeping session user:', message)
+        }
       }
-
-      console.warn('[Middleware] Transient auth error, allowing request:', error.message)
-      return supabaseResponse
     }
 
     if (!user && isProtectedRoute) {
-      const hasAuthCookie = request.cookies
-        .getAll()
-        .some(({ name }) => name.startsWith('sb-') && name.includes('-auth-token'))
-
-      if (hasAuthCookie) {
+      if (hasSupabaseAuthCookie(request)) {
+        // Cookie presente pero aún no hidratada/resoluble: no expulsar (rompe el bucle login)
         console.warn('[Middleware] Auth cookie present but user unresolved, allowing request')
         return supabaseResponse
       }
@@ -91,9 +126,14 @@ export async function updateSession(request: NextRequest) {
 
     console.error('[Middleware] Error in session validation:', error)
 
-    if (isProtectedRoute) {
+    // Solo expulsar si NO hay cookie de auth (evitar bucles por fallos transitorios)
+    if (isProtectedRoute && !hasSupabaseAuthCookie(request)) {
       const redirectUrl = new URL('/auth/login?reason=expired', request.url)
       return NextResponse.redirect(redirectUrl)
+    }
+
+    if (isProtectedRoute) {
+      console.warn('[Middleware] Exception with auth cookie present, allowing request')
     }
   }
 

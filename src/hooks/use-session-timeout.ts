@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { SESSION_CONFIG, SESSION_MESSAGES } from '@/lib/session-config'
 import { destroyClientSession } from '@/lib/auth/session-cleanup'
+import { getInFlightSessionRequests } from '@/lib/session-activity'
 
 interface SessionTimeoutConfig {
   timeoutMinutes?: number
@@ -28,6 +29,7 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasTimedOutRef = useRef(false)
+  const lastActivityRef = useRef(Date.now())
 
   const [showWarning, setShowWarning] = useState(false)
   const [remainingSeconds, setRemainingSeconds] = useState(0)
@@ -43,6 +45,36 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
 
   const handleTimeout = useCallback(async () => {
     if (hasTimedOutRef.current) return
+
+    // No cortar si hay operaciones en curso (guardar tickets, cargas, etc.)
+    if (getInFlightSessionRequests() > 0) {
+      console.warn('[SessionTimeout] Logout deferred: request in flight')
+      lastActivityRef.current = Date.now()
+      // Reprogramar un poco más adelante
+      if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current)
+      logoutTimerRef.current = setTimeout(() => {
+        void handleTimeout()
+      }, 60 * 1000)
+      return
+    }
+
+    // Si hubo actividad reciente (últimos 30s), extender en lugar de cerrar
+    const msSinceActivity = Date.now() - lastActivityRef.current
+    if (msSinceActivity < 30_000) {
+      console.warn('[SessionTimeout] Logout deferred: recent activity — extending')
+      // Se reprograma vía scheduleTimers desde el efecto de actividad;
+      // aquí forzamos extensión por si el debounce no corrió.
+      lastActivityRef.current = Date.now()
+      hasTimedOutRef.current = false
+      setShowWarning(false)
+      clearTimers()
+      const totalMs = timeoutMinutes * 60 * 1000
+      logoutTimerRef.current = setTimeout(() => {
+        void handleTimeout()
+      }, totalMs)
+      return
+    }
+
     hasTimedOutRef.current = true
     clearTimers()
     setShowWarning(false)
@@ -57,7 +89,7 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
       toast.dismiss()
       router.replace(SESSION_CONFIG.REDIRECT_URLS.TIMEOUT)
     }
-  }, [supabase, router, clearTimers])
+  }, [supabase, router, clearTimers, timeoutMinutes])
 
   const handleLogout = useCallback(async () => {
     clearTimers()
@@ -77,6 +109,7 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
   const scheduleTimers = useCallback(() => {
     if (!enabled) return
 
+    lastActivityRef.current = Date.now()
     hasTimedOutRef.current = false
     setShowWarning(false)
     clearTimers()
@@ -113,6 +146,8 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
   const debouncedSchedule = useCallback(() => {
     if (!enabled) return
 
+    lastActivityRef.current = Date.now()
+
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
     debounceTimerRef.current = setTimeout(() => {
       scheduleTimers()
@@ -121,7 +156,15 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
 
   const extendSession = useCallback(() => {
     scheduleTimers()
-  }, [scheduleTimers])
+    void supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.expires_at) {
+        const expiresIn = data.session.expires_at - Math.floor(Date.now() / 1000)
+        if (expiresIn < 15 * 60) {
+          void supabase.auth.refreshSession()
+        }
+      }
+    })
+  }, [scheduleTimers, supabase])
 
   useEffect(() => {
     if (!enabled) {
@@ -137,6 +180,7 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
     })
 
     window.addEventListener(SESSION_CONFIG.ACTIVITY_EVENT, onActivity)
+    window.addEventListener(SESSION_CONFIG.REQUEST_ACTIVITY_EVENT, onActivity)
 
     const onVisibilityChange = () => {
       if (document.visibilityState !== 'visible') return
@@ -152,6 +196,7 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
         document.removeEventListener(event, onActivity, true)
       })
       window.removeEventListener(SESSION_CONFIG.ACTIVITY_EVENT, onActivity)
+      window.removeEventListener(SESSION_CONFIG.REQUEST_ACTIVITY_EVENT, onActivity)
       document.removeEventListener('visibilitychange', onVisibilityChange)
 
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
@@ -159,6 +204,31 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
       hasTimedOutRef.current = false
     }
   }, [enabled, scheduleTimers, debouncedSchedule, clearTimers, supabase])
+
+  // Si el aviso está abierto y hay actividad/peticiones, extender automáticamente
+  useEffect(() => {
+    if (!showWarning || !enabled) return
+
+    let extended = false
+    const autoExtendOnActivity = () => {
+      if (extended) return
+      extended = true
+      extendSession()
+    }
+
+    window.addEventListener(SESSION_CONFIG.ACTIVITY_EVENT, autoExtendOnActivity)
+    window.addEventListener(SESSION_CONFIG.REQUEST_ACTIVITY_EVENT, autoExtendOnActivity)
+    // También teclado/click mientras el banner está visible
+    document.addEventListener('keydown', autoExtendOnActivity, true)
+    document.addEventListener('mousedown', autoExtendOnActivity, true)
+
+    return () => {
+      window.removeEventListener(SESSION_CONFIG.ACTIVITY_EVENT, autoExtendOnActivity)
+      window.removeEventListener(SESSION_CONFIG.REQUEST_ACTIVITY_EVENT, autoExtendOnActivity)
+      document.removeEventListener('keydown', autoExtendOnActivity, true)
+      document.removeEventListener('mousedown', autoExtendOnActivity, true)
+    }
+  }, [showWarning, enabled, extendSession])
 
   return {
     resetTimeout: scheduleTimers,

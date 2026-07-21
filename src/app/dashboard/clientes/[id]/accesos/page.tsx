@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ProtectedRoute } from '@/components/auth/protected-route'
-import { SecureRoute, SecurityProvider } from '@/components/security/security-provider'
+import { SecureRoute } from '@/components/security/security-provider'
 import { TwoFactorRequiredNotice } from '@/components/security/2fa-required-notice'
 import { useAuth } from '@/hooks/use-auth'
 import { useClient } from '@/hooks/use-clients'
@@ -48,11 +48,9 @@ export default function ClienteAccesosPage() {
       {!has2FA ? (
         <TwoFactorRequiredNotice />
       ) : (
-        <SecurityProvider>
-          <SecureRoute requireAdmin={false}>
-            <ClienteAccesosContent />
-          </SecureRoute>
-        </SecurityProvider>
+        <SecureRoute requireAdmin={false}>
+          <ClienteAccesosContent />
+        </SecureRoute>
       )}
     </ProtectedRoute>
   )

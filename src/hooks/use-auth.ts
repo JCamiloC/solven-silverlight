@@ -25,15 +25,14 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-// Cache del perfil en memoria para evitar refetches innecesarios
-let profileCache: { [userId: string]: { profile: Profile, timestamp: number } } = {}
-// Cache del estado auth para evitar parpadeos y bucles de loading al navegar.
+let profileCache: { [userId: string]: { profile: Profile; timestamp: number } } = {}
 let authStateCache: AuthState = {
   user: null,
   profile: null,
   loading: true,
 }
-const CACHE_DURATION = 5 * 60 * 1000 // 5 minutos
+const CACHE_DURATION = 5 * 60 * 1000
+const AUTH_BOOTSTRAP_TIMEOUT_MS = 12000
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -67,74 +66,98 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const bootstrappedRef = useRef(false)
 
   const setAndCacheAuthState = useCallback((nextState: AuthState) => {
     authStateCache = nextState
     setAuthState(nextState)
   }, [])
 
-  const getProfile = useCallback(async (user: User): Promise<Profile | null> => {
-    try {
-      const userId = user.id
-      // Verificar caché primero
-      const cached = profileCache[userId]
-      const now = Date.now()
-      
-      if (cached && (now - cached.timestamp) < CACHE_DURATION) {
-        console.log('[useAuth] Using cached profile')
-        return cached.profile
-      }
+  const getProfile = useCallback(
+    async (user: User): Promise<Profile | null> => {
+      try {
+        const userId = user.id
+        const cached = profileCache[userId]
+        const now = Date.now()
 
-      console.log('[useAuth] Fetching profile for user:', userId)
-      // Reintento corto para absorber fallos transitorios de red en navegador.
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .single()
+        if (cached && now - cached.timestamp < CACHE_DURATION) {
+          return cached.profile
+        }
 
-        if (!error && data) {
-          profileCache[userId] = {
-            profile: data,
-            timestamp: now,
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('user_id', userId)
+            .single()
+
+          if (!error && data) {
+            profileCache[userId] = {
+              profile: data,
+              timestamp: now,
+            }
+            return data
           }
-          console.log('[useAuth] Profile fetched successfully:', data?.role)
-          return data
+
+          if (attempt === 0) {
+            await sleep(250)
+            continue
+          }
+
+          console.error('[useAuth] Error fetching profile:', error)
         }
 
-        if (attempt === 0) {
-          await sleep(250)
-          continue
-        }
-
-        console.error('[useAuth] Error fetching profile:', error)
+        return buildFallbackProfile(user)
+      } catch (error) {
+        console.error('[useAuth] Exception fetching profile:', error)
+        return buildFallbackProfile(user)
       }
-
-      // Fallback defensivo para no bloquear la UI si profiles falla temporalmente.
-      return buildFallbackProfile(user)
-    } catch (error) {
-      console.error('[useAuth] Exception fetching profile:', error)
-      return buildFallbackProfile(user)
-    }
-  }, [supabase])
+    },
+    [supabase]
+  )
 
   useEffect(() => {
     let isMounted = true
 
-    // Timeout de seguridad: si la verificación tarda demasiado, liberar loading sin forzar redirección
     loadingTimeoutRef.current = setTimeout(() => {
       console.warn('[useAuth] Loading timeout, forcing non-loading state')
       if (!isMounted) return
       if (!authStateCache.loading) return
 
+      // No borrar user si ya hay sesión parcial; solo liberar loading
       setAndCacheAuthState({
         ...authStateCache,
         loading: false,
       })
-    }, 3000)
+      bootstrappedRef.current = true
+    }, AUTH_BOOTSTRAP_TIMEOUT_MS)
 
-    // Get initial session
+    const applySession = async (sessionUser: User | null) => {
+      if (!isMounted) return
+
+      if (sessionUser) {
+        const profile = await getProfile(sessionUser)
+        if (!isMounted) return
+        setAndCacheAuthState({
+          user: sessionUser,
+          profile,
+          loading: false,
+        })
+      } else {
+        setAndCacheAuthState({
+          user: null,
+          profile: null,
+          loading: false,
+        })
+      }
+
+      bootstrappedRef.current = true
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current)
+        loadingTimeoutRef.current = null
+      }
+    }
+
     const getInitialSession = async () => {
       try {
         console.log('[useAuth] Getting initial session...')
@@ -144,99 +167,86 @@ export function AuthProvider({ children }: AuthProviderProps) {
           error,
         } = await supabase.auth.getSession()
 
-        if (loadingTimeoutRef.current) {
-          clearTimeout(loadingTimeoutRef.current)
-        }
-
         if (!isMounted) return
-        
+
         if (error) {
           console.error('[useAuth] Error getting session:', error)
-          setAndCacheAuthState({
-            user: null,
-            profile: null,
-            loading: false,
-          })
+          // No limpiar sesión existente por error transitorio si ya había user
+          if (!authStateCache.user) {
+            await applySession(null)
+          } else {
+            setAndCacheAuthState({ ...authStateCache, loading: false })
+            bootstrappedRef.current = true
+          }
           return
         }
-        
-        if (session?.user) {
-          console.log('[useAuth] Session found, fetching profile...')
-          const profile = await getProfile(session.user)
-          if (!isMounted) return
 
-          setAndCacheAuthState({
-            user: session.user,
-            profile,
-            loading: false,
-          })
-        } else {
-          console.log('[useAuth] No session found')
-          setAndCacheAuthState({
-            user: null,
-            profile: null,
-            loading: false,
-          })
+        // Si onAuthStateChange ya aplicó la sesión, no sobrescribir con null
+        if (!session?.user && bootstrappedRef.current && authStateCache.user) {
+          setAndCacheAuthState({ ...authStateCache, loading: false })
+          return
         }
+
+        await applySession(session?.user ?? null)
       } catch (error) {
         console.error('[useAuth] Error in getInitialSession:', error)
-        if (loadingTimeoutRef.current) {
-          clearTimeout(loadingTimeoutRef.current)
+        if (!isMounted) return
+
+        // Errores de red: no expulsar si ya hay user en cache
+        if (authStateCache.user) {
+          setAndCacheAuthState({ ...authStateCache, loading: false })
+          bootstrappedRef.current = true
+          return
         }
 
-        if (!isMounted) return
-        
-        setAndCacheAuthState({
-          user: null,
-          profile: null,
-          loading: false,
-        })
+        await applySession(null)
       }
     }
 
     getInitialSession()
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('[useAuth] Auth event:', event, session ? 'Session exists' : 'No session')
-        
-        try {
-          if (session?.user) {
-            const profile = await getProfile(session.user)
-            if (!isMounted) return
-            setAndCacheAuthState({
-              user: session.user,
-              profile,
-              loading: false,
-            })
-          } else {
-            if (!isMounted) return
-            setAndCacheAuthState({
-              user: null,
-              profile: null,
-              loading: false,
-            })
-            
-            // Handle different logout scenarios
-            if (event === 'SIGNED_OUT') {
-              // Limpiar caché
-              profileCache = {}
-              clearSupabaseAuthStorage()
-              router.replace('/auth/login?logout=1')
-            }
-          }
-        } catch (error) {
-          console.error('[useAuth] Error in auth state change:', error)
-          if (!isMounted) return
-          setAndCacheAuthState({
-            user: null,
-            profile: null,
-            loading: false,
-          })
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[useAuth] Auth event:', event, session ? 'Session exists' : 'No session')
+
+      try {
+        if (session?.user) {
+          await applySession(session.user)
+          return
         }
+
+        // INITIAL_SESSION sin sesión: normal en primera carga sin cookies.
+        // TOKEN_REFRESHED/USER_UPDATED sin sesión no deben forzar logout inmediato.
+        if (event === 'INITIAL_SESSION') {
+          if (!bootstrappedRef.current) {
+            await applySession(null)
+          }
+          return
+        }
+
+        if (event === 'SIGNED_OUT') {
+          profileCache = {}
+          clearSupabaseAuthStorage()
+          await applySession(null)
+
+          if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth/')) {
+            router.replace('/auth/login?logout=1')
+          }
+          return
+        }
+
+        // Otros eventos sin sesión: no borrar user activo (evita bounce post-login)
+        if (authStateCache.user && bootstrappedRef.current) {
+          console.warn('[useAuth] Ignoring empty session for event:', event)
+          return
+        }
+
+        await applySession(null)
+      } catch (error) {
+        console.error('[useAuth] Error in auth state change:', error)
       }
-    )
+    })
 
     return () => {
       isMounted = false
@@ -253,7 +263,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const refreshIfNeeded = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
         if (!session?.expires_at) return
 
         const expiresIn = session.expires_at - Math.floor(Date.now() / 1000)
@@ -293,11 +305,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const redirectToLogin = () => {
       if (typeof window !== 'undefined') {
-        // Navegación dura inmediata para evitar rebotes por estado stale en App Router.
         window.location.assign('/auth/login?logout=1')
         return
       }
-
       router.replace('/auth/login?logout=1')
     }
 
@@ -305,11 +315,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       profileCache = {}
       clearLocalAuthState()
       await destroyClientSession(supabase)
-
       redirectToLogin()
     } catch (error) {
       console.error('[useAuth] Error in signOut:', error)
-      // Intentar redirigir de todas formas
       clearLocalAuthState()
       redirectToLogin()
       throw error
@@ -322,20 +330,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       ...authStateCache,
       loading: true,
     })
-    
+
     try {
-      const { data: { session }, error } = await supabase.auth.getSession()
-      
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession()
+
       if (error) {
         console.error('[useAuth] Error refreshing session:', error)
         setAndCacheAuthState({
-          user: null,
-          profile: null,
+          ...authStateCache,
           loading: false,
         })
         return
       }
-      
+
       if (session?.user) {
         const profile = await getProfile(session.user)
         setAndCacheAuthState({
@@ -353,8 +363,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       console.error('[useAuth] Exception refreshing:', error)
       setAndCacheAuthState({
-        user: null,
-        profile: null,
+        ...authStateCache,
         loading: false,
       })
     }
@@ -370,16 +379,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isSupport = () => hasRole(['administrador', 'lider_soporte', 'agente_soporte'])
   const isClient = () => hasRole(['cliente'])
 
-  const value = useMemo<AuthContextValue>(() => ({
-    ...authState,
-    signOut,
-    refresh,
-    hasRole,
-    isAdmin,
-    isLeader,
-    isSupport,
-    isClient,
-  }), [authState, refresh])
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      ...authState,
+      signOut,
+      refresh,
+      hasRole,
+      isAdmin,
+      isLeader,
+      isSupport,
+      isClient,
+    }),
+    [authState, refresh]
+  )
 
   return createElement(AuthContext.Provider, { value }, children)
 }

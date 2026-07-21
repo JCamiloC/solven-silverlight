@@ -13,7 +13,9 @@ function withAuthTimeout<T>(promise: Promise<T>, timeoutMs: number = 10000): Pro
 }
 
 export class AuthService {
-  private supabase = createClient()
+  private get supabase() {
+    return createClient()
+  }
 
   async signIn(email: string, password: string) {
     const signInPromise = this.supabase.auth.signInWithPassword({
@@ -21,7 +23,7 @@ export class AuthService {
       password,
     })
     
-    const { data, error } = await withAuthTimeout(signInPromise)
+    const { data, error } = await withAuthTimeout(signInPromise, 20000)
     
     if (error) throw error
     return data

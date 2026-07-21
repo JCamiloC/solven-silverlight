@@ -223,9 +223,13 @@ export class TwoFactorService {
   }
 
   /**
-   * Verifica si la última verificación 2FA es reciente (para sesiones)
+   * Verifica si la última verificación 2FA sigue vigente.
+   * Staff interno: 24h. Cliente: 8h (por defecto si no se pasa maxAgeMinutes).
    */
-  static async isRecentlyVerified(userId: string, maxAgeMinutes: number = 30): Promise<boolean> {
+  static async isRecentlyVerified(
+    userId: string,
+    maxAgeMinutes: number = 24 * 60
+  ): Promise<boolean> {
     try {
       const { data: profile, error } = await supabase
         .from('profiles')

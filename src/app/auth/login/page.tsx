@@ -60,12 +60,13 @@ function LoginForm() {
     if (!(error instanceof Error)) return false
     const message = error.message.toLowerCase()
 
+    // Solo errores claros de sesión corrupta — evitar match amplio de "session"/"token"
     return (
-      message.includes('refresh token') ||
-      message.includes('invalid token') ||
-      message.includes('token') ||
-      message.includes('session') ||
-      message.includes('jwt')
+      message.includes('refresh token not found') ||
+      message.includes('invalid refresh token') ||
+      message.includes('invalid jwt') ||
+      message.includes('jwt expired') ||
+      message.includes('session missing')
     )
   }
 
@@ -170,7 +171,28 @@ function LoginForm() {
         throw new Error('No se pudo establecer la sesión. Intenta nuevamente.')
       }
 
+      // Confirmar que la sesión quedó persistida en cookies antes de navegar.
+      // Evita el bucle: login OK → dashboard → middleware sin cookie → login.
+      const {
+        data: { session: persistedSession },
+      } = await withTimeout(supabase.auth.getSession(), 10000)
+
+      if (!persistedSession?.user?.id) {
+        // Reintento corto: a veces el cookie write es asíncrono
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        const {
+          data: { session: retrySession },
+        } = await withTimeout(supabase.auth.getSession(), 10000)
+
+        if (!retrySession?.user?.id) {
+          throw new Error(
+            'La sesión no se pudo guardar en el navegador. Verifica cookies bloqueadas o modo privado e intenta de nuevo.'
+          )
+        }
+      }
+
       const redirectPath = await resolveRedirectPath(userId)
+      // Hard navigation para que middleware lea cookies frescas
       window.location.assign(redirectPath)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al iniciar sesión'

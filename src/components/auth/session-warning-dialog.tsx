@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback } from 'react'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Clock, AlertTriangle } from 'lucide-react'
 
@@ -12,63 +11,52 @@ interface SessionWarningDialogProps {
   onLogout: () => void
 }
 
-export function SessionWarningDialog({ 
-  isOpen, 
-  remainingTime, 
-  onExtend, 
-  onLogout 
+/**
+ * Aviso no bloqueante: el usuario puede seguir trabajando.
+ * Cualquier actividad o petición alarga la sesión automáticamente.
+ */
+export function SessionWarningDialog({
+  isOpen,
+  remainingTime,
+  onExtend,
+  onLogout,
 }: SessionWarningDialogProps) {
-  
-  const handleExtend = useCallback(() => {
-    onExtend()
-  }, [onExtend])
-
-  const handleLogout = useCallback(() => {
-    onLogout()
-  }, [onLogout])
-
   const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }, [])
 
+  if (!isOpen) return null
+
   return (
-    <AlertDialog open={isOpen} onOpenChange={() => {}}>
-      <AlertDialogContent className="sm:max-w-md">
-        <AlertDialogHeader>
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            <AlertDialogTitle>Sesión por Expirar</AlertDialogTitle>
+    <div
+      className="fixed bottom-4 left-1/2 z-[100] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-lg"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <p className="text-sm font-semibold text-amber-900">Sesión por expirar</p>
+          <p className="text-sm text-amber-800">
+            Sin actividad se cerrará en{' '}
+            <span className="inline-flex items-center gap-1 font-mono font-bold text-red-600">
+              <Clock className="h-4 w-4" />
+              {formatTime(remainingTime)}
+            </span>
+            . Seguir trabajando o guardar datos la alarga automáticamente.
+          </p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button size="sm" onClick={onExtend}>
+              Extender sesión
+            </Button>
+            <Button size="sm" variant="outline" onClick={onLogout}>
+              Cerrar sesión
+            </Button>
           </div>
-          <AlertDialogDescription asChild>
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Tu sesión expirará por inactividad en:
-              </p>
-              <div className="flex items-center justify-center gap-2 text-2xl font-mono font-bold text-red-500">
-                <Clock className="h-6 w-6" />
-                {formatTime(remainingTime)}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                ¿Deseas extender tu sesión o cerrar sesión ahora?
-              </p>
-            </div>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter className="sm:space-x-2">
-          <AlertDialogCancel asChild>
-            <Button variant="outline" onClick={handleLogout}>
-              Cerrar Sesión
-            </Button>
-          </AlertDialogCancel>
-          <AlertDialogAction asChild>
-            <Button onClick={handleExtend}>
-              Extender Sesión
-            </Button>
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+        </div>
+      </div>
+    </div>
   )
 }

@@ -1,11 +1,20 @@
 import { createBrowserClient } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { notifySessionActivity } from '@/lib/session-activity'
+import { beginSessionRequest, endSessionRequest } from '@/lib/session-activity'
 
-// Timeout para queries de Supabase (15 segundos)
+// Timeout para queries de datos (15s). Auth usa timeout más largo.
 const QUERY_TIMEOUT = 15000
+const AUTH_FETCH_TIMEOUT = 30000
 
-// Wrapper para agregar timeout a las queries de Supabase
+function isAuthRequest(url: string): boolean {
+  return (
+    url.includes('/auth/v1/') ||
+    url.includes('/auth/v1/token') ||
+    url.includes('/auth/v1/user')
+  )
+}
+
+// Wrapper para agregar timeout a las queries de Supabase (solo data queries)
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number = QUERY_TIMEOUT): Promise<T> {
   return Promise.race([
     promise,
@@ -20,99 +29,114 @@ function createClientWithTimeout(client: SupabaseClient) {
   return new Proxy(client, {
     get(target, prop) {
       const value = target[prop as keyof typeof target]
-      
-      // Si es el método 'from', interceptamos para agregar timeout
+
       if (prop === 'from') {
         return (...args: any[]) => {
           const queryBuilder = (value as any).apply(target, args)
-          
-          // Interceptar métodos de query
+
           return new Proxy(queryBuilder, {
             get(qbTarget: any, qbProp) {
               const qbValue = qbTarget[qbProp]
-              
-              // Si es un método que retorna Promise (single, select, etc)
-              if (typeof qbValue === 'function' && 
-                  ['single', 'maybeSingle', 'then', 'catch'].includes(qbProp as string)) {
-                return function(...qbArgs: any[]) {
+
+              if (
+                typeof qbValue === 'function' &&
+                ['single', 'maybeSingle', 'then', 'catch'].includes(qbProp as string)
+              ) {
+                return function (...qbArgs: any[]) {
                   const result = qbValue.apply(qbTarget, qbArgs)
-                  
-                  // Si retorna Promise, agregar timeout
+
                   if (result && typeof result.then === 'function') {
                     return withTimeout(result)
                   }
                   return result
                 }
               }
-              
+
               return qbValue
-            }
+            },
           })
         }
       }
-      
+
       return value
-    }
+    },
   })
 }
 
+let browserClient: SupabaseClient | null = null
+
 export function createClient() {
+  if (browserClient) {
+    return browserClient
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  // Verificar que las variables de entorno estén configuradas
-  if (!supabaseUrl || !supabaseAnonKey || 
-      supabaseUrl.includes('placeholder') || 
-      supabaseAnonKey.includes('placeholder')) {
+  if (
+    !supabaseUrl ||
+    !supabaseAnonKey ||
+    supabaseUrl.includes('placeholder') ||
+    supabaseAnonKey.includes('placeholder')
+  ) {
     console.warn('⚠️  Supabase no configurado correctamente. Usar variables reales en .env.local')
-    
-    // En desarrollo, permitir crear cliente con valores placeholder
+
     if (process.env.NODE_ENV === 'development') {
       const client = createBrowserClient(
         'https://placeholder.supabase.co',
         'placeholder-key'
       )
-      return createClientWithTimeout(client)
+      browserClient = createClientWithTimeout(client)
+      return browserClient
     }
-    
+
     throw new Error('Supabase URL y ANON_KEY son requeridos. Verificar configuración en .env.local')
   }
 
   const client = createBrowserClient(supabaseUrl, supabaseAnonKey, {
     auth: {
-      // Mantener sesión activa mientras exista actividad del usuario.
       autoRefreshToken: true,
-      // Persistir sesión
       persistSession: true,
-      // Detectar cambios en sesión
       detectSessionInUrl: true,
+      flowType: 'pkce',
     },
-    // Timeout global para requests HTTP
     global: {
       fetch: (url, options = {}) => {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), QUERY_TIMEOUT)
         const requestUrl = typeof url === 'string' ? url : url.toString()
+        const timeoutMs = isAuthRequest(requestUrl) ? AUTH_FETCH_TIMEOUT : QUERY_TIMEOUT
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
         const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const isSupabaseRequest = Boolean(supabaseHost && requestUrl.startsWith(supabaseHost))
+
+        // Respetar signal externo si existe, abortando también el nuestro
+        const externalSignal = options.signal
+        if (externalSignal) {
+          if (externalSignal.aborted) {
+            controller.abort()
+          } else {
+            externalSignal.addEventListener('abort', () => controller.abort(), { once: true })
+          }
+        }
+
+        // Extender sesión al INICIO de la petición (cargas largas de tickets, etc.)
+        if (isSupabaseRequest) {
+          beginSessionRequest()
+        }
 
         return fetch(url, {
           ...options,
           signal: controller.signal,
+        }).finally(() => {
+          clearTimeout(timeoutId)
+          if (isSupabaseRequest) {
+            endSessionRequest()
+          }
         })
-          .then((response) => {
-            if (
-              response.ok &&
-              supabaseHost &&
-              requestUrl.startsWith(supabaseHost)
-            ) {
-              notifySessionActivity()
-            }
-            return response
-          })
-          .finally(() => clearTimeout(timeoutId))
       },
     },
   })
 
-  return createClientWithTimeout(client)
+  browserClient = createClientWithTimeout(client)
+  return browserClient
 }

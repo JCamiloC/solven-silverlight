@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import Image from 'next/image'
 import { useAuth } from '@/hooks/use-auth'
 import { TwoFactorService } from '@/lib/two-factor'
+import { getTwoFactorValidityMinutes } from '@/lib/session-config'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -51,13 +52,17 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
       setIs2FAEnabled(enabled)
       
       if (enabled) {
-        const recentlyVerified = await TwoFactorService.isRecentlyVerified(user.id, 30)
+        const validityMinutes = getTwoFactorValidityMinutes(profile?.role)
+        const recentlyVerified = await TwoFactorService.isRecentlyVerified(
+          user.id,
+          validityMinutes
+        )
         setIsVerified(recentlyVerified)
       }
     } catch (error) {
       console.error('Error checking 2FA status:', error)
     }
-  }, [user?.id])
+  }, [user?.id, profile?.role])
 
   // Check 2FA status on mount
   useEffect(() => {
@@ -90,8 +95,12 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
       return false
     }
 
-    // Check if recently verified
-    const recentlyVerified = await TwoFactorService.isRecentlyVerified(user.id, 30)
+    // Check if recently verified (staff interno: 24h; cliente: 8h)
+    const validityMinutes = getTwoFactorValidityMinutes(profile?.role)
+    const recentlyVerified = await TwoFactorService.isRecentlyVerified(
+      user.id,
+      validityMinutes
+    )
     if (recentlyVerified) {
       setIsVerified(true)
       return true
