@@ -27,7 +27,8 @@ interface InteractionLockContextValue {
 }
 
 const DEFAULT_MESSAGE = 'Procesando...'
-const DEFAULT_TIMEOUT_MS = 30000
+// Debe superar timeouts de mutación/storage del cliente Supabase
+const DEFAULT_TIMEOUT_MS = 120_000
 
 const InteractionLockContext = createContext<InteractionLockContextValue | undefined>(undefined)
 

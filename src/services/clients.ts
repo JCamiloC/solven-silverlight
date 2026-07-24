@@ -33,9 +33,12 @@ export class ClientService {
   async getAll(): Promise<Client[]> {
     const { data, error } = await supabase
       .from('clients')
-      .select('*')
+      .select(
+        'id, name, email, phone, address, contact_person, nit, mantenimientos_al_anio, client_type, created_at, updated_at'
+      )
       .order('name')
 
+    if (error) throw error
     return data || []
   }
 

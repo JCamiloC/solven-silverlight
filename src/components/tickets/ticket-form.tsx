@@ -38,6 +38,7 @@ import { useSoftwareByClient } from '@/hooks/use-software'
 import { useCustomApplicationsByClient } from '@/hooks/use-custom-applications'
 import { useAccessCredentialsByClient } from '@/hooks/use-access-credentials'
 import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
 import { AlertCircle, Upload, X } from 'lucide-react'
 
 const ticketFormSchema = z.object({
@@ -209,41 +210,42 @@ export function TicketForm({
     setErrorMessage(null)
 
     try {
-      await runWithLock(async () => {
+      await runWithLock(
+        async () => {
       // 1. Subir archivo si existe
       let attachmentData: { url?: string; name?: string; size?: number } = {}
       if (selectedFile) {
         setIsUploading(true)
-        const supabase = createClient()
-        const fileExt = selectedFile.name.split('.').pop()
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-        
-        console.log('📤 Intentando subir archivo:', { fileName, size: selectedFile.size, type: selectedFile.type })
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('ticket-attachments')
-          .upload(fileName, selectedFile, {
-            cacheControl: '3600',
-            upsert: false
-          })
-        
-        console.log('📤 Resultado de subida:', { uploadData, uploadError })
+        try {
+          const supabase = createClient()
+          const fileExt = selectedFile.name.split('.').pop()
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
 
-        if (uploadError) {
-          throw new Error(`Error al subir archivo: ${uploadError.message}`)
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('ticket-attachments')
+            .upload(fileName, selectedFile, {
+              cacheControl: '3600',
+              upsert: false,
+            })
+
+          if (uploadError) {
+            throw new Error(`Error al subir archivo: ${uploadError.message}`)
+          }
+
+          void uploadData
+
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from('ticket-attachments').getPublicUrl(fileName)
+
+          attachmentData = {
+            url: publicUrl,
+            name: selectedFile.name,
+            size: selectedFile.size,
+          }
+        } finally {
+          setIsUploading(false)
         }
-
-        // Obtener URL pública
-        const { data: { publicUrl } } = supabase.storage
-          .from('ticket-attachments')
-          .getPublicUrl(fileName)
-
-        attachmentData = {
-          url: publicUrl,
-          name: selectedFile.name,
-          size: selectedFile.size
-        }
-        setIsUploading(false)
       }
       if (isEditMode && ticketId) {
         // Modo edición
@@ -324,22 +326,30 @@ export function TicketForm({
           router.push('/dashboard/tickets')
         }
       }
-      }, { message: isEditMode ? 'Actualizando ticket...' : 'Creando ticket...' })
-    } catch (error: any) {
+        },
+        {
+          message: isEditMode ? 'Actualizando ticket...' : 'Creando ticket...',
+          timeoutMs: 120_000,
+        }
+      )
+    } catch (error: unknown) {
       console.error(`Error ${isEditMode ? 'updating' : 'creating'} ticket:`, error)
-      
-      // Resetear estado de React Query
+
       if (isEditMode) {
         updateTicket.reset()
       } else {
         createTicket.reset()
       }
-      
-      // Mostrar mensaje de error al usuario
-      const errorMsg = error?.message || 'Ocurrió un error al procesar el ticket'
+
+      const rawMessage = error instanceof Error ? error.message : ''
+      const errorMsg =
+        rawMessage ||
+        'Ocurrió un error al procesar el ticket. Si el problema continúa, recarga la página e intenta de nuevo.'
       setErrorMessage(errorMsg)
-      
-      // Scroll al inicio para ver el error
+      toast.error(isEditMode ? 'No se pudo actualizar el ticket' : 'No se pudo crear el ticket', {
+        description: errorMsg,
+      })
+
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }

@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { TicketsService, Ticket, TicketInsert, TicketUpdate, TicketWithRelations } from '@/lib/services/tickets'
+import {
+  TicketsService,
+  TICKET_LIST_COLUMNS,
+  Ticket,
+  TicketInsert,
+  TicketUpdate,
+  TicketWithRelations,
+} from '@/lib/services/tickets'
 import { createClient } from '@/lib/supabase/client'
 
 const supabase = createClient()
@@ -31,9 +38,10 @@ export function useClientTickets(clientId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('tickets')
-        .select('*')
+        .select(TICKET_LIST_COLUMNS)
         .eq('client_id', clientId)
         .order('created_at', { ascending: false })
+        .limit(500)
 
       if (error) throw new Error(`Error al obtener tickets del cliente: ${error.message}`)
       return data as TicketWithRelations[]
@@ -62,9 +70,10 @@ export function useMyTickets(userId: string) {
       // Luego obtener los tickets de ese cliente
       const { data, error } = await supabase
         .from('tickets')
-        .select('*')
+        .select(TICKET_LIST_COLUMNS)
         .eq('client_id', profile.client_id)
         .order('created_at', { ascending: false })
+        .limit(500)
 
       if (error) throw new Error(`Error al obtener mis tickets: ${error.message}`)
       return data as TicketWithRelations[]
