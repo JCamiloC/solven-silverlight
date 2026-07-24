@@ -26,6 +26,9 @@ interface AuthContextValue extends AuthState {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 let profileCache: { [userId: string]: { profile: Profile; timestamp: number } } = {}
+// getInitialSession y onAuthStateChange arrancan a la vez: sin esto se dispara
+// la misma consulta de perfil dos veces en cada carga.
+let inFlightProfile: { [userId: string]: Promise<Profile | null> } = {}
 let authStateCache: AuthState = {
   user: null,
   profile: null,
@@ -73,16 +76,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setAuthState(nextState)
   }, [])
 
-  const getProfile = useCallback(
+  const fetchProfile = useCallback(
     async (user: User): Promise<Profile | null> => {
       try {
         const userId = user.id
-        const cached = profileCache[userId]
         const now = Date.now()
-
-        if (cached && now - cached.timestamp < CACHE_DURATION) {
-          return cached.profile
-        }
 
         for (let attempt = 0; attempt < 2; attempt++) {
           const { data, error } = await supabase
@@ -114,6 +112,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     },
     [supabase]
+  )
+
+  const getProfile = useCallback(
+    (user: User): Promise<Profile | null> => {
+      const userId = user.id
+      const cached = profileCache[userId]
+
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        return Promise.resolve(cached.profile)
+      }
+
+      const pending = inFlightProfile[userId]
+      if (pending) return pending
+
+      const request = fetchProfile(user).finally(() => {
+        delete inFlightProfile[userId]
+      })
+
+      inFlightProfile[userId] = request
+      return request
+    },
+    [fetchProfile]
   )
 
   useEffect(() => {
@@ -227,6 +247,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (event === 'SIGNED_OUT') {
           profileCache = {}
+          inFlightProfile = {}
           clearSupabaseAuthStorage()
           await applySession(null)
 
@@ -313,6 +334,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     try {
       profileCache = {}
+      inFlightProfile = {}
       clearLocalAuthState()
       await destroyClientSession(supabase)
       redirectToLogin()

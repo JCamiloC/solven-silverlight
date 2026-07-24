@@ -1,15 +1,23 @@
 import { createClient } from '@/lib/supabase/client'
-import { User, Profile, UserRole } from '@/types'
+import { Profile, UserRole } from '@/types'
 import { clearSupabaseAuthStorage } from '@/lib/auth/session-cleanup'
 
-// Helper para agregar timeout a operaciones de auth
-function withAuthTimeout<T>(promise: Promise<T>, timeoutMs: number = 10000): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error('Operación de autenticación timeout. Por favor, verifica tu conexión.')), timeoutMs)
-    ),
-  ])
+function isAbortOrTimeoutError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  return (
+    error.name === 'AbortError' ||
+    /aborted|abort|timeout|tardó demasiado/i.test(error.message)
+  )
+}
+
+function toAuthError(error: unknown): Error {
+  if (isAbortOrTimeoutError(error)) {
+    return new Error(
+      'La autenticación tardó demasiado. Revisa tu conexión e intenta de nuevo.'
+    )
+  }
+  if (error instanceof Error) return error
+  return new Error('Error de autenticación')
 }
 
 export class AuthService {
@@ -17,44 +25,56 @@ export class AuthService {
     return createClient()
   }
 
+  /**
+   * Sin Promise.race extra: el fetch del cliente ya aborta auth a 45s.
+   * Un segundo timeout más corto (antes 20s) generaba falsos "timeout" con red lenta.
+   */
   async signIn(email: string, password: string) {
-    const signInPromise = this.supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    
-    const { data, error } = await withAuthTimeout(signInPromise, 20000)
-    
-    if (error) throw error
-    return data
+    try {
+      const { data, error } = await this.supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) throw error
+      return data
+    } catch (error) {
+      throw toAuthError(error)
+    }
   }
 
-  async signUp(email: string, password: string, userData: {
-    firstName: string
-    lastName: string
-    role: UserRole
-  }) {
-    const signUpPromise = this.supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          first_name: userData.firstName,
-          last_name: userData.lastName,
-          role: userData.role,
+  async signUp(
+    email: string,
+    password: string,
+    userData: {
+      firstName: string
+      lastName: string
+      role: UserRole
+    }
+  ) {
+    try {
+      const { data, error } = await this.supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: userData.firstName,
+            last_name: userData.lastName,
+            role: userData.role,
+          },
         },
-      },
-    })
-    
-    const { data, error } = await withAuthTimeout(signUpPromise)
-    
-    if (error) throw error
-    return data
+      })
+
+      if (error) throw error
+      return data
+    } catch (error) {
+      throw toAuthError(error)
+    }
   }
 
   async signOut() {
     try {
-      const { error } = await withAuthTimeout(this.supabase.auth.signOut({ scope: 'global' }), 5000)
+      const { error } = await this.supabase.auth.signOut({ scope: 'global' })
       if (error) throw error
     } finally {
       clearSupabaseAuthStorage()
@@ -62,7 +82,10 @@ export class AuthService {
   }
 
   async getCurrentUser() {
-    const { data: { user }, error } = await withAuthTimeout(this.supabase.auth.getUser())
+    const {
+      data: { user },
+      error,
+    } = await this.supabase.auth.getUser()
     if (error) throw error
     return user
   }
@@ -99,12 +122,12 @@ export class AuthService {
   async checkRole(requiredRoles: UserRole[]): Promise<boolean> {
     const profile = await this.getCurrentProfile()
     if (!profile) return false
-    
+
     return requiredRoles.includes(profile.role)
   }
 
   onAuthStateChange(callback: (user: any | null) => void) {
-    return this.supabase.auth.onAuthStateChange((event, session) => {
+    return this.supabase.auth.onAuthStateChange((_event, session) => {
       callback(session?.user || null)
     })
   }

@@ -25,7 +25,8 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
 
-  const withTimeout = async <T,>(promise: Promise<T>, timeoutMs = 8000): Promise<T> => {
+  // PromiseLike: los query builders de Supabase son thenables, no Promises.
+  const withTimeout = async <T,>(promise: PromiseLike<T>, timeoutMs = 8000): Promise<T> => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null
 
     try {
@@ -42,18 +43,44 @@ function LoginForm() {
     }
   }
 
+  // El destino es una optimización, no un requisito: si tarda o falla,
+  // /dashboard redirige igual según el rol.
   const resolveRedirectPath = async (userId: string) => {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, client_id')
-      .eq('user_id', userId)
-      .single()
+    try {
+      const { data: profile } = await withTimeout(
+        supabase.from('profiles').select('role, client_id').eq('user_id', userId).single(),
+        4000
+      )
 
-    if (profile?.role === 'cliente' && profile.client_id) {
-      return `/dashboard/clientes/${profile.client_id}`
+      if (profile?.role === 'cliente' && profile.client_id) {
+        return `/dashboard/clientes/${profile.client_id}`
+      }
+    } catch (error) {
+      console.warn('[login] No se pudo resolver el destino, usando /dashboard:', error)
     }
 
     return '/dashboard'
+  }
+
+  const isSessionPersisted = async () => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const {
+          data: { session },
+        } = await withTimeout(supabase.auth.getSession(), 4000)
+
+        if (session?.user?.id) return true
+      } catch (error) {
+        // Inconcluyente: signIn ya devolvió sesión, no bloquear al usuario aquí.
+        console.warn('[login] Verificación de sesión no concluyente:', error)
+        return true
+      }
+
+      // El write de la cookie puede ser asíncrono
+      if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 300))
+    }
+
+    return false
   }
 
   const shouldRetryWithCleanup = (error: unknown) => {
@@ -104,14 +131,28 @@ function LoginForm() {
         if (!isMounted) return
 
         if (session?.user) {
-          const {
-            data: { user: currentUser },
-          } = await withTimeout(supabase.auth.getUser(), 12000)
+          // Preferir session local: getUser es validación remota y no debe
+          // bloquear el ingreso si la sesión ya está en el navegador.
+          let userId = session.user.id
+
+          try {
+            const {
+              data: { user: currentUser },
+            } = await withTimeout(supabase.auth.getUser(), 8000)
+            if (currentUser?.id) {
+              userId = currentUser.id
+            }
+          } catch (verifyError) {
+            console.warn(
+              '[login] getUser lento/falló; redirigiendo con sesión local:',
+              verifyError
+            )
+          }
 
           if (!isMounted) return
 
-          if (currentUser?.id) {
-            const redirectPath = await resolveRedirectPath(currentUser.id)
+          if (userId) {
+            const redirectPath = await resolveRedirectPath(userId)
             window.location.assign(redirectPath)
             return
           }
@@ -157,45 +198,25 @@ function LoginForm() {
 
       const { user, session } = signInResult
 
-      // Priorizar la sesión devuelta por signIn para evitar falsos timeout en getSession.
-      let userId: string | undefined = session?.user?.id || user?.id
-
-      if (!userId) {
-        const {
-          data: { user: currentUser },
-        } = await withTimeout(supabase.auth.getUser(), 12000)
-        userId = currentUser?.id
-      }
-
+      // Única fuente de verdad post-login: lo que devolvió signIn.
+      // No llamar getUser/getSession con timeouts cortos aquí: si Auth ya autenticó,
+      // un fallo de verificación no debe tumbar el ingreso.
+      const userId = session?.user?.id || user?.id
       if (!userId) {
         throw new Error('No se pudo establecer la sesión. Intenta nuevamente.')
       }
 
-      // Confirmar que la sesión quedó persistida en cookies antes de navegar.
-      // Evita el bucle: login OK → dashboard → middleware sin cookie → login.
-      const {
-        data: { session: persistedSession },
-      } = await withTimeout(supabase.auth.getSession(), 10000)
-
-      if (!persistedSession?.user?.id) {
-        // Reintento corto: a veces el cookie write es asíncrono
-        await new Promise((resolve) => setTimeout(resolve, 300))
-        const {
-          data: { session: retrySession },
-        } = await withTimeout(supabase.auth.getSession(), 10000)
-
-        if (!retrySession?.user?.id) {
-          throw new Error(
-            'La sesión no se pudo guardar en el navegador. Verifica cookies bloqueadas o modo privado e intenta de nuevo.'
-          )
-        }
-      }
+      // Best-effort: si confirma cookies, bien; si timeout/error, igual navegamos.
+      // El middleware deja pasar si hay cookie o si Auth aún está hidratando.
+      void (await isSessionPersisted())
 
       const redirectPath = await resolveRedirectPath(userId)
-      // Hard navigation para que middleware lea cookies frescas
       window.location.assign(redirectPath)
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error al iniciar sesión'
+      const raw = err instanceof Error ? err.message : 'Error al iniciar sesión'
+      const errorMessage = /timeout|tardó demasiado|aborted|abort/i.test(raw)
+        ? 'La autenticación tardó demasiado. Revisa tu conexión e intenta de nuevo.'
+        : raw
       setError(errorMessage)
     } finally {
       setLoading(false)
