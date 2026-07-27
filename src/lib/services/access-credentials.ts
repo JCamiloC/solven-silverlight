@@ -310,9 +310,11 @@ export class AccessCredentialsService {
       const updateData: any = { ...updates }
 
       // If password is being updated, encrypt it
-      if (updates.password) {
-        updateData.password_hash = CryptoService.encrypt(updates.password)
+      if (updates.password?.trim()) {
+        updateData.password_hash = CryptoService.encrypt(updates.password.trim())
         delete updateData.password // Remove plain password
+      } else {
+        delete updateData.password
       }
 
       const { data, error } = await supabase

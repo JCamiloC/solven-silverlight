@@ -579,7 +579,7 @@ function AccessCredentialForm({ credential, onSubmit, onCancel, isLoading }: Acc
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     const submitData: any = {
       system_name: formData.system_name,
       username: formData.username,
@@ -588,12 +588,17 @@ function AccessCredentialForm({ credential, onSubmit, onCancel, isLoading }: Acc
       status: formData.status,
     }
 
+    const password = formData.password.trim()
+
     if (!credential) {
-      if (!formData.password.trim()) {
+      if (!password) {
         return
       }
-      submitData.password = formData.password
+      submitData.password = password
       submitData.created_by = profile!.id
+    } else if (password) {
+      // En edición, solo enviar password si el usuario escribió una nueva
+      submitData.password = password
     }
 
     onSubmit(submitData)
