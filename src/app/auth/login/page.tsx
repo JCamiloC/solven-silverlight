@@ -25,7 +25,14 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])
 
-  // PromiseLike: los query builders de Supabase son thenables, no Promises.
+  const hasAuthCookieHint = () => {
+    if (typeof document === 'undefined') return false
+    return document.cookie.split(';').some((entry) => {
+      const name = entry.trim().split('=')[0] || ''
+      return name.startsWith('sb-') && name.includes('auth-token')
+    })
+  }
+
   const withTimeout = async <T,>(promise: PromiseLike<T>, timeoutMs = 8000): Promise<T> => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null
 
@@ -163,6 +170,12 @@ function LoginForm() {
         }
       } catch (sessionError) {
         console.error('Error checking existing session:', sessionError)
+        // Cookie presente pero getSession falló/timeout: no dejar al usuario
+        // en el formulario con sesión ya válida (causa el hang al re-login).
+        if (isMounted && hasAuthCookieHint()) {
+          window.location.assign('/dashboard')
+          return
+        }
       } finally {
         if (isMounted) {
           setCheckingSession(false)
@@ -177,44 +190,100 @@ function LoginForm() {
     }
   }, [router, searchParams, supabase])
 
+  const redirectSignedInUser = async (userId?: string) => {
+    if (userId) {
+      const redirectPath = await resolveRedirectPath(userId)
+      window.location.assign(redirectPath)
+      return
+    }
+    // Cookie presente pero no pudimos leer el user: el dashboard sí hidrata
+    window.location.assign('/dashboard')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
     try {
+      // Si ya hay sesión/cookie, NO llamar signInWithPassword.
+      // Con AuthProvider activo, el mutex de supabase-js puede dejar el login
+      // colgado en "Iniciando sesión..." aunque el dashboard cargue bien.
+      try {
+        const {
+          data: { session: existingSession },
+        } = await withTimeout(supabase.auth.getSession(), 3000)
+
+        if (existingSession?.user?.id) {
+          const sameUser =
+            existingSession.user.email?.toLowerCase() === email.trim().toLowerCase()
+
+          if (sameUser) {
+            await redirectSignedInUser(existingSession.user.id)
+            return
+          }
+
+          await destroyClientSession(supabase, { preferLocal: true, timeoutMs: 3000 })
+        } else if (hasAuthCookieHint()) {
+          // Cookie existe pero getSession no devolvió user a tiempo: ir al dashboard
+          await redirectSignedInUser()
+          return
+        }
+      } catch (sessionProbeError) {
+        console.warn('[login] No se pudo inspeccionar sesión previa:', sessionProbeError)
+        if (hasAuthCookieHint()) {
+          await redirectSignedInUser()
+          return
+        }
+      }
+
       let signInResult: Awaited<ReturnType<typeof authService.signIn>>
 
       try {
-        signInResult = await authService.signIn(email, password)
+        // Tope duro: evita spinner infinito si el mutex de auth se queda trabado
+        signInResult = await withTimeout(authService.signIn(email, password), 20000)
       } catch (signInError) {
+        // Si Auth quedó autenticado de todos modos, no mostrar error: entrar
+        if (hasAuthCookieHint()) {
+          try {
+            const {
+              data: { session: recovered },
+            } = await withTimeout(supabase.auth.getSession(), 3000)
+            if (recovered?.user?.id) {
+              await redirectSignedInUser(recovered.user.id)
+              return
+            }
+          } catch {
+            await redirectSignedInUser()
+            return
+          }
+        }
+
         if (!shouldRetryWithCleanup(signInError)) {
           throw signInError
         }
 
         await destroyClientSession(supabase, { preferLocal: true, timeoutMs: 3000 })
-        signInResult = await authService.signIn(email, password)
+        signInResult = await withTimeout(authService.signIn(email, password), 20000)
       }
 
       const { user, session } = signInResult
-
-      // Única fuente de verdad post-login: lo que devolvió signIn.
-      // No llamar getUser/getSession con timeouts cortos aquí: si Auth ya autenticó,
-      // un fallo de verificación no debe tumbar el ingreso.
       const userId = session?.user?.id || user?.id
       if (!userId) {
         throw new Error('No se pudo establecer la sesión. Intenta nuevamente.')
       }
 
-      // Best-effort: si confirma cookies, bien; si timeout/error, igual navegamos.
-      // El middleware deja pasar si hay cookie o si Auth aún está hidratando.
       void (await isSessionPersisted())
-
-      const redirectPath = await resolveRedirectPath(userId)
-      window.location.assign(redirectPath)
+      await redirectSignedInUser(userId)
     } catch (err) {
+      // Último recurso: cookie de sesión presente → entrar al dashboard
+      if (hasAuthCookieHint()) {
+        window.location.assign('/dashboard')
+        return
+      }
+
       const raw = err instanceof Error ? err.message : 'Error al iniciar sesión'
-      const errorMessage = /timeout|tardó demasiado|aborted|abort/i.test(raw)
+      const errorMessage = /timeout|tardó demasiado|aborted|abort|Session verification/i.test(raw)
         ? 'La autenticación tardó demasiado. Revisa tu conexión e intenta de nuevo.'
         : raw
       setError(errorMessage)

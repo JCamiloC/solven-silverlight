@@ -420,7 +420,26 @@ export function TicketTable({
                     </TableCell>
                   )}
                   <TableCell className="max-w-[300px]">
-                    <div className="truncate">{ticket.title}</div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {ticket.has_update && (
+                        <Badge
+                          variant="secondary"
+                          className="shrink-0 bg-sky-100 text-sky-800 hover:bg-sky-100"
+                          title={
+                            ticket.last_update_type === 'comment'
+                              ? 'Nuevo comentario'
+                              : ticket.last_update_type === 'status_change'
+                                ? 'Cambio de estado'
+                                : ticket.last_update_type === 'assignment'
+                                  ? 'Cambio de asignación'
+                                  : 'Actualización pendiente'
+                          }
+                        >
+                          Nuevo
+                        </Badge>
+                      )}
+                      <div className="truncate font-medium">{ticket.title}</div>
+                    </div>
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
                     <Badge variant="outline">

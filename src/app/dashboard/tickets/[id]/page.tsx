@@ -42,7 +42,7 @@ import {
 // import { format } from 'date-fns'
 // import { es } from 'date-fns/locale'
 import { useAuth } from '@/hooks/use-auth'
-import { useTicket, useUpdateTicket, useUpdateTicketStatus } from '@/hooks/use-tickets'
+import { useTicket, useUpdateTicket, useUpdateTicketStatus, useMarkTicketUpdateAsRead } from '@/hooks/use-tickets'
 import { useTicketComments, useCreateTicketComment, useUpdateTicketComment, useDeleteTicketComment } from '@/hooks/use-ticket-comments'
 import { useAssignableUsers } from '@/hooks/use-users'
 import { useClients } from '@/hooks/use-clients'
@@ -96,6 +96,7 @@ export default function TicketDetailPage() {
   
   const updateTicketMutation = useUpdateTicket()
   const updateStatusMutation = useUpdateTicketStatus()
+  const markUpdateAsRead = useMarkTicketUpdateAsRead()
   const createCommentMutation = useCreateTicketComment()
   const updateCommentMutation = useUpdateTicketComment()
   const deleteCommentMutation = useDeleteTicketComment()
@@ -109,6 +110,14 @@ export default function TicketDetailPage() {
       setEditableHardwareId(ticket.hardware_id || '')
     }
   }, [ticket])
+
+  // Al abrir el detalle, marcar la notificación como leída
+  useEffect(() => {
+    if (!ticket?.id || !ticket.has_update) return
+    markUpdateAsRead.mutate(ticket.id)
+    // Solo al cargar un ticket con update pendiente
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticket?.id, ticket?.has_update])
 
   // Validar que clientes solo vean sus propios tickets
   useEffect(() => {
@@ -367,7 +376,14 @@ export default function TicketDetailPage() {
             <span className="sm:hidden">Volver</span>
           </Button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg md:text-2xl font-bold truncate">{ticket.ticket_number || `Ticket #${ticket.id.slice(-8)}`}</h1>
+            <div className="flex items-center gap-2 min-w-0">
+              <h1 className="text-lg md:text-2xl font-bold truncate">{ticket.ticket_number || `Ticket #${ticket.id.slice(-8)}`}</h1>
+              {ticket.has_update && (
+                <Badge variant="secondary" className="shrink-0 bg-sky-100 text-sky-800">
+                  Nuevo
+                </Badge>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground truncate">{ticket.title}</p>
           </div>
         </div>

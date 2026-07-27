@@ -345,17 +345,13 @@ export function useMarkTicketUpdateAsRead() {
   return useMutation({
     mutationFn: (ticketId: string) => TicketsService.markUpdateAsRead(ticketId),
     onSuccess: (_, ticketId) => {
-      // Invalidar las queries relevantes
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tickets })
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.ticket(ticketId) })
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pendingUpdates })
-      
-      toast.success('Notificación marcada como leída')
+      // Sin toast: se llama automáticamente al abrir el detalle
     },
     onError: (error) => {
-      toast.error('Error al marcar como leída', {
-        description: error.message,
-      })
+      console.warn('[tickets] No se pudo marcar actualización como leída:', error)
     },
   })
 }
