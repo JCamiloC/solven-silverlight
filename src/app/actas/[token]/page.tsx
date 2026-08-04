@@ -1,6 +1,10 @@
 import ActaSigningClient from '@/components/actas/ActaSigningClient'
 
-export default function Page(props: any) {
-  const token = props?.params?.token
+type PageProps = {
+  params: Promise<{ token: string }>
+}
+
+export default async function Page({ params }: PageProps) {
+  const { token } = await params
   return <ActaSigningClient token={token} />
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react"
 import { Bot, Headset, MessageCircle, Send, UserRound, X } from "lucide-react"
 
@@ -34,6 +35,8 @@ interface ChatViewer {
 }
 
 export function FloatingChat() {
+  const pathname = usePathname()
+  const isPublicActaPage = pathname?.startsWith("/actas")
   const realtimeEnabled = process.env.NEXT_PUBLIC_CHAT_REALTIME_ENABLED === "true"
   const [supabase] = useState(() => createClient())
   const [isOpen, setIsOpen] = useState(false)
@@ -236,6 +239,11 @@ export function FloatingChat() {
     } finally {
       setIsEscalating(false)
     }
+  }
+
+  // Firma pública de actas: sin sesión; no mostrar chat de soporte
+  if (isPublicActaPage) {
+    return null
   }
 
   return (

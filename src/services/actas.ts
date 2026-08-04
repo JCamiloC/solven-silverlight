@@ -93,15 +93,24 @@ export const ActasService = {
     return { ...acta, link_temporal: token, generador_firma_url: generador_firma_url || acta.generador_firma_url }
   },
 
+  /**
+   * Lectura pública del acta por token (sin sesión).
+   * RLS bloquea al anónimo en hardware_actas; el API usa service role.
+   */
   async getByToken(token: string) {
-    const { data, error } = await supabase
-      .from('hardware_actas')
-      .select('*')
-      .eq('link_temporal', token)
-      .maybeSingle()
+    const response = await fetch(`/api/actas/by-token/${encodeURIComponent(token)}`, {
+      method: 'GET',
+      cache: 'no-store',
+    })
 
-    if (error) throw new Error(error.message)
-    return data
+    if (response.status === 404) return null
+
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(payload?.error || 'No se pudo cargar el acta')
+    }
+
+    return payload
   },
 
   async getByHardwareAssetId(hardware_asset_id: string) {
@@ -115,6 +124,51 @@ export const ActasService = {
 
     if (error) throw new Error(error.message)
     return data
+  },
+
+  /** Última acta por cada hardware_asset_id (para listados / estado en tabla). */
+  async getLatestByHardwareIds(ids: string[]): Promise<
+    Record<
+      string,
+      {
+        id: string
+        hardware_asset_id: string
+        estado_firma: string | null
+        firmado_en: string | null
+        enviado_en: string | null
+        creado_en: string | null
+      }
+    >
+  > {
+    if (!ids.length) return {}
+
+    const { data, error } = await supabase
+      .from('hardware_actas')
+      .select('id, hardware_asset_id, estado_firma, firmado_en, enviado_en, creado_en')
+      .in('hardware_asset_id', ids)
+      .order('creado_en', { ascending: false })
+
+    if (error) throw new Error(error.message)
+
+    const map: Record<
+      string,
+      {
+        id: string
+        hardware_asset_id: string
+        estado_firma: string | null
+        firmado_en: string | null
+        enviado_en: string | null
+        creado_en: string | null
+      }
+    > = {}
+
+    for (const row of data || []) {
+      if (!map[row.hardware_asset_id]) {
+        map[row.hardware_asset_id] = row
+      }
+    }
+
+    return map
   },
 
   async signByClient({ token, cliente_nombre, cliente_cedula, cliente_firma_dataurl }: any) {

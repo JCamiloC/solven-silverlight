@@ -1,13 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import ActasService from '@/services/actas'
-import { createClient } from '@/lib/supabase/client'
-
-const supabase = createClient()
 
 const QUERY_KEYS = {
   actas: ['actas'] as const,
   actaByToken: (t: string) => ['actas', 'token', t] as const,
+  actasByHardware: (ids: string[]) => ['actas', 'hardware', ...ids] as const,
 }
 
 export function useActaByToken(token: string) {
@@ -15,15 +13,28 @@ export function useActaByToken(token: string) {
     queryKey: QUERY_KEYS.actaByToken(token),
     queryFn: () => ActasService.getByToken(token),
     enabled: !!token,
+    retry: 1,
+    staleTime: 30_000,
   })
 }
+
+export function useLatestActasByHardwareIds(ids: string[]) {
+  const sorted = [...ids].filter(Boolean).sort()
+  return useQuery({
+    queryKey: QUERY_KEYS.actasByHardware(sorted),
+    queryFn: () => ActasService.getLatestByHardwareIds(sorted),
+    enabled: sorted.length > 0,
+  })
+}
+
+export { QUERY_KEYS as ACTAS_QUERY_KEYS }
 
 export function useCreateActa() {
   const qc = useQueryClient()
 
   return useMutation({
     mutationFn: (data: any) => ActasService.createActa(data),
-    onSuccess: (data) => {
+    onSuccess: () => {
       toast.success('Acta creada', { description: 'Se generó el link para la firma del cliente' })
       qc.invalidateQueries({ queryKey: QUERY_KEYS.actas })
     },
@@ -53,9 +64,14 @@ export function useSignActa() {
 
       return payload
     },
-    onSuccess: () => {
-      toast.success('Acta firmada por cliente')
+    onSuccess: (_data, variables) => {
+      toast.success('Acta firmada', {
+        description: 'Tu firma quedó registrada. Gracias.',
+      })
       qc.invalidateQueries({ queryKey: QUERY_KEYS.actas })
+      if (variables?.token) {
+        qc.invalidateQueries({ queryKey: QUERY_KEYS.actaByToken(variables.token) })
+      }
     },
     onError: (error: any) => {
       toast.error('Error al firmar acta', { description: error.message })

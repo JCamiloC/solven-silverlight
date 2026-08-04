@@ -69,6 +69,8 @@ import { toast } from 'sonner'
 import { Progress } from '@/components/ui/progress'
 import ActasService from '@/services/actas'
 import { useAuth } from '@/hooks/use-auth'
+import { useLatestActasByHardwareIds, ACTAS_QUERY_KEYS } from '@/hooks/use-actas'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface HardwareTableProps {
   data: HardwareAsset[]
@@ -80,6 +82,7 @@ interface HardwareTableProps {
 export function HardwareTable({ data, isLoading, clientId, readOnly = false }: HardwareTableProps) {
   const router = useRouter()
   const { user, profile } = useAuth()
+  const queryClient = useQueryClient()
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -88,7 +91,10 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
   const [pdfProgress, setPdfProgress] = useState(0)
   const [pdfProgressText, setPdfProgressText] = useState('')
   const [pdfType, setPdfType] = useState<'lifesheet' | 'acta'>('lifesheet')
-  
+
+  const hardwareIds = data.map((item) => item.id)
+  const { data: actasByHardware = {} } = useLatestActasByHardwareIds(hardwareIds)
+
   const updateMutation = useUpdateHardware()
   const deleteMutation = useDeleteHardware()
 
@@ -98,12 +104,49 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       maintenance: { variant: 'secondary' as const, label: 'Mantenimiento' },
       retired: { variant: 'destructive' as const, label: 'Retirado' },
     }
-    
+
     const config = variants[status as keyof typeof variants] || variants.active
-    
+
     return (
       <Badge variant={config.variant}>
         {config.label}
+      </Badge>
+    )
+  }
+
+  const getActaStatusBadge = (hardwareId: string) => {
+    const acta = actasByHardware[hardwareId]
+    if (!acta) {
+      return (
+        <Badge variant="outline" className="font-normal text-muted-foreground">
+          Sin acta
+        </Badge>
+      )
+    }
+
+    const estado = (acta.estado_firma || '').toLowerCase()
+    if (estado === 'completo') {
+      return (
+        <Badge className="bg-emerald-600 hover:bg-emerald-600 font-normal">Firmada</Badge>
+      )
+    }
+    if (estado === 'falta_cliente' || estado === 'pendiente') {
+      return (
+        <Badge variant="secondary" className="bg-amber-100 text-amber-900 hover:bg-amber-100 font-normal">
+          Falta cliente
+        </Badge>
+      )
+    }
+    if (estado === 'falta_solven') {
+      return (
+        <Badge variant="secondary" className="font-normal">
+          Falta Solven
+        </Badge>
+      )
+    }
+    return (
+      <Badge variant="outline" className="font-normal">
+        {acta.estado_firma || 'Pendiente'}
       </Badge>
     )
   }
@@ -143,6 +186,11 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
       accessorKey: 'status',
       header: 'Estado',
       cell: ({ row }) => getStatusBadge(row.getValue('status')),
+    },
+    {
+      id: 'acta_status',
+      header: 'Acta',
+      cell: ({ row }) => getActaStatusBadge(row.original.id),
     },
     {
       accessorKey: 'persona_responsable',
@@ -199,7 +247,11 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => downloadActa(asset)}>
                 <Download className="mr-2 h-4 w-4" />
-                Descargar Acta
+                {actasByHardware[asset.id]?.estado_firma === 'completo'
+                  ? 'Descargar Acta'
+                  : actasByHardware[asset.id]
+                    ? 'Reenviar link de firma'
+                    : 'Generar / enviar link de firma'}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => sendActaByEmail(asset)}>
                 <Mail className="mr-2 h-4 w-4" />
@@ -652,6 +704,9 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
           hardwareName: hardware.name,
           clientName: empresaCliente?.nombre,
           recipientName: hardware.persona_responsable || undefined,
+          token: acta.link_temporal,
+          actaId: acta.id,
+          staffNotifyEmail: user?.email || profile?.email || undefined,
         }),
       })
 
@@ -660,15 +715,20 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
         throw new Error(data?.error || 'No se pudo enviar el correo con el link de firma')
       }
 
+      await queryClient.invalidateQueries({ queryKey: ACTAS_QUERY_KEYS.actas })
+
       clearInterval(progressInterval)
       setPdfProgress(100)
       setPdfProgressText('¡Link enviado!')
 
+      const staffEmail = user?.email || profile?.email
       setTimeout(() => {
         setGeneratingPDF(false)
         setPdfProgress(0)
         toast.success('Link de firma enviado por correo', {
-          description: 'Cuando el receptor firme, podrás descargar el acta.',
+          description: staffEmail
+            ? `Enviado a ${hardware.correo_responsable}. También te llegó confirmación a ${staffEmail} con el mismo link.`
+            : `Enviado a ${hardware.correo_responsable}. Estado: Falta firma del cliente.`,
         })
       }, 700)
 
