@@ -28,54 +28,29 @@ export function ProtectedRoute({
   const { user, profile, loading, hasRole } = useAuth()
   const router = useRouter()
   const [isRedirecting, setIsRedirecting] = useState(false)
-  const [loadingGuardTriggered, setLoadingGuardTriggered] = useState(false)
-  const [authGraceExpired, setAuthGraceExpired] = useState(false)
+  const [waitExpired, setWaitExpired] = useState(false)
 
-  // Esperar más tiempo antes de considerar "sin sesión" (evita bounce post-login)
-  useEffect(() => {
-    if (!loading) {
-      setLoadingGuardTriggered(false)
-      return
-    }
+  const waitingForHydration = Boolean(
+    requireAuth && !user && !waitExpired && (loading || hasAuthCookieHint())
+  )
 
-    const timeout = setTimeout(() => {
-      setLoadingGuardTriggered(true)
-    }, 10000)
-
-    return () => clearTimeout(timeout)
-  }, [loading])
-
-  // Gracia adicional si hay cookie pero user aún no hidratado
   useEffect(() => {
     if (user || !requireAuth) {
-      setAuthGraceExpired(false)
+      setWaitExpired(false)
       return
     }
 
-    if (!hasAuthCookieHint()) {
-      setAuthGraceExpired(true)
-      return
-    }
-
-    setAuthGraceExpired(false)
     const timeout = setTimeout(() => {
-      setAuthGraceExpired(true)
+      setWaitExpired(true)
     }, 8000)
 
     return () => clearTimeout(timeout)
   }, [user, requireAuth])
 
-  const isCheckingAuth = (loading && !loadingGuardTriggered) || (!user && !authGraceExpired && hasAuthCookieHint())
-
   useEffect(() => {
-    if (isCheckingAuth || isRedirecting) return
+    if (waitingForHydration || isRedirecting) return
 
     if (requireAuth && !user) {
-      // Última salvaguarda: si aún hay cookie, no redirigir (middleware/cliente aún sincronizando)
-      if (hasAuthCookieHint() && !authGraceExpired) {
-        return
-      }
-
       setIsRedirecting(true)
       router.replace('/auth/login')
       return
@@ -101,11 +76,17 @@ export function ProtectedRoute({
     requireAuth,
     router,
     isRedirecting,
-    isCheckingAuth,
-    authGraceExpired,
+    waitingForHydration,
   ])
 
-  if (isCheckingAuth) {
+  if (user) {
+    if (allowedRoles.length > 0 && profile && !hasRole(allowedRoles)) {
+      return null
+    }
+    return <>{children}</>
+  }
+
+  if (waitingForHydration) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loading size="lg" text="Verificando autenticación..." />
@@ -113,15 +94,7 @@ export function ProtectedRoute({
     )
   }
 
-  if (isRedirecting) {
-    return null
-  }
-
-  if (requireAuth && !user) {
-    return null
-  }
-
-  if (allowedRoles.length > 0 && !hasRole(allowedRoles)) {
+  if (isRedirecting || (requireAuth && !user)) {
     return null
   }
 

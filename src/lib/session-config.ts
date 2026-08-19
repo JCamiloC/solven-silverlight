@@ -4,7 +4,7 @@ export const SESSION_CONFIG = {
   TIMEOUT_MINUTES: 120,
 
   // Timeout por rol (minutos de inactividad real)
-  // Se reinicia con interacción DOM o peticiones a Supabase (inicio y fin).
+  // Se reinicia con interacción real del usuario (click, teclado, touch).
   TIMEOUT_BY_ROLE: {
     administrador: 240,
     lider_soporte: 240,
@@ -15,13 +15,10 @@ export const SESSION_CONFIG = {
   // Aviso antes del cierre por inactividad (minutos)
   WARNING_MINUTES: 5,
 
-  // Debounce para eventos de alta frecuencia (mousemove, scroll)
-  ACTIVITY_DEBOUNCE_MS: 500,
+  // Debounce para eventos de alta frecuencia
+  ACTIVITY_DEBOUNCE_MS: 1000,
 
-  // Evento personalizado disparado por actividad de red autenticada
-  ACTIVITY_EVENT: 'solven:session-activity',
-
-  // Evento cuando hay peticiones en vuelo (evita cortar operaciones largas)
+  // Evento cuando hay peticiones REST en vuelo (evita cortar un guardado)
   REQUEST_ACTIVITY_EVENT: 'solven:session-request',
 
   // Habilitar/deshabilitar timeout de sesión
@@ -45,16 +42,10 @@ export const SESSION_CONFIG = {
   // Eventos DOM que reinician el contador de inactividad
   ACTIVITY_EVENTS: [
     'mousedown',
-    'mousemove',
     'pointerdown',
-    'pointermove',
     'keydown',
-    'keypress',
-    'scroll',
-    'wheel',
     'touchstart',
     'click',
-    'focus',
   ] as const,
 } as const
 

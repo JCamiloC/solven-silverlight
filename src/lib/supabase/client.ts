@@ -1,11 +1,11 @@
 import { createBrowserClient } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { beginSessionRequest, endSessionRequest } from '@/lib/session-activity'
+import { toQueryError } from '@/lib/query-errors'
 
 // Un solo timeout por request (evita Abort + Promise.race a 15s que dejaba mutaciones colgadas)
 const QUERY_TIMEOUT_MS = 45_000
 const MUTATION_TIMEOUT_MS = 75_000
-const AUTH_FETCH_TIMEOUT_MS = 45_000
 const STORAGE_TIMEOUT_MS = 120_000
 
 function isAuthRequest(url: string): boolean {
@@ -17,7 +17,6 @@ function isStorageRequest(url: string): boolean {
 }
 
 function resolveTimeoutMs(url: string, options?: RequestInit): number {
-  if (isAuthRequest(url)) return AUTH_FETCH_TIMEOUT_MS
   if (isStorageRequest(url)) return STORAGE_TIMEOUT_MS
 
   const method = (options?.method || 'GET').toUpperCase()
@@ -26,23 +25,6 @@ function resolveTimeoutMs(url: string, options?: RequestInit): number {
   }
 
   return QUERY_TIMEOUT_MS
-}
-
-function toUserFacingFetchError(error: unknown): Error {
-  if (error instanceof Error) {
-    const aborted =
-      error.name === 'AbortError' ||
-      /aborted|abort|timeout/i.test(error.message)
-
-    if (aborted) {
-      return new Error(
-        'La petición tardó demasiado o se interrumpió. Revisa tu conexión e intenta de nuevo.'
-      )
-    }
-    return error
-  }
-
-  return new Error('Error de red al contactar el servidor')
 }
 
 let browserClient: SupabaseClient | null = null
@@ -84,18 +66,41 @@ export function createClient() {
     global: {
       fetch: (url, options = {}) => {
         const requestUrl = typeof url === 'string' ? url : url.toString()
+        const isSupabaseRequest = Boolean(supabaseUrl && requestUrl.startsWith(supabaseUrl))
+
+        // Auth (getSession/refresh): fetch plano. Contarlo como actividad
+        // reprogramaba timeouts y competía con GoTrue.
+        if (isAuthRequest(requestUrl)) {
+          return fetch(url, options)
+        }
+
         const timeoutMs = resolveTimeoutMs(requestUrl, options)
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
-        const isSupabaseRequest = Boolean(supabaseUrl && requestUrl.startsWith(supabaseUrl))
+        const timeoutId = setTimeout(() => {
+          controller.abort(new Error(`Request timeout after ${timeoutMs}ms`))
+        }, timeoutMs)
 
         const externalSignal = options.signal
         if (externalSignal) {
           if (externalSignal.aborted) {
-            controller.abort()
-          } else {
-            externalSignal.addEventListener('abort', () => controller.abort(), { once: true })
+            clearTimeout(timeoutId)
+            const reason = externalSignal.reason
+            return Promise.reject(
+              reason instanceof Error
+                ? reason
+                : new DOMException('The operation was aborted.', 'AbortError')
+            )
           }
+          externalSignal.addEventListener(
+            'abort',
+            () => {
+              controller.abort(
+                externalSignal.reason ??
+                  new DOMException('The operation was aborted.', 'AbortError')
+              )
+            },
+            { once: true }
+          )
         }
 
         if (isSupabaseRequest) {
@@ -107,7 +112,11 @@ export function createClient() {
           signal: controller.signal,
         })
           .catch((error) => {
-            throw toUserFacingFetchError(error)
+            // Cancelación real del caller (React Query unmount): preservar AbortError
+            if (externalSignal?.aborted) {
+              throw error
+            }
+            throw toQueryError(error)
           })
           .finally(() => {
             clearTimeout(timeoutId)

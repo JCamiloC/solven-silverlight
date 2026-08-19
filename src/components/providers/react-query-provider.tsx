@@ -3,8 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
+import { isAbortLikeError } from '@/lib/query-errors'
 
 export function ReactQueryProvider({ children }: { children: React.ReactNode }) {
   const showDevtools =
@@ -16,25 +15,24 @@ export function ReactQueryProvider({ children }: { children: React.ReactNode }) 
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 60 * 1000, // 1 minute
-            // Timeout para todas las queries
-            gcTime: 5 * 60 * 1000, // 5 minutes (antes era cacheTime)
+            staleTime: 60 * 1000,
+            gcTime: 5 * 60 * 1000,
+            refetchOnWindowFocus: false,
+            refetchOnReconnect: true,
             // Retry logic mejorado
             retry: (failureCount, error) => {
-              // No reintentar en errores de autenticación
               if (error && typeof error === 'object' && 'status' in error) {
                 const status = (error as { status?: number }).status
                 if (status === 401 || status === 403) {
                   return false
                 }
               }
-              
-              // No reintentar si es timeout
-              if (error instanceof Error && error.message.includes('timeout')) {
-                return false
+
+              // Abort/timeout: un reintento corto, no un bucle de loading
+              if (isAbortLikeError(error)) {
+                return failureCount < 1
               }
               
-              // No reintentar si es error de sesión expirada
               if (error instanceof Error && 
                   (error.message.includes('sesión') || 
                    error.message.includes('session') ||
@@ -42,7 +40,7 @@ export function ReactQueryProvider({ children }: { children: React.ReactNode }) 
                 return false
               }
               
-              return failureCount < 2 // Reducir reintentos de 3 a 2
+              return failureCount < 2
             },
           },
           mutations: {

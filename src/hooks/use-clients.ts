@@ -13,8 +13,7 @@ export function useClients() {
   return useQuery({
     queryKey: clientKeys.list(),
     queryFn: clientService.getAll,
-    staleTime: 5 * 60 * 1000, // Reducido a 5 minutos para refrescar más frecuente
-    refetchOnWindowFocus: true, // Refetch cuando vuelves a la ventana
+    staleTime: 5 * 60 * 1000,
   })
 }
 

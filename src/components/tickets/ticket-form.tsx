@@ -149,12 +149,16 @@ export function TicketForm({
   // Watchear cliente y categoría seleccionados
   const selectedClientId = form.watch('client_id')
   const selectedCategory = form.watch('category')
+  const loadHardware = selectedCategory === 'hardware' && !!selectedClientId
+  const loadSoftware = selectedCategory === 'software' && !!selectedClientId
+  const loadAccess = selectedCategory === 'access' && !!selectedClientId
   
-  // Obtener datos según categoría y cliente
-  const { data: hardwareList, isLoading: loadingHardware } = useHardwareAssetsByClient(selectedClientId || '')
-  const { data: softwareList, isLoading: loadingSoftware } = useSoftwareByClient(selectedClientId || '')
-  const { data: customApplicationsList, isLoading: loadingCustomApplications } = useCustomApplicationsByClient(selectedClientId || '')
-  const { data: accessList, isLoading: loadingAccess } = useAccessCredentialsByClient(selectedClientId || '')
+  const { data: hardwareList, isPending: loadingHardware, isError: hardwareError, refetch: refetchHardware } = useHardwareAssetsByClient(loadHardware ? selectedClientId : '')
+  const { data: softwareList, isPending: loadingSoftware, isError: softwareError, refetch: refetchSoftware } = useSoftwareByClient(loadSoftware ? selectedClientId : '')
+  const { data: customApplicationsList, isPending: loadingCustomApplications, isError: customAppsError, refetch: refetchCustomApps } = useCustomApplicationsByClient(loadSoftware ? selectedClientId : '')
+  const { data: accessList, isPending: loadingAccess, isError: accessError, refetch: refetchAccess } = useAccessCredentialsByClient(loadAccess ? selectedClientId : '')
+
+  const softwareListLoading = loadSoftware && (loadingSoftware || loadingCustomApplications)
 
   const softwareOptions = [
     ...(softwareList?.map((sw) => ({
@@ -652,6 +656,19 @@ export function TicketForm({
                         disabled={loadingHardware}
                       />
                     </FormControl>
+                    {hardwareError && (
+                      <p className="text-sm text-muted-foreground">
+                        No se pudo cargar el listado.{' '}
+                        <button
+                          type="button"
+                          className="underline text-primary"
+                          onClick={() => { void refetchHardware() }}
+                        >
+                          Reintentar
+                        </button>
+                        {' '}o elige “Otro”.
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -696,13 +713,29 @@ export function TicketForm({
                           field.onChange(id)
                           form.setValue('software_source', source as 'license' | 'custom_app')
                         }}
-                        placeholder={(loadingSoftware || loadingCustomApplications) ? 'Cargando...' : 'Seleccione software o aplicativo'}
+                        placeholder={softwareListLoading ? 'Cargando...' : 'Seleccione software o aplicativo'}
                         searchPlaceholder="Buscar software, versión o aplicativo..."
                         emptyMessage="No se encontraron opciones de software"
                         minSearchChars={1}
-                        disabled={loadingSoftware || loadingCustomApplications}
+                        disabled={softwareListLoading}
                       />
                     </FormControl>
+                    {(softwareError || customAppsError) && (
+                      <p className="text-sm text-muted-foreground">
+                        No se pudo cargar el listado.{' '}
+                        <button
+                          type="button"
+                          className="underline text-primary"
+                          onClick={() => {
+                            void refetchSoftware()
+                            void refetchCustomApps()
+                          }}
+                        >
+                          Reintentar
+                        </button>
+                        {' '}o elige “Otro”.
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -737,6 +770,19 @@ export function TicketForm({
                         disabled={loadingAccess}
                       />
                     </FormControl>
+                    {accessError && (
+                      <p className="text-sm text-muted-foreground">
+                        No se pudo cargar el listado.{' '}
+                        <button
+                          type="button"
+                          className="underline text-primary"
+                          onClick={() => { void refetchAccess() }}
+                        >
+                          Reintentar
+                        </button>
+                        {' '}o elige “Otro”.
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

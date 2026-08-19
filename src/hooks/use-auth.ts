@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { User } from '@supabase/supabase-js'
 import { Profile, UserRole } from '@/types'
 import { clearSupabaseAuthStorage, destroyClientSession } from '@/lib/auth/session-cleanup'
+import { isAbortLikeError } from '@/lib/query-errors'
 
 interface AuthState {
   user: User | null
@@ -26,8 +27,6 @@ interface AuthContextValue extends AuthState {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 let profileCache: { [userId: string]: { profile: Profile; timestamp: number } } = {}
-// getInitialSession y onAuthStateChange arrancan a la vez: sin esto se dispara
-// la misma consulta de perfil dos veces en cada carga.
 let inFlightProfile: { [userId: string]: Promise<Profile | null> } = {}
 let authStateCache: AuthState = {
   user: null,
@@ -35,7 +34,7 @@ let authStateCache: AuthState = {
   loading: true,
 }
 const CACHE_DURATION = 5 * 60 * 1000
-const AUTH_BOOTSTRAP_TIMEOUT_MS = 12000
+const AUTH_BOOTSTRAP_TIMEOUT_MS = 8000
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -70,6 +69,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const supabase = useMemo(() => createClient(), [])
   const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const bootstrappedRef = useRef(false)
+  const applyGenRef = useRef(0)
 
   const setAndCacheAuthState = useCallback((nextState: AuthState) => {
     authStateCache = nextState
@@ -140,11 +140,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     let isMounted = true
 
     loadingTimeoutRef.current = setTimeout(() => {
-      console.warn('[useAuth] Loading timeout, forcing non-loading state')
       if (!isMounted) return
       if (!authStateCache.loading) return
 
-      // No borrar user si ya hay sesión parcial; solo liberar loading
+      console.warn('[useAuth] Loading timeout, forcing non-loading state')
       setAndCacheAuthState({
         ...authStateCache,
         loading: false,
@@ -152,12 +151,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
       bootstrappedRef.current = true
     }, AUTH_BOOTSTRAP_TIMEOUT_MS)
 
-    const applySession = async (sessionUser: User | null) => {
+    const applySession = async (
+      sessionUser: User | null,
+      options: { refetchProfile?: boolean } = {}
+    ) => {
       if (!isMounted) return
+      const gen = ++applyGenRef.current
+      const refetchProfile = options.refetchProfile ?? true
 
       if (sessionUser) {
-        const profile = await getProfile(sessionUser)
-        if (!isMounted) return
+        const sameUser = authStateCache.user?.id === sessionUser.id
+        let profile = sameUser ? authStateCache.profile : null
+
+        if (!profile || refetchProfile) {
+          profile = await getProfile(sessionUser)
+        }
+
+        if (!isMounted || gen !== applyGenRef.current) return
+
+        if (
+          sameUser &&
+          authStateCache.profile?.id === profile?.id &&
+          authStateCache.loading === false
+        ) {
+          bootstrappedRef.current = true
+          return
+        }
+
         setAndCacheAuthState({
           user: sessionUser,
           profile,
@@ -180,8 +200,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const getInitialSession = async () => {
       try {
-        console.log('[useAuth] Getting initial session...')
-
         const {
           data: { session },
           error,
@@ -190,18 +208,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (!isMounted) return
 
         if (error) {
-          console.error('[useAuth] Error getting session:', error)
-          // No limpiar sesión existente por error transitorio si ya había user
-          if (!authStateCache.user) {
-            await applySession(null)
-          } else {
+          if (isAbortLikeError(error) || authStateCache.user) {
             setAndCacheAuthState({ ...authStateCache, loading: false })
             bootstrappedRef.current = true
+            return
           }
+          await applySession(null)
           return
         }
 
-        // Si onAuthStateChange ya aplicó la sesión, no sobrescribir con null
         if (!session?.user && bootstrappedRef.current && authStateCache.user) {
           setAndCacheAuthState({ ...authStateCache, loading: false })
           return
@@ -212,8 +227,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.error('[useAuth] Error in getInitialSession:', error)
         if (!isMounted) return
 
-        // Errores de red: no expulsar si ya hay user en cache
-        if (authStateCache.user) {
+        if (authStateCache.user || isAbortLikeError(error)) {
           setAndCacheAuthState({ ...authStateCache, loading: false })
           bootstrappedRef.current = true
           return
@@ -223,21 +237,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     }
 
-    getInitialSession()
+    void getInitialSession()
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[useAuth] Auth event:', event, session ? 'Session exists' : 'No session')
-
       try {
-        if (session?.user) {
-          await applySession(session.user)
+        if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+          if (session?.user) {
+            await applySession(session.user, { refetchProfile: false })
+          }
           return
         }
 
-        // INITIAL_SESSION sin sesión: normal en primera carga sin cookies.
-        // TOKEN_REFRESHED/USER_UPDATED sin sesión no deben forzar logout inmediato.
+        if (session?.user) {
+          await applySession(session.user, {
+            refetchProfile: event === 'SIGNED_IN' || event === 'INITIAL_SESSION',
+          })
+          return
+        }
+
         if (event === 'INITIAL_SESSION') {
           if (!bootstrappedRef.current) {
             await applySession(null)
@@ -257,9 +276,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return
         }
 
-        // Otros eventos sin sesión: no borrar user activo (evita bounce post-login)
         if (authStateCache.user && bootstrappedRef.current) {
-          console.warn('[useAuth] Ignoring empty session for event:', event)
           return
         }
 
@@ -278,44 +295,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [getProfile, router, setAndCacheAuthState, supabase])
 
-  // Renovar JWT antes de expirar y al volver a la pestaña
-  useEffect(() => {
-    if (!authState.user) return
-
-    const refreshIfNeeded = async () => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-        if (!session?.expires_at) return
-
-        const expiresIn = session.expires_at - Math.floor(Date.now() / 1000)
-        if (expiresIn < 10 * 60) {
-          await supabase.auth.refreshSession()
-        }
-      } catch (error) {
-        console.warn('[useAuth] Token refresh skipped:', error)
-      }
-    }
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        void refreshIfNeeded()
-      }
-    }
-
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    const interval = setInterval(() => {
-      void refreshIfNeeded()
-    }, 50 * 60 * 1000)
-
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-      clearInterval(interval)
-    }
-  }, [authState.user, supabase])
-
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     const clearLocalAuthState = () => {
       setAndCacheAuthState({
         user: null,
@@ -344,15 +324,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       redirectToLogin()
       throw error
     }
-  }
+  }, [router, setAndCacheAuthState, supabase])
 
-  const refresh = async () => {
-    console.log('[useAuth] Manual refresh triggered')
-    setAndCacheAuthState({
-      ...authStateCache,
-      loading: true,
-    })
-
+  const refresh = useCallback(async () => {
     try {
       const {
         data: { session },
@@ -360,7 +334,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } = await supabase.auth.getSession()
 
       if (error) {
-        console.error('[useAuth] Error refreshing session:', error)
         setAndCacheAuthState({
           ...authStateCache,
           loading: false,
@@ -375,10 +348,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
           profile,
           loading: false,
         })
-      } else {
+      } else if (!authStateCache.user) {
         setAndCacheAuthState({
           user: null,
           profile: null,
+          loading: false,
+        })
+      } else {
+        setAndCacheAuthState({
+          ...authStateCache,
           loading: false,
         })
       }
@@ -389,17 +367,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
         loading: false,
       })
     }
-  }
+  }, [getProfile, setAndCacheAuthState, supabase])
 
-  const hasRole = (roles: UserRole[]): boolean => {
+  const hasRole = useCallback((roles: UserRole[]): boolean => {
     if (!authState.profile) return false
     return roles.includes(authState.profile.role)
-  }
+  }, [authState.profile])
 
-  const isAdmin = () => hasRole(['administrador'])
-  const isLeader = () => hasRole(['administrador', 'lider_soporte'])
-  const isSupport = () => hasRole(['administrador', 'lider_soporte', 'agente_soporte'])
-  const isClient = () => hasRole(['cliente'])
+  const isAdmin = useCallback(() => hasRole(['administrador']), [hasRole])
+  const isLeader = useCallback(() => hasRole(['administrador', 'lider_soporte']), [hasRole])
+  const isSupport = useCallback(
+    () => hasRole(['administrador', 'lider_soporte', 'agente_soporte']),
+    [hasRole]
+  )
+  const isClient = useCallback(() => hasRole(['cliente']), [hasRole])
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -412,7 +393,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       isSupport,
       isClient,
     }),
-    [authState, refresh]
+    [authState, signOut, refresh, hasRole, isAdmin, isLeader, isSupport, isClient]
   )
 
   return createElement(AuthContext.Provider, { value }, children)

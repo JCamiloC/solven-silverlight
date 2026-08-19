@@ -26,7 +26,6 @@ export function useSoftwareLicenses() {
     queryKey: softwareKeys.lists(),
     queryFn: softwareService.getAll,
     staleTime: 3 * 60 * 1000, // 3 minutes (reducido para refrescar más seguido)
-    refetchOnWindowFocus: true,
   })
 }
 
@@ -56,7 +55,6 @@ export function useSoftwareByClient(clientId: string) {
     queryFn: () => softwareService.getByClient(clientId),
     enabled: !!clientId,
     staleTime: 3 * 60 * 1000,
-    refetchOnWindowFocus: true,
   })
 }
 

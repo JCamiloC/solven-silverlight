@@ -46,11 +46,8 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
   const handleTimeout = useCallback(async () => {
     if (hasTimedOutRef.current) return
 
-    // No cortar si hay operaciones en curso (guardar tickets, cargas, etc.)
     if (getInFlightSessionRequests() > 0) {
-      console.warn('[SessionTimeout] Logout deferred: request in flight')
       lastActivityRef.current = Date.now()
-      // Reprogramar un poco más adelante
       if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current)
       logoutTimerRef.current = setTimeout(() => {
         void handleTimeout()
@@ -58,12 +55,8 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
       return
     }
 
-    // Si hubo actividad reciente (últimos 30s), extender en lugar de cerrar
     const msSinceActivity = Date.now() - lastActivityRef.current
     if (msSinceActivity < 30_000) {
-      console.warn('[SessionTimeout] Logout deferred: recent activity — extending')
-      // Se reprograma vía scheduleTimers desde el efecto de actividad;
-      // aquí forzamos extensión por si el debounce no corrió.
       lastActivityRef.current = Date.now()
       hasTimedOutRef.current = false
       setShowWarning(false)
@@ -111,7 +104,7 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
 
     lastActivityRef.current = Date.now()
     hasTimedOutRef.current = false
-    setShowWarning(false)
+    setShowWarning((prev) => (prev ? false : prev))
     clearTimers()
 
     const totalMs = timeoutMinutes * 60 * 1000
@@ -156,15 +149,7 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
 
   const extendSession = useCallback(() => {
     scheduleTimers()
-    void supabase.auth.getSession().then(({ data }) => {
-      if (data.session?.expires_at) {
-        const expiresIn = data.session.expires_at - Math.floor(Date.now() / 1000)
-        if (expiresIn < 15 * 60) {
-          void supabase.auth.refreshSession()
-        }
-      }
-    })
-  }, [scheduleTimers, supabase])
+  }, [scheduleTimers])
 
   useEffect(() => {
     if (!enabled) {
@@ -173,39 +158,31 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
       return
     }
 
-    const onActivity = () => debouncedSchedule()
+    const onUserActivity = () => debouncedSchedule()
 
     SESSION_CONFIG.ACTIVITY_EVENTS.forEach((event) => {
-      document.addEventListener(event, onActivity, true)
+      document.addEventListener(event, onUserActivity, true)
     })
 
-    window.addEventListener(SESSION_CONFIG.ACTIVITY_EVENT, onActivity)
-    window.addEventListener(SESSION_CONFIG.REQUEST_ACTIVITY_EVENT, onActivity)
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState !== 'visible') return
-      scheduleTimers()
-      void supabase.auth.getSession()
+    const onRequestInFlight = () => {
+      lastActivityRef.current = Date.now()
     }
-    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener(SESSION_CONFIG.REQUEST_ACTIVITY_EVENT, onRequestInFlight)
 
     scheduleTimers()
 
     return () => {
       SESSION_CONFIG.ACTIVITY_EVENTS.forEach((event) => {
-        document.removeEventListener(event, onActivity, true)
+        document.removeEventListener(event, onUserActivity, true)
       })
-      window.removeEventListener(SESSION_CONFIG.ACTIVITY_EVENT, onActivity)
-      window.removeEventListener(SESSION_CONFIG.REQUEST_ACTIVITY_EVENT, onActivity)
-      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener(SESSION_CONFIG.REQUEST_ACTIVITY_EVENT, onRequestInFlight)
 
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
       clearTimers()
       hasTimedOutRef.current = false
     }
-  }, [enabled, scheduleTimers, debouncedSchedule, clearTimers, supabase])
+  }, [enabled, scheduleTimers, debouncedSchedule, clearTimers])
 
-  // Si el aviso está abierto y hay actividad/peticiones, extender automáticamente
   useEffect(() => {
     if (!showWarning || !enabled) return
 
@@ -216,14 +193,11 @@ export function useSessionTimeout(config: SessionTimeoutConfig = {}) {
       extendSession()
     }
 
-    window.addEventListener(SESSION_CONFIG.ACTIVITY_EVENT, autoExtendOnActivity)
     window.addEventListener(SESSION_CONFIG.REQUEST_ACTIVITY_EVENT, autoExtendOnActivity)
-    // También teclado/click mientras el banner está visible
     document.addEventListener('keydown', autoExtendOnActivity, true)
     document.addEventListener('mousedown', autoExtendOnActivity, true)
 
     return () => {
-      window.removeEventListener(SESSION_CONFIG.ACTIVITY_EVENT, autoExtendOnActivity)
       window.removeEventListener(SESSION_CONFIG.REQUEST_ACTIVITY_EVENT, autoExtendOnActivity)
       document.removeEventListener('keydown', autoExtendOnActivity, true)
       document.removeEventListener('mousedown', autoExtendOnActivity, true)

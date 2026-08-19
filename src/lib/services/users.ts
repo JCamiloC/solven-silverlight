@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import { UserRole } from '@/types'
+import { toQueryError } from '@/lib/query-errors'
 
 const supabase = createClient()
 
@@ -58,12 +59,12 @@ export class UsersService {
       
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, user_id, client_id, email, first_name, last_name, phone, role, avatar_url, created_at, updated_at')
         .order('first_name, last_name')
 
       if (profilesError) {
         console.error('Error fetching profiles from database:', profilesError)
-        throw new Error(`Error connecting to database: ${profilesError.message}`)
+        throw toQueryError(profilesError)
       }
 
       console.log('✅ Usuarios obtenidos correctamente desde profiles')
@@ -85,7 +86,7 @@ export class UsersService {
 
     } catch (error) {
       console.error('Error in getAll users:', error)
-      throw new Error(`Failed to fetch users: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      throw toQueryError(error)
     }
   }
 

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { toQueryError } from '@/lib/query-errors'
 
 const supabase = createClient()
 
@@ -169,7 +170,7 @@ export class SoftwareService {
       .eq('client_id', clientId)
       .order('created_at', { ascending: false })
 
-    if (error) throw error
+    if (error) throw toQueryError(error)
     return data || []
   }
 

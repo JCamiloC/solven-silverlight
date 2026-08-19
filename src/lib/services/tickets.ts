@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
+import { toQueryError } from '@/lib/query-errors'
 
 export interface Ticket {
   id: string
@@ -131,7 +132,7 @@ export class TicketsService {
 
     if (error) {
       console.error('Error fetching tickets:', error)
-      throw new Error(`Error al obtener tickets: ${error.message}`)
+      throw toQueryError(error)
     }
 
     return (data || []) as TicketWithRelations[]

@@ -138,35 +138,9 @@ function LoginForm() {
         if (!isMounted) return
 
         if (session?.user) {
-          // Preferir session local: getUser es validación remota y no debe
-          // bloquear el ingreso si la sesión ya está en el navegador.
-          let userId = session.user.id
-
-          try {
-            const {
-              data: { user: currentUser },
-            } = await withTimeout(supabase.auth.getUser(), 8000)
-            if (currentUser?.id) {
-              userId = currentUser.id
-            }
-          } catch (verifyError) {
-            console.warn(
-              '[login] getUser lento/falló; redirigiendo con sesión local:',
-              verifyError
-            )
-          }
-
-          if (!isMounted) return
-
-          if (userId) {
-            const redirectPath = await resolveRedirectPath(userId)
-            window.location.assign(redirectPath)
-            return
-          }
-
-          await destroyClientSession(supabase, { preferLocal: true, timeoutMs: 3000 })
-          if (!isMounted) return
-          setSessionMessage('Se limpió una sesión inválida. Ahora puedes iniciar sesión de nuevo.')
+          const redirectPath = await resolveRedirectPath(session.user.id)
+          window.location.assign(redirectPath)
+          return
         }
       } catch (sessionError) {
         console.error('Error checking existing session:', sessionError)

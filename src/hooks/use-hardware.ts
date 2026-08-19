@@ -67,7 +67,6 @@ export function useHardwareAssets() {
     queryKey: hardwareKeys.list(),
     queryFn: hardwareService.getAll,
     staleTime: 2 * 60 * 1000,
-    refetchOnWindowFocus: true,
   });
 }
 
@@ -78,7 +77,6 @@ export function useHardwareAssetsByClient(clientId: string) {
     queryFn: () => hardwareService.getByClient(clientId),
     enabled: !!clientId,
     staleTime: 2 * 60 * 1000,
-    refetchOnWindowFocus: true,
   });
 }
 

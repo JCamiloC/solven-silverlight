@@ -1,58 +1,35 @@
-# Help Desk Application (Mesa de Ayuda) - Copilot Instructions
+# Solven — instrucciones para agentes
 
-This project is a Next.js 15 (App Router) Help Desk application with Supabase integration, designed following ISO 27001 principles.
+Next.js 15 App Router + TypeScript + Supabase. Mesa de ayuda e inventario para Silverlight Colombia. Documentación canónica: `README.md`.
 
-## Project Architecture
+## Arquitectura
 
-### Tech Stack
-- **Framework**: Next.js 15 with App Router
-- **Language**: TypeScript
-- **Styling**: TailwindCSS + shadcn/ui + Radix UI
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth
-- **Icons**: Lucide React
-- **State Management**: React Query/SWR
-- **Deployment**: Serverless-first
+- Páginas en `src/app/` (client components con `ProtectedRoute` en dashboard).
+- Datos: hook React Query (`src/hooks/`) → service (`src/services/` o `src/lib/services/`) → Supabase.
+- API routes (`src/app/api/`) solo para service role, firma pública de actas, SMTP o chat.
+- Tipos en `src/types/index.ts`. UI base en `src/components/ui/` (shadcn).
+- Esquema: migraciones incrementales en `database/`. No inventar tablas que no estén ahí.
 
-### User Roles
-- **Cliente**: Basic ticket creation and viewing
-- **Agente de Soporte**: Ticket handling and basic CRUD operations
-- **Líder de Soporte**: Team management and advanced operations
-- **Administrador**: Full system access and configuration
+## Roles
 
-### Module Structure
-- **Auth**: Role-based authentication with Supabase
-- **Hardware**: Asset management with maintenance logs and PDF generation
-- **Software**: License tracking and maintenance
-- **Accesos**: Credential and access log management
-- **Reportes**: Client-specific dashboards and reports
-- **Tickets**: Complete support ticket workflow
+`cliente` | `agente_soporte` | `lider_soporte` | `administrador`
 
-## Development Guidelines
+- Cliente: portal `/dashboard/clientes/[su_client_id]`, lectura + crear tickets + chat. Nunca otros clientes.
+- Usar `useClientPermissions` y no agregar `cliente` a `allowedRoles` de módulos globales (dashboard, reportes, parámetros, usuarios, listados globales).
+- RLS es obligatorio; el frontend no es la frontera de seguridad.
 
-### Code Organization
-- Use clean architecture with modular design
-- Implement reusable UI components
-- Follow TypeScript best practices
-- Use Supabase RLS for security
-- Implement optimistic updates for better UX
+## Módulos a no romper
 
-### Component Guidelines
-- All components should be typed with TypeScript
-- Use shadcn/ui as base component library
-- Implement proper error handling
-- Follow accessibility best practices
-- Use Lucide icons consistently
+- **Hardware:** upgrades automáticos al cambiar specs; seguimientos con ENUM `tipo_seguimiento`; actas `falta_cliente` / `completo`.
+- **Tickets:** `ticket_number` lo genera trigger SQL (`SilverYYYYMMDD-###`). Estados: `open` | `pendiente_confirmacion` | `solucionado`.
+- **Software a medida:** ciclo discovery → posventa (fases, docs, reuniones, releases, ajustes).
+- **Actas:** captura en dashboard + página pública `/actas/[token]` + PDF con firmas.
+- **Chat:** `bot` → `waiting_agent` → `agent_connected` → `closed`.
+- **Sesión:** timeouts y auto-refresh; no quitar guards de loading/auth.
 
-### API Design
-- Use Supabase client with proper service roles
-- Implement RLS policies for data security
-- Use Edge Functions for complex operations
-- Follow RESTful principles for API routes
+## Estilo
 
-### Security Considerations
-- Implement proper authentication flows
-- Use RLS for database security
-- Validate all inputs
-- Follow ISO 27001 principles
-- Secure credential management in Accesos module
+- TypeScript estricto, componentes tipados, Lucide, toasts con sonner.
+- Formularios: RHF + Zod. No textarea de opciones en parámetros.
+- Validar inputs. Credenciales de accesos cifradas (`src/lib/crypto.ts`).
+- Cambios de esquema: nuevo `.sql` en `database/`, no editar migraciones ya aplicadas como si fueran el estado actual.
