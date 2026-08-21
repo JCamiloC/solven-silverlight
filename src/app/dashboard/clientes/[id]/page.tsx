@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import type { Resolver } from 'react-hook-form'
@@ -43,6 +43,7 @@ import { LoadingLink } from '@/components/ui/loading-link'
 import { InfoField } from '@/components/ui/info-field'
 import { useClient, useUpdateClient } from '@/hooks/use-clients'
 import { useActionLock } from '@/hooks/use-action-lock'
+import { useHydrateFormOnce, useSubmitGuard } from '@/hooks/use-form-guards'
 import { useClientPermissions } from '@/hooks/use-client-permissions'
 import { useQuery } from '@tanstack/react-query'
 import { clientService } from '@/services/clients'
@@ -86,6 +87,9 @@ export default function ClienteDetailPage() {
   const { data: client, isLoading, error, refetch: refetchClient } = useClient(clientId)
   const updateClient = useUpdateClient()
   const { runWithLock, isLocked } = useActionLock()
+  const { runGuarded } = useSubmitGuard()
+  const clientRef = useRef(client)
+  clientRef.current = client
   
   // Obtener usuarios del cliente
   const { data: clientUsers = [], isLoading: isLoadingUsers } = useQuery({
@@ -108,28 +112,32 @@ export default function ClienteDetailPage() {
     },
   })
 
-  // Actualizar valores del formulario cuando se carga el cliente
-  if (client && form.getValues('name') === '') {
-    form.reset({
-      name: client.name,
-      email: client.email,
-      phone: client.phone || '',
-      address: client.address || '',
-      contact_person: client.contact_person,
-      nit: client.nit || '',
-      mantenimientos_al_anio: client.mantenimientos_al_anio ?? 0,
-      client_type: client.client_type || 'no_aplica',
-    })
-  }
+  useHydrateFormOnce(
+    form,
+    client?.id,
+    () => ({
+      name: clientRef.current?.name || '',
+      email: clientRef.current?.email || '',
+      phone: clientRef.current?.phone || '',
+      address: clientRef.current?.address || '',
+      contact_person: clientRef.current?.contact_person || '',
+      nit: clientRef.current?.nit || '',
+      mantenimientos_al_anio: clientRef.current?.mantenimientos_al_anio ?? 0,
+      client_type: clientRef.current?.client_type || 'no_aplica',
+    }),
+    !!client
+  )
 
   const onSubmit = async (data: ClientFormData) => {
-    try {
-      await runWithLock(async () => {
-        await updateClient.mutateAsync({ id: clientId, updates: data })
-      }, { message: 'Guardando cliente...' })
-    } catch {
-      // El error ya es manejado por el hook
-    }
+    await runGuarded(async () => {
+      try {
+        await runWithLock(async () => {
+          await updateClient.mutateAsync({ id: clientId, updates: data })
+        }, { message: 'Guardando cliente...' })
+      } catch {
+        // El error ya es manejado por el hook
+      }
+    })
   }
 
   if (isLoading) {

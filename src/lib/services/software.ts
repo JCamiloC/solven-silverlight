@@ -106,7 +106,7 @@ export class SoftwareService {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) throw toQueryError(error)
     return data
   }
 
@@ -118,7 +118,7 @@ export class SoftwareService {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) throw toQueryError(error)
     return data
   }
 
@@ -128,7 +128,7 @@ export class SoftwareService {
       .delete()
       .eq('id', id)
 
-    if (error) throw error
+    if (error) throw toQueryError(error)
   }
 
   async getStats(): Promise<SoftwareStats> {

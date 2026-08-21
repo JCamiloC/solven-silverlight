@@ -3,6 +3,19 @@ import { Client } from '@/types'
 
 const supabase = createClient()
 
+/** Normaliza NIT a solo dígitos (ignora guiones, espacios y puntos). */
+export function normalizeNit(nit?: string | null): string {
+  return (nit || '').replace(/[^0-9]/g, '')
+}
+
+function isUniqueViolation(error: { code?: string; message?: string } | null | undefined) {
+  if (!error) return false
+  return (
+    error.code === '23505' ||
+    /clients_nit_unique_normalized|duplicate key/i.test(error.message || '')
+  )
+}
+
 export interface ClientInsert {
   name: string
   email: string
@@ -64,41 +77,96 @@ export class ClientService {
     return data || []
   }
 
-  async create(client: ClientInsert): Promise<Client> {
+  /** Busca otro cliente con el mismo NIT (comparación por dígitos). */
+  async findByNit(
+    nit: string,
+    excludeId?: string
+  ): Promise<Pick<Client, 'id' | 'name' | 'nit'> | null> {
+    const normalized = normalizeNit(nit)
+    if (!normalized) return null
+
     const { data, error } = await supabase
       .from('clients')
-      .insert(client)
+      .select('id, name, nit')
+      .not('nit', 'is', null)
+
+    if (error) throw error
+
+    const match = (data || []).find((client) => {
+      if (excludeId && client.id === excludeId) return false
+      return normalizeNit(client.nit) === normalized
+    })
+
+    return match || null
+  }
+
+  private async assertNitAvailable(nit: string | undefined, excludeId?: string) {
+    const trimmed = (nit || '').trim()
+    const normalized = normalizeNit(trimmed)
+
+    if (!normalized) {
+      throw new Error('El NIT es requerido')
+    }
+
+    const existing = await this.findByNit(trimmed, excludeId)
+    if (existing) {
+      throw new Error(
+        `Ya existe un cliente con el NIT ${existing.nit || trimmed}: ${existing.name}`
+      )
+    }
+
+    return trimmed
+  }
+
+  async create(client: ClientInsert): Promise<Client> {
+    const nit = await this.assertNitAvailable(client.nit)
+
+    const { data, error } = await supabase
+      .from('clients')
+      .insert({ ...client, nit })
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      if (isUniqueViolation(error)) {
+        throw new Error(`Ya existe un cliente registrado con el NIT ${nit}`)
+      }
+      throw error
+    }
     return data
   }
 
   async update(id: string, updates: ClientUpdate): Promise<Client> {
-    // Primero hacer el update
+    const payload = { ...updates }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'nit')) {
+      payload.nit = await this.assertNitAvailable(updates.nit, id)
+    }
+
     const { data: updateData, error: updateError } = await supabase
       .from('clients')
-      .update(updates)
+      .update(payload)
       .eq('id', id)
       .select()
-    
+
     if (updateError) {
+      if (isUniqueViolation(updateError)) {
+        throw new Error(
+          `Ya existe un cliente registrado con el NIT ${payload.nit || updates.nit || ''}`
+        )
+      }
       throw updateError
     }
-    
+
     if (!updateData || updateData.length === 0) {
       throw new Error('No se pudo actualizar el cliente. Verifica los permisos.')
     }
-    
+
     return updateData[0]
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('clients')
-      .delete()
-      .eq('id', id)
+    const { error } = await supabase.from('clients').delete().eq('id', id)
 
     if (error) throw error
   }
