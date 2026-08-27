@@ -7,11 +7,13 @@ import { User } from '@supabase/supabase-js'
 import { Profile, UserRole } from '@/types'
 import { clearSupabaseAuthStorage, destroyClientSession } from '@/lib/auth/session-cleanup'
 import { isAbortLikeError } from '@/lib/query-errors'
+import { ensureFreshSession } from '@/lib/auth/ensure-fresh-session'
 
 interface AuthState {
   user: User | null
   profile: Profile | null
   loading: boolean
+  initialized: boolean
 }
 
 interface AuthContextValue extends AuthState {
@@ -32,9 +34,10 @@ let authStateCache: AuthState = {
   user: null,
   profile: null,
   loading: true,
+  initialized: false,
 }
 const CACHE_DURATION = 5 * 60 * 1000
-const AUTH_BOOTSTRAP_TIMEOUT_MS = 8000
+const AUTH_BOOTSTRAP_TIMEOUT_MS = 15_000
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -69,6 +72,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const supabase = useMemo(() => createClient(), [])
   const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const bootstrappedRef = useRef(false)
+  const recoveringRef = useRef(false)
   const applyGenRef = useRef(0)
 
   const setAndCacheAuthState = useCallback((nextState: AuthState) => {
@@ -140,13 +144,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     let isMounted = true
 
     loadingTimeoutRef.current = setTimeout(() => {
-      if (!isMounted) return
-      if (!authStateCache.loading) return
+      if (!isMounted || bootstrappedRef.current) return
 
-      console.warn('[useAuth] Loading timeout, forcing non-loading state')
+      console.warn('[useAuth] Loading timeout, forcing initialized state')
       setAndCacheAuthState({
         ...authStateCache,
         loading: false,
+        initialized: true,
       })
       bootstrappedRef.current = true
     }, AUTH_BOOTSTRAP_TIMEOUT_MS)
@@ -172,7 +176,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (
           sameUser &&
           authStateCache.profile?.id === profile?.id &&
-          authStateCache.loading === false
+          authStateCache.loading === false &&
+          authStateCache.initialized
         ) {
           bootstrappedRef.current = true
           return
@@ -182,12 +187,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
           user: sessionUser,
           profile,
           loading: false,
+          initialized: true,
         })
       } else {
         setAndCacheAuthState({
           user: null,
           profile: null,
           loading: false,
+          initialized: true,
         })
       }
 
@@ -198,54 +205,60 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     }
 
-    const getInitialSession = async () => {
-      try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession()
+    const recoverSession = async () => {
+      recoveringRef.current = true
 
+      try {
+        const sessionOk = await ensureFreshSession()
         if (!isMounted) return
 
-        if (error) {
-          if (isAbortLikeError(error) || authStateCache.user) {
-            setAndCacheAuthState({ ...authStateCache, loading: false })
-            bootstrappedRef.current = true
-            return
-          }
+        if (!sessionOk) {
           await applySession(null)
           return
         }
 
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+
+        if (!isMounted) return
+
         if (!session?.user && bootstrappedRef.current && authStateCache.user) {
-          setAndCacheAuthState({ ...authStateCache, loading: false })
+          setAndCacheAuthState({ ...authStateCache, loading: false, initialized: true })
           return
         }
 
         await applySession(session?.user ?? null)
       } catch (error) {
-        console.error('[useAuth] Error in getInitialSession:', error)
+        console.error('[useAuth] Error recovering session:', error)
         if (!isMounted) return
 
         if (authStateCache.user || isAbortLikeError(error)) {
-          setAndCacheAuthState({ ...authStateCache, loading: false })
+          setAndCacheAuthState({
+            ...authStateCache,
+            loading: false,
+            initialized: true,
+          })
           bootstrappedRef.current = true
           return
         }
 
         await applySession(null)
+      } finally {
+        recoveringRef.current = false
       }
     }
 
-    void getInitialSession()
+    void recoverSession()
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       try {
         if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-          if (session?.user) {
-            await applySession(session.user, { refetchProfile: false })
+          // Solo en el arranque, antes de decidir. Después no re-renderizar ni reabrir el ping-pong.
+          if (session?.user && !authStateCache.user && !bootstrappedRef.current) {
+            await applySession(session.user, { refetchProfile: true })
           }
           return
         }
@@ -258,13 +271,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         if (event === 'INITIAL_SESSION') {
-          if (!bootstrappedRef.current) {
+          // getSession() a veces emite null mientras refresca el JWT vencido.
+          // recoverSession es la autoridad del arranque.
+          if (!recoveringRef.current && !bootstrappedRef.current) {
             await applySession(null)
           }
           return
         }
 
         if (event === 'SIGNED_OUT') {
+          if (recoveringRef.current) return
+
           profileCache = {}
           inFlightProfile = {}
           clearSupabaseAuthStorage()
@@ -280,6 +297,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return
         }
 
+        if (recoveringRef.current) return
+
         await applySession(null)
       } catch (error) {
         console.error('[useAuth] Error in auth state change:', error)
@@ -288,6 +307,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     return () => {
       isMounted = false
+      recoveringRef.current = false
       subscription.unsubscribe()
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current)
@@ -295,12 +315,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [getProfile, router, setAndCacheAuthState, supabase])
 
+  // Pestaña en segundo plano: Chrome pausa el autoRefresh. Al volver, renovar JWT
+  // sin recargar perfil ni re-renderizar el árbol.
+  useEffect(() => {
+    if (!authState.user) return
+
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      void ensureFreshSession()
+    }
+
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [authState.user])
+
   const signOut = useCallback(async () => {
     const clearLocalAuthState = () => {
       setAndCacheAuthState({
         user: null,
         profile: null,
         loading: false,
+        initialized: true,
       })
     }
 
@@ -337,6 +377,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setAndCacheAuthState({
           ...authStateCache,
           loading: false,
+          initialized: true,
         })
         return
       }
@@ -347,17 +388,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
           user: session.user,
           profile,
           loading: false,
+          initialized: true,
         })
       } else if (!authStateCache.user) {
         setAndCacheAuthState({
           user: null,
           profile: null,
           loading: false,
+          initialized: true,
         })
       } else {
         setAndCacheAuthState({
           ...authStateCache,
           loading: false,
+          initialized: true,
         })
       }
     } catch (error) {
@@ -365,6 +409,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setAndCacheAuthState({
         ...authStateCache,
         loading: false,
+        initialized: true,
       })
     }
   }, [getProfile, setAndCacheAuthState, supabase])

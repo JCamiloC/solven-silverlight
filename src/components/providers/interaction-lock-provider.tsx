@@ -3,6 +3,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
+import { ensureFreshSession } from '@/lib/auth/ensure-fresh-session'
 
 type LockKind = 'action' | 'navigation'
 
@@ -78,6 +79,12 @@ export function InteractionLockProvider({ children }: { children: ReactNode }) {
   const withActionLock = useCallback(async <T,>(action: () => Promise<T>, options?: LockOptions): Promise<T> => {
     const lockId = lockAction(options)
     try {
+      const sessionOk = await ensureFreshSession()
+      if (!sessionOk) {
+        throw new Error(
+          'Tu sesión expiró o no se pudo renovar. Copia los datos del formulario, recarga e inicia sesión de nuevo.'
+        )
+      }
       return await action()
     } finally {
       unlock(lockId)

@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Loading } from '@/components/ui/loading'
+import { TablePagination, paginateItems } from '@/components/ui/table-pagination'
 import { useClient } from '@/hooks/use-clients'
 import { useClientPermissions } from '@/hooks/use-client-permissions'
 import {
@@ -44,6 +45,7 @@ export default function ClienteMantenimientosPage() {
   const clientId = typeof id === 'string' ? id : ''
   const currentYear = new Date().getFullYear()
   const [year, setYear] = useState<number>(currentYear)
+  const [schedulePage, setSchedulePage] = useState(1)
 
   const { profile } = useAuth()
   const { canCreate, readOnly } = useClientPermissions()
@@ -65,6 +67,7 @@ export default function ClienteMantenimientosPage() {
   }, [schedules])
 
   const years = [currentYear - 1, currentYear, currentYear + 1]
+  const pagedSchedules = paginateItems(schedules, schedulePage)
 
   const handleGenerateSchedule = async () => {
     try {
@@ -171,7 +174,10 @@ export default function ClienteMantenimientosPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div className="w-full sm:w-56 space-y-2">
                 <Label>Año</Label>
-                <Select value={String(year)} onValueChange={(value) => setYear(Number(value))}>
+                <Select value={String(year)} onValueChange={(value) => {
+                  setYear(Number(value))
+                  setSchedulePage(1)
+                }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {years.map((y) => (
@@ -208,6 +214,7 @@ export default function ClienteMantenimientosPage() {
                 No hay agenda para {year}. {!readOnly && 'Usa “Generar / Completar agenda”.'}
               </div>
             ) : (
+              <>
               <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -221,7 +228,7 @@ export default function ClienteMantenimientosPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {schedules.map((row) => (
+                    {pagedSchedules.items.map((row) => (
                       <MaintenanceRow
                         key={row.id}
                         row={row}
@@ -233,6 +240,14 @@ export default function ClienteMantenimientosPage() {
                   </TableBody>
                 </Table>
               </div>
+              <TablePagination
+                currentPage={pagedSchedules.currentPage}
+                totalPages={pagedSchedules.totalPages}
+                totalItems={pagedSchedules.totalItems}
+                itemsPerPage={pagedSchedules.itemsPerPage}
+                onPageChange={setSchedulePage}
+              />
+              </>
             )}
           </CardContent>
         </Card>

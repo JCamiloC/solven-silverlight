@@ -12,43 +12,17 @@ interface ProtectedRouteProps {
   requireAuth?: boolean
 }
 
-function hasAuthCookieHint(): boolean {
-  if (typeof document === 'undefined') return false
-  return document.cookie.split(';').some((entry) => {
-    const name = entry.trim().split('=')[0] || ''
-    return name.startsWith('sb-') && name.includes('auth-token')
-  })
-}
-
 export function ProtectedRoute({
   children,
   allowedRoles = [],
   requireAuth = true,
 }: ProtectedRouteProps) {
-  const { user, profile, loading, hasRole } = useAuth()
+  const { user, profile, initialized, hasRole } = useAuth()
   const router = useRouter()
   const [isRedirecting, setIsRedirecting] = useState(false)
-  const [waitExpired, setWaitExpired] = useState(false)
-
-  const waitingForHydration = Boolean(
-    requireAuth && !user && !waitExpired && (loading || hasAuthCookieHint())
-  )
 
   useEffect(() => {
-    if (user || !requireAuth) {
-      setWaitExpired(false)
-      return
-    }
-
-    const timeout = setTimeout(() => {
-      setWaitExpired(true)
-    }, 8000)
-
-    return () => clearTimeout(timeout)
-  }, [user, requireAuth])
-
-  useEffect(() => {
-    if (waitingForHydration || isRedirecting) return
+    if (!initialized || isRedirecting) return
 
     if (requireAuth && !user) {
       setIsRedirecting(true)
@@ -76,8 +50,16 @@ export function ProtectedRoute({
     requireAuth,
     router,
     isRedirecting,
-    waitingForHydration,
+    initialized,
   ])
+
+  if (!initialized) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loading size="lg" text="Verificando autenticación..." />
+      </div>
+    )
+  }
 
   if (user) {
     if (allowedRoles.length > 0 && profile && !hasRole(allowedRoles)) {
@@ -86,15 +68,7 @@ export function ProtectedRoute({
     return <>{children}</>
   }
 
-  if (waitingForHydration) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loading size="lg" text="Verificando autenticación..." />
-      </div>
-    )
-  }
-
-  if (isRedirecting || (requireAuth && !user)) {
+  if (isRedirecting || requireAuth) {
     return null
   }
 

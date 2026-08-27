@@ -1,14 +1,17 @@
 "use client"
+import { useState } from 'react'
 import { ProtectedRoute } from '@/components/auth/protected-route'
-import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Plus, Edit } from 'lucide-react'
 import { useParameters } from '@/hooks/use-parameters'
 import { useRouter } from 'next/navigation'
+import { TablePagination, paginateItems } from '@/components/ui/table-pagination'
 
 export default function ParametrosPage() {
   const { data, isLoading } = useParameters()
   const router = useRouter()
+  const [page, setPage] = useState(1)
+  const pagedParameters = paginateItems(data || [], page)
 
   return (
     <ProtectedRoute allowedRoles={["administrador","lider_soporte"]}>
@@ -30,8 +33,9 @@ export default function ParametrosPage() {
           {isLoading ? (
             <div>Cargando...</div>
           ) : (
+            <>
             <div className="space-y-2">
-              {(data || []).map((p: any) => (
+              {pagedParameters.items.map((p: any) => (
                 <div key={p.id} className="flex items-center justify-between p-2 border rounded">
                   <div>
                     <div className="font-medium">{p.name}</div>
@@ -48,6 +52,14 @@ export default function ParametrosPage() {
                 </div>
               ))}
             </div>
+            <TablePagination
+              currentPage={pagedParameters.currentPage}
+              totalPages={pagedParameters.totalPages}
+              totalItems={pagedParameters.totalItems}
+              itemsPerPage={pagedParameters.itemsPerPage}
+              onPageChange={setPage}
+            />
+            </>
           )}
         </div>
       </div>

@@ -46,6 +46,7 @@ export const SESSION_CONFIG = {
     'keydown',
     'touchstart',
     'click',
+    'input',
   ] as const,
 } as const
 

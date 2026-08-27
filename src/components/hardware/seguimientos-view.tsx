@@ -28,6 +28,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
+import { TablePagination, paginateItems } from '@/components/ui/table-pagination'
 import { useGetFollowUps, useCreateFollowUp } from '@/hooks/use-hardware'
 import { useTickets } from '@/hooks/use-tickets'
 import { useAllClientVisits } from '@/hooks/use-visitas'
@@ -132,6 +133,13 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
   const [isFormOpen, setIsFormOpen] = useState(true)
   const [selectedSeguimiento, setSelectedSeguimiento] = useState<any | null>(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+  const [historyPage, setHistoryPage] = useState(1)
+  const [ticketsPage, setTicketsPage] = useState(1)
+  const [visitsPage, setVisitsPage] = useState(1)
+
+  const pagedSeguimientos = paginateItems(seguimientos ?? [], historyPage)
+  const pagedRelatedTickets = paginateItems(relatedTickets, ticketsPage)
+  const pagedRelatedVisits = paginateItems(relatedVisits, visitsPage)
 
   const handleActividadToggle = (actividad: string) => {
     setActividades(prev =>
@@ -492,6 +500,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
               <p>No hay seguimientos registrados para este activo tecnológico</p>
             </div>
           ) : (
+            <>
             <div className="rounded-md border overflow-x-auto">
               <Table className="min-w-[980px] table-fixed">
                 <TableHeader>
@@ -503,7 +512,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {seguimientos.map((seg: any) => (
+                  {pagedSeguimientos.items.map((seg: any) => (
                     <TableRow key={seg.id}>
                       <TableCell className="whitespace-nowrap">
                         {format(new Date(seg.fecha_registro), 'dd/MM/yyyy HH:mm', { locale: es })}
@@ -541,6 +550,14 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
                 </TableBody>
               </Table>
             </div>
+            <TablePagination
+              currentPage={pagedSeguimientos.currentPage}
+              totalPages={pagedSeguimientos.totalPages}
+              totalItems={pagedSeguimientos.totalItems}
+              itemsPerPage={pagedSeguimientos.itemsPerPage}
+              onPageChange={setHistoryPage}
+            />
+            </>
           )}
         </CardContent>
       </Card>
@@ -569,6 +586,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
                 No hay tickets asociados a este activo tecnológico.
               </div>
             ) : (
+              <>
               <div className="rounded-md border overflow-x-auto">
                 <Table className="min-w-[980px] table-fixed">
                   <TableHeader>
@@ -581,7 +599,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {relatedTickets.map((ticket) => (
+                    {pagedRelatedTickets.items.map((ticket) => (
                       <TableRow key={ticket.id}>
                         <TableCell className="whitespace-nowrap">
                           {format(new Date(ticket.created_at), 'dd/MM/yyyy HH:mm', { locale: es })}
@@ -609,6 +627,14 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
                   </TableBody>
                 </Table>
               </div>
+              <TablePagination
+                currentPage={pagedRelatedTickets.currentPage}
+                totalPages={pagedRelatedTickets.totalPages}
+                totalItems={pagedRelatedTickets.totalItems}
+                itemsPerPage={pagedRelatedTickets.itemsPerPage}
+                onPageChange={setTicketsPage}
+              />
+              </>
             )}
           </div>
 
@@ -628,6 +654,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
                 No hay visitas asociadas a este activo tecnológico.
               </div>
             ) : (
+              <>
               <div className="rounded-md border overflow-x-auto">
                 <Table className="min-w-[980px] table-fixed">
                   <TableHeader>
@@ -640,7 +667,7 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {relatedVisits.map((visit) => (
+                    {pagedRelatedVisits.items.map((visit) => (
                       <TableRow key={visit.id}>
                         <TableCell className="whitespace-nowrap">
                           {format(new Date(visit.fecha_visita), 'dd/MM/yyyy HH:mm', { locale: es })}
@@ -679,6 +706,14 @@ export function SeguimientosView({ hardwareId, hardwareName }: SeguimientosViewP
                   </TableBody>
                 </Table>
               </div>
+              <TablePagination
+                currentPage={pagedRelatedVisits.currentPage}
+                totalPages={pagedRelatedVisits.totalPages}
+                totalItems={pagedRelatedVisits.totalItems}
+                itemsPerPage={pagedRelatedVisits.itemsPerPage}
+                onPageChange={setVisitsPage}
+              />
+              </>
             )}
           </div>
         </CardContent>

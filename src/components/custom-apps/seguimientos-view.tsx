@@ -28,6 +28,7 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
+import { TablePagination, paginateItems } from '@/components/ui/table-pagination'
 import { useCustomAppFollowups, useCreateCustomAppFollowup } from '@/hooks/use-custom-applications'
 import { useAuth } from '@/hooks/use-auth'
 import { format } from 'date-fns'
@@ -96,6 +97,9 @@ export function SeguimientosView({ applicationId, applicationName }: Seguimiento
   const [isFormOpen, setIsFormOpen] = useState(true)
   const [selectedSeguimiento, setSelectedSeguimiento] = useState<any | null>(null)
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+  const [historyPage, setHistoryPage] = useState(1)
+
+  const pagedSeguimientos = paginateItems(seguimientos ?? [], historyPage)
 
   const handleActividadToggle = (actividad: string) => {
     setActividades(prev =>
@@ -389,6 +393,7 @@ export function SeguimientosView({ applicationId, applicationName }: Seguimiento
               <p className="text-xs mt-2">Application ID: {applicationId}</p>
             </div>
           ) : (
+            <>
             <div className="rounded-md border overflow-x-auto">
               <Table className="min-w-[800px]">
                 <TableHeader>
@@ -402,7 +407,7 @@ export function SeguimientosView({ applicationId, applicationName }: Seguimiento
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {seguimientos.map((seg: any) => (
+                  {pagedSeguimientos.items.map((seg: any) => (
                     <TableRow key={seg.id}>
                       <TableCell className="whitespace-nowrap">
                         {format(new Date(seg.fecha_registro), 'dd/MM/yyyy HH:mm', { locale: es })}
@@ -453,6 +458,14 @@ export function SeguimientosView({ applicationId, applicationName }: Seguimiento
                 </TableBody>
               </Table>
             </div>
+            <TablePagination
+              currentPage={pagedSeguimientos.currentPage}
+              totalPages={pagedSeguimientos.totalPages}
+              totalItems={pagedSeguimientos.totalItems}
+              itemsPerPage={pagedSeguimientos.itemsPerPage}
+              onPageChange={setHistoryPage}
+            />
+            </>
           )}
         </CardContent>
       </Card>

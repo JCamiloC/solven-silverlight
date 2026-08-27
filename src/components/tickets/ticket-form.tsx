@@ -208,7 +208,12 @@ export function TicketForm({
   }, [isEditMode, initialData, form])
 
   const onSubmit = async (data: TicketFormValues) => {
-    if (!user?.id) return
+    if (!user?.id) {
+      toast.error('Tu sesión no está activa', {
+        description: 'Recarga la página e inicia sesión de nuevo. Copia el texto del formulario antes de recargar.',
+      })
+      return
+    }
 
     // Limpiar error previo
     setErrorMessage(null)

@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { hardwareService } from '@/services/hardware'
 import { HardwareUpgrade } from '@/types'
@@ -10,12 +11,14 @@ import { es } from 'date-fns/locale'
 import { Cpu, HardDrive, MemoryStick, Clock, User, FileText, History } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { TablePagination, paginateItems } from '@/components/ui/table-pagination'
 
 interface HardwareUpgradesHistoryProps {
   hardwareId: string
 }
 
 export function HardwareUpgradesHistory({ hardwareId }: HardwareUpgradesHistoryProps) {
+  const [page, setPage] = useState(1)
   const { data: upgrades, isLoading, error } = useQuery({
     queryKey: ['hardware-upgrades', hardwareId],
     queryFn: () => hardwareService.getUpgrades(hardwareId),
@@ -206,6 +209,8 @@ export function HardwareUpgradesHistory({ hardwareId }: HardwareUpgradesHistoryP
     )
   }
 
+  const pagedUpgrades = paginateItems(upgrades ?? [], page)
+
   return (
     <Card>
       <CardHeader>
@@ -219,8 +224,15 @@ export function HardwareUpgradesHistory({ hardwareId }: HardwareUpgradesHistoryP
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[600px] pr-4">
-          {upgrades.map(renderUpgradeCard)}
+          {pagedUpgrades.items.map(renderUpgradeCard)}
         </ScrollArea>
+        <TablePagination
+          currentPage={pagedUpgrades.currentPage}
+          totalPages={pagedUpgrades.totalPages}
+          totalItems={pagedUpgrades.totalItems}
+          itemsPerPage={pagedUpgrades.itemsPerPage}
+          onPageChange={setPage}
+        />
       </CardContent>
     </Card>
   )
