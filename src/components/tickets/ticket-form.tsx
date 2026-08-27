@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -191,21 +191,29 @@ export function TicketForm({
     setSelectedFile(null)
   }
 
-  // Actualizar client_id si cambia el prop
+  // Actualizar client_id si cambia el prop (solo creación / sin pisar edición ya hidratada)
   useEffect(() => {
     if (clientId) {
       form.setValue('client_id', clientId)
     }
   }, [clientId, form])
 
-  // Cargar datos iniciales en modo edición
+  // Hidratar edición una sola vez por ticketId (evita bucle al refetch de initialData)
+  const hydratedTicketIdRef = useRef<string | null>(null)
+  const initialDataRef = useRef(initialData)
+  initialDataRef.current = initialData
+
   useEffect(() => {
-    if (isEditMode && initialData) {
-      Object.entries(initialData).forEach(([key, value]) => {
-        form.setValue(key as keyof TicketFormValues, value)
-      })
-    }
-  }, [isEditMode, initialData, form])
+    if (!isEditMode || !ticketId || !initialDataRef.current) return
+    if (hydratedTicketIdRef.current === ticketId) return
+
+    hydratedTicketIdRef.current = ticketId
+    Object.entries(initialDataRef.current).forEach(([key, value]) => {
+      form.setValue(key as keyof TicketFormValues, value as any)
+    })
+  }, [isEditMode, ticketId, form])
+
+  const submittingRef = useRef(false)
 
   const onSubmit = async (data: TicketFormValues) => {
     if (!user?.id) {
@@ -214,6 +222,8 @@ export function TicketForm({
       })
       return
     }
+    if (submittingRef.current) return
+    submittingRef.current = true
 
     // Limpiar error previo
     setErrorMessage(null)
@@ -360,6 +370,8 @@ export function TicketForm({
       })
 
       window.scrollTo({ top: 0, behavior: 'smooth' })
+    } finally {
+      submittingRef.current = false
     }
   }
 

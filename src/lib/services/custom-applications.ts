@@ -288,7 +288,7 @@ export class CustomApplicationsService {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) throw toQueryError(error)
     return data
   }
 
@@ -302,7 +302,7 @@ export class CustomApplicationsService {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) throw toQueryError(error)
     return data
   }
 
@@ -314,7 +314,7 @@ export class CustomApplicationsService {
       .delete()
       .eq('id', id)
 
-    if (error) throw error
+    if (error) throw toQueryError(error)
   }
 
   // Obtener aplicaciones por cliente

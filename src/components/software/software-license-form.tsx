@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -22,7 +22,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { LoadingButton } from '@/components/ui/loading-button'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -33,6 +32,7 @@ import {
 import { Loader2 } from 'lucide-react'
 import { SoftwareLicenseWithRelations } from '@/lib/services/software'
 import { useActionLock } from '@/hooks/use-action-lock'
+import { useHydrateFormOnce, useSubmitGuard } from '@/hooks/use-form-guards'
 
 const formSchema = z.object({
   client_id: z.string().min(1, 'Selecciona un cliente'),
@@ -57,6 +57,24 @@ interface SoftwareLicenseFormProps {
   onCancel?: () => void
 }
 
+function toFormValues(
+  source: SoftwareLicenseWithRelations | undefined,
+  clientId?: string
+): FormValues {
+  return {
+    client_id: clientId || source?.client_id || '',
+    name: source?.name || '',
+    vendor: source?.vendor || '',
+    version: source?.version || '',
+    license_key: source?.license_key || '',
+    license_type: source?.license_type || 'subscription',
+    periodicidad: source?.periodicidad || undefined,
+    seats: source?.seats || 1,
+    expiry_date: source?.expiry_date || '',
+    status: source?.status || 'active',
+  }
+}
+
 export function SoftwareLicenseForm({
   license,
   licenseId,
@@ -69,68 +87,52 @@ export function SoftwareLicenseForm({
   const createLicense = useCreateSoftwareLicense()
   const updateLicense = useUpdateSoftwareLicense()
   const { runWithLock, isLocked } = useActionLock()
+  const { runGuarded } = useSubmitGuard()
+  const licenseDataRef = useRef(license || existingLicense)
 
-  const licenseData = license || existingLicense
+  const licenseData = license || existingLicense || undefined
+  licenseDataRef.current = licenseData
+  const entityId = licenseData?.id
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      client_id: clientId || licenseData?.client_id || '',
-      name: licenseData?.name || '',
-      vendor: licenseData?.vendor || '',
-      version: licenseData?.version || '',
-      license_key: licenseData?.license_key || '',
-      license_type: licenseData?.license_type || 'subscription',
-      periodicidad: licenseData?.periodicidad || undefined,
-      seats: licenseData?.seats || 1,
-      expiry_date: licenseData?.expiry_date || '',
-      status: licenseData?.status || 'active',
-    },
+    defaultValues: toFormValues(licenseData, clientId),
   })
 
+  useHydrateFormOnce(form, entityId, () => toFormValues(licenseDataRef.current || undefined, clientId))
+
+  // Solo client_id en modo creación (sin pisar el resto del form)
   useEffect(() => {
-    if (licenseData) {
-      form.reset({
-        client_id: clientId || licenseData.client_id,
-        name: licenseData.name,
-        vendor: licenseData.vendor,
-        version: licenseData.version,
-        license_key: licenseData.license_key,
-        license_type: licenseData.license_type,
-        periodicidad: licenseData.periodicidad || undefined,
-        seats: licenseData.seats,
-        expiry_date: licenseData.expiry_date || '',
-        status: licenseData.status,
-      })
-    } else if (clientId) {
-      // Si no hay licenseData pero sí clientId, actualizar solo el cliente
-      form.setValue('client_id', clientId)
-    }
-  }, [licenseData, form, clientId])
+    if (entityId || !clientId) return
+    form.setValue('client_id', clientId)
+  }, [clientId, entityId, form])
 
   const onSubmit = async (data: FormValues) => {
-    try {
-      const cleanedData = {
-        ...data,
-        expiry_date: data.expiry_date || undefined,
-      }
-
-      await runWithLock(async () => {
-        if (licenseData) {
-          await updateLicense.mutateAsync({
-            id: licenseData.id,
-            data: cleanedData,
-          })
-        } else {
-          await createLicense.mutateAsync(cleanedData as any)
+    await runGuarded(async () => {
+      try {
+        const cleanedData = {
+          ...data,
+          expiry_date: data.expiry_date || undefined,
         }
-      }, { message: licenseData ? 'Actualizando licencia...' : 'Creando licencia...' })
+        const current = licenseDataRef.current
 
-      form.reset()
-      onSuccess?.()
-    } catch (error) {
-      console.error('Error saving license:', error)
-    }
+        await runWithLock(async () => {
+          if (current?.id) {
+            await updateLicense.mutateAsync({
+              id: current.id,
+              data: cleanedData,
+            })
+          } else {
+            await createLicense.mutateAsync(cleanedData as any)
+            form.reset(toFormValues(undefined, clientId))
+          }
+        }, { message: current?.id ? 'Actualizando licencia...' : 'Creando licencia...' })
+
+        onSuccess?.()
+      } catch (error) {
+        console.error('Error saving license:', error)
+      }
+    })
   }
 
   const isSubmitting = createLicense.isPending || updateLicense.isPending || isLocked
@@ -146,10 +148,9 @@ export function SoftwareLicenseForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* Información Básica */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Información Básica</h3>
-          
+
           <div className="grid gap-4 md:grid-cols-2">
             <FormField
               control={form.control}
@@ -271,10 +272,9 @@ export function SoftwareLicenseForm({
           </div>
         </div>
 
-        {/* Licencia */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Detalles de Licencia</h3>
-          
+
           <FormField
             control={form.control}
             name="license_key"
@@ -348,10 +348,9 @@ export function SoftwareLicenseForm({
           </div>
         </div>
 
-        {/* Fechas y Periodicidad */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Fechas y Periodicidad</h3>
-          
+
           <div className="grid gap-4 md:grid-cols-2">
             <FormField
               control={form.control}
@@ -405,7 +404,6 @@ export function SoftwareLicenseForm({
           </div>
         </div>
 
-        {/* Buttons */}
         <div className="flex flex-col-reverse sm:flex-row justify-end gap-2">
           {onCancel && (
             <Button
@@ -417,8 +415,12 @@ export function SoftwareLicenseForm({
               Cancelar
             </Button>
           )}
-          <LoadingButton type="submit" loading={isSubmitting} loadingText={licenseData ? 'Actualizando licencia...' : 'Creando licencia...'}>
-            {licenseData ? 'Actualizar' : 'Crear'} Licencia
+          <LoadingButton
+            type="submit"
+            loading={isSubmitting}
+            loadingText={entityId ? 'Actualizando licencia...' : 'Creando licencia...'}
+          >
+            {entityId ? 'Actualizar' : 'Crear'} Licencia
           </LoadingButton>
         </div>
       </form>

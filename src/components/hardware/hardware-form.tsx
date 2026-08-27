@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useRef } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import type { Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -29,6 +29,7 @@ import {
 import { HardwareAsset } from '@/types';
 import { useCreateHardware, useUpdateHardware, hardwareKeys } from '@/hooks/use-hardware';
 import { useActionLock } from '@/hooks/use-action-lock';
+import { useSubmitGuard } from '@/hooks/use-form-guards';
 import { useParameters } from '@/hooks/use-parameters';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -136,22 +137,20 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
   const createMutation = useCreateHardware();
   const updateMutation = useUpdateHardware();
   const { runWithLock, isLocked } = useActionLock();
+  const { runGuarded } = useSubmitGuard();
   const queryClient = useQueryClient();
   const { data: parameters } = useParameters();
+  const assetRef = useRef(asset);
+  assetRef.current = asset;
 
-  // Helper function to get parameter options by key
   const getParameterOptions = (key: string): Array<{ value: string; label: string }> => {
     const param = parameters?.find((p: any) => p.key === key);
     if (!param || !Array.isArray(param.options)) return [];
-    // Handle both object format {value, label} and string format
     return param.options.map((opt: any) => {
       if (typeof opt === 'string') return { value: opt, label: opt };
       return { value: opt.value || opt, label: opt.label || opt };
     });
   };
-
-  // Debug: show the asset received when opening the form
-  console.log('HardwareForm opened with asset:', asset, 'clientId:', clientId)
 
   const form = useForm<HardwareFormData>({
     resolver: zodResolver(hardwareSchema) as Resolver<HardwareFormData>,
@@ -243,66 +242,44 @@ export function HardwareForm({ asset, clientId, onSuccess, onCancel }: HardwareF
     name: 'software_extra',
   });
 
-  const isLoading = createMutation.isPending || updateMutation.isPending;
+  const isLoading = createMutation.isPending || updateMutation.isPending || isLocked;
 
   const onSubmit = async (data: HardwareFormData) => {
-    // Debug: log payload and action
-    console.log('HardwareForm.onSubmit called', {
-      action: asset ? 'update' : 'create',
-      assetId: asset?.id,
-      payload: data,
-    })
-
-    try {
-      await runWithLock(async () => {
-      if (asset) {
-        console.log('Calling updateMutation.mutateAsync with:', { id: asset.id, updates: data })
-        const res = await updateMutation.mutateAsync({ id: asset.id, updates: data })
-        console.log('updateMutation response:', res)
-        try {
-          // Invalidate client-specific cache so list/modal refreshes
-          if (clientId) queryClient.invalidateQueries({ queryKey: hardwareKeys.byClient(clientId) })
-          queryClient.invalidateQueries({ queryKey: hardwareKeys.detail(asset.id) })
-          queryClient.invalidateQueries({ queryKey: hardwareKeys.list() })
-        } catch (e) {
-          console.warn('Failed to invalidate queries after update', e)
-        }
-      } else {
-        console.log('Calling createMutation.mutateAsync with:', data)
-        const res = await createMutation.mutateAsync(data)
-        console.log('createMutation response:', res)
-        try {
-          if (clientId) queryClient.invalidateQueries({ queryKey: hardwareKeys.byClient(clientId) })
-          queryClient.invalidateQueries({ queryKey: hardwareKeys.list() })
-        } catch (e) {
-          console.warn('Failed to invalidate queries after create', e)
-        }
-      }
-      onSuccess?.();
-      }, { message: asset ? 'Actualizando activo tecnológico...' : 'Creando activo tecnológico...' })
-    } catch (error: any) {
-      // Try to extract server error details if present
+    await runGuarded(async () => {
       try {
-        console.error('Error saving hardware (detailed):', {
-          message: error?.message,
-          code: error?.code,
-          details: error?.details,
-          hint: error?.hint,
-          stack: error?.stack,
+        await runWithLock(async () => {
+          const current = assetRef.current
+          if (current?.id) {
+            await updateMutation.mutateAsync({ id: current.id, updates: data })
+            if (clientId) {
+              queryClient.invalidateQueries({ queryKey: hardwareKeys.byClient(clientId) })
+            }
+            queryClient.invalidateQueries({ queryKey: hardwareKeys.detail(current.id) })
+            queryClient.invalidateQueries({ queryKey: hardwareKeys.list() })
+          } else {
+            await createMutation.mutateAsync(data)
+            if (clientId) {
+              queryClient.invalidateQueries({ queryKey: hardwareKeys.byClient(clientId) })
+            }
+            queryClient.invalidateQueries({ queryKey: hardwareKeys.list() })
+          }
+          onSuccess?.()
+        }, {
+          message: assetRef.current?.id
+            ? 'Actualizando activo tecnológico...'
+            : 'Creando activo tecnológico...',
         })
-      } catch (logErr) {
-        console.error('Error saving hardware:', error)
+      } catch (error: any) {
+        console.error('Error saving hardware:', error?.message || error)
       }
-      throw error
-    }
+    })
   };
 
   const onError = (errors: any) => {
-    console.log('HardwareForm validation errors:', errors)
     try {
       const firstKey = Object.keys(errors)[0]
       if (firstKey) form.setFocus(firstKey as any)
-    } catch (err) {
+    } catch {
       // ignore
     }
   }

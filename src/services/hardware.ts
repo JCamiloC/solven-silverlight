@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client';
 import { HardwareAsset, HardwareUpgrade, AccionRecomendadaEstado } from '@/types';
+import { toQueryError } from '@/lib/query-errors';
 
 const supabase = createClient();
 
@@ -82,7 +83,7 @@ export class HardwareService {
       .select(`*, client:clients(name, email, contact_person)`)
       .single();
     console.debug('HardwareService.create response:', { data, error })
-    if (error) throw error;
+    if (error) throw toQueryError(error);
     return data;
   }
 
@@ -90,11 +91,13 @@ export class HardwareService {
     console.debug('HardwareService.update payload:', { id, updates })
     
     // Primero obtener los valores actuales
-    const { data: currentAsset } = await supabase
+    const { data: currentAsset, error: currentError } = await supabase
       .from('hardware_assets')
       .select('procesador, memoria_ram, disco_duro')
       .eq('id', id)
       .single();
+
+    if (currentError) throw toQueryError(currentError);
     
     // Detectar cambios en componentes físicos
     const physicalFields = ['procesador', 'memoria_ram', 'disco_duro'] as const;
@@ -127,9 +130,7 @@ export class HardwareService {
       .single();
     
     console.debug('HardwareService.update response:', { data, error })
-    if (error) throw error;
-    
-    // Si hubo cambios físicos, guardar en historial
+    if (error) throw toQueryError(error);
     if (changedFields.length > 0) {
       try {
         const { data: { user } } = await supabase.auth.getUser();

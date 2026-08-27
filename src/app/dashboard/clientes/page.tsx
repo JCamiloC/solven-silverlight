@@ -57,11 +57,14 @@ export default function ClientesPage() {
 
   const filteredClients = clients?.filter((client) => {
     const search = searchTerm.toLowerCase()
+    const nit = (client.nit || '').toLowerCase()
     return (
       client.name.toLowerCase().includes(search) ||
       client.email.toLowerCase().includes(search) ||
       client.contact_person.toLowerCase().includes(search) ||
-      (client.phone && client.phone.includes(search))
+      (client.phone && client.phone.includes(search)) ||
+      nit.includes(search) ||
+      nit.replace(/[^0-9]/g, '').includes(search.replace(/[^0-9]/g, ''))
     )
   }) || []
 
@@ -167,7 +170,7 @@ export default function ClientesPage() {
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por nombre, email, contacto o teléfono..."
+                placeholder="Buscar por nombre, email, contacto, teléfono o NIT..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-8"
@@ -266,14 +269,34 @@ export default function ClientesPage() {
             </DialogDescription>
           </DialogHeader>
           
-          <form
+            <form
             onSubmit={async (e) => {
               e.preventDefault()
               setFormError('')
 
+              const nitDigits = formData.nit.replace(/[^0-9]/g, '')
+              if (!nitDigits) {
+                setFormError('El NIT es requerido')
+                return
+              }
+
+              const duplicate = clients?.find(
+                (client) =>
+                  (client.nit || '').replace(/[^0-9]/g, '') === nitDigits
+              )
+              if (duplicate) {
+                setFormError(
+                  `Ya existe un cliente con ese NIT: ${duplicate.name}`
+                )
+                return
+              }
+
               try {
                 await runWithLock(async () => {
-                  await createClient(formData)
+                  await createClient({
+                    ...formData,
+                    nit: formData.nit.trim(),
+                  })
                   setShowCreateDialog(false)
                   setFormData({ 
                     name: '', 

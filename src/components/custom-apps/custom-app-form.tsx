@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -32,6 +32,7 @@ import {
 import { Loader2 } from 'lucide-react'
 import { CustomApplicationWithRelations } from '@/lib/services/custom-applications'
 import { useActionLock } from '@/hooks/use-action-lock'
+import { useHydrateFormOnce, useSubmitGuard } from '@/hooks/use-form-guards'
 
 const formSchema = z.object({
   client_id: z.string().min(1, 'Selecciona un cliente'),
@@ -77,6 +78,39 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>
 
+function toFormValues(
+  application?: CustomApplicationWithRelations,
+  clientId?: string
+): FormValues {
+  return {
+    client_id: clientId || application?.client_id || '',
+    name: application?.name || '',
+    description: application?.description || '',
+    status: application?.status || 'development',
+    production_url: application?.production_url || '',
+    staging_url: application?.staging_url || '',
+    development_url: application?.development_url || '',
+    admin_panel_url: application?.admin_panel_url || '',
+    hosting_provider: application?.hosting_provider || '',
+    hosting_plan: application?.hosting_plan || '',
+    hosting_renewal_date: application?.hosting_renewal_date || '',
+    domain_registrar: application?.domain_registrar || '',
+    domain_expiry_date: application?.domain_expiry_date || '',
+    database_type: application?.database_type || '',
+    database_host: application?.database_host || '',
+    database_name: application?.database_name || '',
+    repository_url: application?.repository_url || '',
+    repository_branch: application?.repository_branch || 'main',
+    frontend_tech: application?.frontend_tech || '',
+    backend_tech: application?.backend_tech || '',
+    mobile_tech: application?.mobile_tech || '',
+    ssl_certificate: application?.ssl_certificate || '',
+    ssl_expiry_date: application?.ssl_expiry_date || '',
+    cdn_provider: application?.cdn_provider || '',
+    notes: application?.notes || '',
+  }
+}
+
 interface CustomAppFormProps {
   application?: CustomApplicationWithRelations
   clientId?: string
@@ -94,93 +128,52 @@ export function CustomAppForm({
   const createApp = useCreateCustomApplication()
   const updateApp = useUpdateCustomApplication()
   const { runWithLock, isLocked } = useActionLock()
+  const { runGuarded } = useSubmitGuard()
+  const applicationRef = useRef(application)
+  applicationRef.current = application
+  const entityId = application?.id
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      client_id: clientId || application?.client_id || '',
-      name: application?.name || '',
-      description: application?.description || '',
-      status: application?.status || 'development',
-      production_url: application?.production_url || '',
-      staging_url: application?.staging_url || '',
-      development_url: application?.development_url || '',
-      admin_panel_url: application?.admin_panel_url || '',
-      hosting_provider: application?.hosting_provider || '',
-      hosting_plan: application?.hosting_plan || '',
-      hosting_renewal_date: application?.hosting_renewal_date || '',
-      domain_registrar: application?.domain_registrar || '',
-      domain_expiry_date: application?.domain_expiry_date || '',
-      database_type: application?.database_type || '',
-      database_host: application?.database_host || '',
-      database_name: application?.database_name || '',
-      repository_url: application?.repository_url || '',
-      repository_branch: application?.repository_branch || 'main',
-      frontend_tech: application?.frontend_tech || '',
-      backend_tech: application?.backend_tech || '',
-      mobile_tech: application?.mobile_tech || '',
-      ssl_certificate: application?.ssl_certificate || '',
-      ssl_expiry_date: application?.ssl_expiry_date || '',
-      cdn_provider: application?.cdn_provider || '',
-      notes: application?.notes || '',
-    },
+    defaultValues: toFormValues(application, clientId),
   })
 
-  // Actualizar el formulario cuando cambian los props
+  useHydrateFormOnce(form, entityId, () => toFormValues(applicationRef.current, clientId))
+
   useEffect(() => {
-    form.reset({
-      client_id: clientId || application?.client_id || '',
-      name: application?.name || '',
-      description: application?.description || '',
-      status: application?.status || 'development',
-      production_url: application?.production_url || '',
-      staging_url: application?.staging_url || '',
-      development_url: application?.development_url || '',
-      admin_panel_url: application?.admin_panel_url || '',
-      hosting_provider: application?.hosting_provider || '',
-      hosting_plan: application?.hosting_plan || '',
-      hosting_renewal_date: application?.hosting_renewal_date || '',
-      domain_registrar: application?.domain_registrar || '',
-      domain_expiry_date: application?.domain_expiry_date || '',
-      database_type: application?.database_type || '',
-      database_host: application?.database_host || '',
-      database_name: application?.database_name || '',
-      repository_url: application?.repository_url || '',
-      repository_branch: application?.repository_branch || 'main',
-      frontend_tech: application?.frontend_tech || '',
-      backend_tech: application?.backend_tech || '',
-      mobile_tech: application?.mobile_tech || '',
-      ssl_certificate: application?.ssl_certificate || '',
-      ssl_expiry_date: application?.ssl_expiry_date || '',
-      cdn_provider: application?.cdn_provider || '',
-      notes: application?.notes || '',
-    })
-  }, [application, clientId, form])
+    if (entityId || !clientId) return
+    form.setValue('client_id', clientId)
+  }, [clientId, entityId, form])
 
   const onSubmit = async (data: FormValues) => {
-    try {
-      // Convert empty strings to null for optional fields
-      const cleanedData = Object.entries(data).reduce((acc, [key, value]) => {
-        acc[key] = value === '' ? null : value
-        return acc
-      }, {} as any)
+    await runGuarded(async () => {
+      try {
+        const cleanedData = Object.entries(data).reduce((acc, [key, value]) => {
+          acc[key] = value === '' ? null : value
+          return acc
+        }, {} as any)
 
-      await runWithLock(async () => {
-        if (application) {
-          await updateApp.mutateAsync({
-            id: application.id,
-            data: cleanedData,
-          })
-        } else {
-          await createApp.mutateAsync(cleanedData)
-        }
-      }, { message: application ? 'Actualizando aplicación...' : 'Creando aplicación...' })
+        const current = applicationRef.current
 
-      form.reset()
-      onSuccess?.()
-    } catch (error) {
-      console.error('Error saving application:', error)
-    }
+        await runWithLock(async () => {
+          if (current?.id) {
+            await updateApp.mutateAsync({
+              id: current.id,
+              data: cleanedData,
+            })
+          } else {
+            await createApp.mutateAsync(cleanedData)
+            form.reset(toFormValues(undefined, clientId))
+          }
+        }, {
+          message: current?.id ? 'Actualizando aplicación...' : 'Creando aplicación...',
+        })
+
+        onSuccess?.()
+      } catch (error) {
+        console.error('Error saving application:', error)
+      }
+    })
   }
 
   const isSubmitting = createApp.isPending || updateApp.isPending || isLocked
@@ -201,7 +194,7 @@ export function CustomAppForm({
                   <FormLabel>Cliente *</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                     disabled={!!clientId || isSubmitting}
                   >
                     <FormControl>
@@ -236,7 +229,7 @@ export function CustomAppForm({
                   <FormLabel>Estado *</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                     disabled={isSubmitting}
                   >
                     <FormControl>
@@ -729,8 +722,8 @@ export function CustomAppForm({
               Cancelar
             </Button>
           )}
-          <LoadingButton type="submit" loading={isSubmitting} loadingText={application ? 'Actualizando aplicación...' : 'Creando aplicación...'}>
-            {application ? 'Actualizar' : 'Crear'} Aplicación
+          <LoadingButton type="submit" loading={isSubmitting} loadingText={entityId ? 'Actualizando aplicación...' : 'Creando aplicación...'}>
+            {entityId ? 'Actualizar' : 'Crear'} Aplicación
           </LoadingButton>
         </div>
       </form>
