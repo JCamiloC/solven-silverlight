@@ -62,27 +62,6 @@ function LoginForm() {
     return '/dashboard'
   }
 
-  const isSessionPersisted = async () => {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const {
-          data: { session },
-        } = await withTimeout(supabase.auth.getSession(), 4000)
-
-        if (session?.user?.id) return true
-      } catch (error) {
-        // Inconcluyente: signIn ya devolvió sesión, no bloquear al usuario aquí.
-        console.warn('[login] Verificación de sesión no concluyente:', error)
-        return true
-      }
-
-      // El write de la cookie puede ser asíncrono
-      if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 300))
-    }
-
-    return false
-  }
-
   const shouldRetryWithCleanup = (error: unknown) => {
     if (!(error instanceof Error)) return false
     const message = error.message.toLowerCase()
@@ -164,65 +143,37 @@ function LoginForm() {
     setError('')
 
     try {
-      try {
-        const {
-          data: { session: existingSession },
-        } = await withTimeout(supabase.auth.getSession(), 3000)
-
-        if (existingSession?.user?.id) {
-          const sameUser =
-            existingSession.user.email?.toLowerCase() === email.trim().toLowerCase()
-
-          if (sameUser) {
-            await redirectSignedInUser(existingSession.user.id)
-            return
-          }
-
-          await destroyClientSession(supabase, { preferLocal: true, timeoutMs: 3000 })
+      if (user?.id) {
+        const sameUser = user.email?.toLowerCase() === email.trim().toLowerCase()
+        if (sameUser) {
+          await redirectSignedInUser(user.id)
+          return
         }
-      } catch (sessionProbeError) {
-        console.warn('[login] No se pudo inspeccionar sesión previa:', sessionProbeError)
+        await destroyClientSession(supabase, { preferLocal: true, timeoutMs: 3000 })
       }
 
       let signInResult: Awaited<ReturnType<typeof authService.signIn>>
 
       try {
-        signInResult = await withTimeout(authService.signIn(email, password), 20000)
+        signInResult = await authService.signIn(email, password)
       } catch (signInError) {
-        try {
-          const {
-            data: { session: recovered },
-          } = await withTimeout(supabase.auth.getSession(), 3000)
-          if (recovered?.user?.id) {
-            await redirectSignedInUser(recovered.user.id)
-            return
-          }
-        } catch {
-          // El sign-in falló y no hay sesión usable: mostrar error.
-        }
-
         if (!shouldRetryWithCleanup(signInError)) {
           throw signInError
         }
 
         await destroyClientSession(supabase, { preferLocal: true, timeoutMs: 3000 })
-        signInResult = await withTimeout(authService.signIn(email, password), 20000)
+        signInResult = await authService.signIn(email, password)
       }
 
-      const { user: signedInUser, session } = signInResult
-      const userId = session?.user?.id || signedInUser?.id
+      const userId = signInResult.session?.user?.id || signInResult.user?.id
       if (!userId) {
         throw new Error('No se pudo establecer la sesión. Intenta nuevamente.')
       }
 
-      void (await isSessionPersisted())
       await redirectSignedInUser(userId)
     } catch (err) {
       const raw = err instanceof Error ? err.message : 'Error al iniciar sesión'
-      const errorMessage = /timeout|tardó demasiado|aborted|abort|Session verification/i.test(raw)
-        ? 'La autenticación tardó demasiado. Revisa tu conexión e intenta de nuevo.'
-        : raw
-      setError(errorMessage)
+      setError(raw)
     } finally {
       setLoading(false)
     }
