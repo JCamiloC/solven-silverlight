@@ -63,24 +63,32 @@ function LoginForm() {
   useEffect(() => {
     if (fromLogout) return
     if (!initialized || !user?.id) return
-    window.location.assign(POST_LOGIN_PATH)
+    window.location.replace(POST_LOGIN_PATH)
   }, [initialized, user?.id, fromLogout])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (loading) return
+
     setLoading(true)
     setError('')
+
+    const loadingGuard = window.setTimeout(() => {
+      setLoading(false)
+      setError('El inicio de sesión tardó demasiado. Recarga la página e intenta de nuevo.')
+    }, 35_000)
 
     try {
       if (user?.id) {
         const sameUser = user.email?.toLowerCase() === email.trim().toLowerCase()
         if (sameUser) {
-          window.location.assign(POST_LOGIN_PATH)
+          window.location.replace(POST_LOGIN_PATH)
           return
         }
-        clearSupabaseAuthStorage()
-        void supabase.auth.signOut({ scope: 'local' }).catch(() => {})
       }
+
+      clearSupabaseAuthStorage()
+      void supabase.auth.signOut({ scope: 'local' }).catch(() => {})
 
       let signInResult: Awaited<ReturnType<typeof authService.signIn>>
 
@@ -101,11 +109,13 @@ function LoginForm() {
         throw new Error('No se pudo establecer la sesión. Intenta nuevamente.')
       }
 
-      window.location.assign(POST_LOGIN_PATH)
+      window.location.replace(POST_LOGIN_PATH)
     } catch (err) {
       const raw = err instanceof Error ? err.message : 'Error al iniciar sesión'
       setError(raw)
       setLoading(false)
+    } finally {
+      window.clearTimeout(loadingGuard)
     }
   }
 

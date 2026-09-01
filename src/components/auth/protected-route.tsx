@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/use-auth'
+import { hasSupabaseAuthCookieHint } from '@/lib/auth/auth-cookie'
 import { UserRole } from '@/types'
 import { Loading } from '@/components/ui/loading'
 
@@ -25,6 +26,9 @@ export function ProtectedRoute({
     if (!initialized || isRedirecting) return
 
     if (requireAuth && !user) {
+      if (hasSupabaseAuthCookieHint()) {
+        return
+      }
       setIsRedirecting(true)
       router.replace('/auth/login')
       return
@@ -66,6 +70,14 @@ export function ProtectedRoute({
       return null
     }
     return <>{children}</>
+  }
+
+  if (requireAuth && hasSupabaseAuthCookieHint()) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loading size="lg" text="Verificando autenticación..." />
+      </div>
+    )
   }
 
   if (isRedirecting || requireAuth) {

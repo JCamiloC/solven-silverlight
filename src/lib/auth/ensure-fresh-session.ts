@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/client'
 import { hasSupabaseAuthCookieHint } from '@/lib/auth/auth-cookie'
 
 const REFRESH_IF_EXPIRES_IN_SECONDS = 120
-const SESSION_CHECK_TIMEOUT_MS = 12_000
+const SESSION_CHECK_TIMEOUT_MS = 8_000
 
 let inFlight: Promise<boolean> | null = null
 
@@ -43,17 +43,25 @@ export async function ensureFreshSession(): Promise<boolean> {
       if (!error && session?.access_token) {
         const expiresIn = (session.expires_at ?? 0) - Math.floor(Date.now() / 1000)
         if (expiresIn > REFRESH_IF_EXPIRES_IN_SECONDS) return true
-      } else if (!hasSupabaseAuthCookieHint()) {
-        return false
+
+        try {
+          const { data, error: refreshError } = await withTimeout(
+            supabase.auth.refreshSession(),
+            SESSION_CHECK_TIMEOUT_MS
+          )
+          if (data.session?.access_token && !refreshError) return true
+          // Token aún válido aunque el refresh falle (red lenta, mutex, etc.)
+          if (expiresIn > 30) return true
+        } catch {
+          if (expiresIn > 30) return true
+        }
+      } else if (hasSupabaseAuthCookieHint()) {
+        return true
       }
 
-      const { data, error: refreshError } = await withTimeout(
-        supabase.auth.refreshSession(),
-        SESSION_CHECK_TIMEOUT_MS
-      )
-      return Boolean(data.session?.access_token) && !refreshError
-    } catch {
       return false
+    } catch {
+      return hasSupabaseAuthCookieHint()
     }
   })()
 

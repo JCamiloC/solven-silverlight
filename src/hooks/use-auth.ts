@@ -64,16 +64,37 @@ const buildFallbackProfile = (user: User): Profile => {
   }
 }
 
+function resolveInitialAuthState(): AuthState {
+  if (typeof window === 'undefined') {
+    return authStateCache
+  }
+
+  if (!isAuthRoutePath(window.location.pathname)) {
+    return authStateCache
+  }
+
+  if (window.location.search.includes('logout=1')) {
+    clearSupabaseAuthStorage()
+  }
+
+  return {
+    user: null,
+    profile: null,
+    loading: false,
+    initialized: true,
+  }
+}
+
 interface AuthProviderProps {
   children: ReactNode
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [authState, setAuthState] = useState<AuthState>(authStateCache)
+  const [authState, setAuthState] = useState<AuthState>(resolveInitialAuthState)
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const bootstrappedRef = useRef(false)
+  const bootstrappedRef = useRef(authState.initialized)
   const recoveringRef = useRef(false)
   const applyGenRef = useRef(0)
 
@@ -214,11 +235,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const onAuthPage =
           typeof window !== 'undefined' && isAuthRoutePath(window.location.pathname)
 
-        if (onAuthPage && !hasSupabaseAuthCookieHint()) {
-          await applySession(null)
-          return
-        }
-
         if (
           onAuthPage &&
           typeof window !== 'undefined' &&
@@ -230,22 +246,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         if (onAuthPage) {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession()
+          // No getSession(): en prod compite con signIn y deja el botón en loader.
+          // onAuthStateChange detectará sesión existente y redirige al dashboard.
+          setAndCacheAuthState({
+            user: null,
+            profile: null,
+            loading: false,
+            initialized: true,
+          })
+          bootstrappedRef.current = true
+          if (loadingTimeoutRef.current) {
+            clearTimeout(loadingTimeoutRef.current)
+            loadingTimeoutRef.current = null
+          }
+          return
+        }
 
-          if (!isMounted) return
-          await applySession(session?.user ?? null)
+        const {
+          data: { session: existingSession },
+        } = await supabase.auth.getSession()
+
+        if (!isMounted) return
+
+        if (existingSession?.user) {
+          await applySession(existingSession.user)
           return
         }
 
         const sessionOk = await ensureFreshSession()
         if (!isMounted) return
-
-        if (!sessionOk) {
-          await applySession(null)
-          return
-        }
 
         const {
           data: { session },
@@ -253,12 +282,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (!isMounted) return
 
+        if (session?.user) {
+          await applySession(session.user)
+          return
+        }
+
+        if (!sessionOk && hasSupabaseAuthCookieHint()) {
+          setAndCacheAuthState({
+            ...authStateCache,
+            loading: false,
+            initialized: true,
+          })
+          bootstrappedRef.current = true
+          return
+        }
+
         if (!session?.user && bootstrappedRef.current && authStateCache.user) {
           setAndCacheAuthState({ ...authStateCache, loading: false, initialized: true })
           return
         }
 
-        await applySession(session?.user ?? null)
+        await applySession(null)
       } catch (error) {
         console.error('[useAuth] Error recovering session:', error)
         if (!isMounted) return
@@ -323,13 +367,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return
         }
 
-        if (authStateCache.user && bootstrappedRef.current) {
-          return
-        }
-
-        if (recoveringRef.current) return
-
-        await applySession(null)
+        // No borrar sesión por eventos transitorios con session null (refresh en curso).
+        return
       } catch (error) {
         console.error('[useAuth] Error in auth state change:', error)
       }
