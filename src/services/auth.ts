@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
+import { createClient, isSupabaseConfigured } from '@/lib/supabase/client'
 import { Profile, UserRole } from '@/types'
 import { clearSupabaseAuthStorage } from '@/lib/auth/session-cleanup'
 
@@ -10,10 +10,28 @@ function isAbortOrTimeoutError(error: unknown): boolean {
   )
 }
 
+function isNetworkError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  return (
+    error.message === 'Failed to fetch' ||
+    /network|fetch failed|networkerror/i.test(error.message)
+  )
+}
+
 function toAuthError(error: unknown): Error {
+  if (!isSupabaseConfigured()) {
+    return new Error(
+      'Supabase no está configurado en este entorno. Crea .env.local con NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY, luego reinicia npm run dev.'
+    )
+  }
   if (isAbortOrTimeoutError(error)) {
     return new Error(
       'La autenticación tardó demasiado. Revisa tu conexión e intenta de nuevo.'
+    )
+  }
+  if (isNetworkError(error)) {
+    return new Error(
+      'No se pudo conectar con Supabase. Verifica .env.local, tu conexión a internet y reinicia el servidor de desarrollo.'
     )
   }
   if (error instanceof Error) return error
@@ -30,6 +48,10 @@ export class AuthService {
    * Un segundo timeout más corto (antes 20s) generaba falsos "timeout" con red lenta.
    */
   async signIn(email: string, password: string) {
+    if (!isSupabaseConfigured()) {
+      throw toAuthError(null)
+    }
+
     try {
       const { data, error } = await this.supabase.auth.signInWithPassword({
         email,

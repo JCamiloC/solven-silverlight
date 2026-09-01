@@ -8,6 +8,8 @@ import { Profile, UserRole } from '@/types'
 import { clearSupabaseAuthStorage, destroyClientSession } from '@/lib/auth/session-cleanup'
 import { isAbortLikeError } from '@/lib/query-errors'
 import { ensureFreshSession } from '@/lib/auth/ensure-fresh-session'
+import { hasSupabaseAuthCookieHint } from '@/lib/auth/auth-cookie'
+import { isAuthRoutePath } from '@/lib/auth/auth-routes'
 
 interface AuthState {
   user: User | null
@@ -209,6 +211,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
       recoveringRef.current = true
 
       try {
+        const onAuthPage =
+          typeof window !== 'undefined' && isAuthRoutePath(window.location.pathname)
+
+        if (onAuthPage && !hasSupabaseAuthCookieHint()) {
+          await applySession(null)
+          return
+        }
+
+        if (
+          onAuthPage &&
+          typeof window !== 'undefined' &&
+          window.location.search.includes('logout=1')
+        ) {
+          clearSupabaseAuthStorage()
+          await applySession(null)
+          return
+        }
+
+        if (onAuthPage) {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession()
+
+          if (!isMounted) return
+          await applySession(session?.user ?? null)
+          return
+        }
+
         const sessionOk = await ensureFreshSession()
         if (!isMounted) return
 
