@@ -155,7 +155,7 @@ export class TwoFactorService {
       }
 
       // Verificar el token usando nuestra función auxiliar robusta
-      const verified = verifyTOTPToken(profile.totp_secret, token, 1)
+      const verified = verifyTOTPToken(profile.totp_secret, token, 2)
 
       if (verified) {
         // Actualizar timestamp de última verificación

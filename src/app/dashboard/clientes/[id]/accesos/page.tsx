@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ProtectedRoute } from '@/components/auth/protected-route'
-import { SecureRoute } from '@/components/security/security-provider'
+import { SecureRoute, useSecurityContext } from '@/components/security/security-provider'
 import { TwoFactorRequiredNotice } from '@/components/security/2fa-required-notice'
 import { useAuth } from '@/hooks/use-auth'
 import { useClient } from '@/hooks/use-clients'
@@ -40,12 +40,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { TablePagination } from '@/components/ui/table-pagination'
 
 export default function ClienteAccesosPage() {
-  const { profile } = useAuth()
-  const has2FA = profile?.totp_enabled === true
+  const { is2FAEnabled, is2FAStatusLoading } = useSecurityContext()
 
   return (
     <ProtectedRoute allowedRoles={['administrador', 'lider_soporte', 'cliente']}>
-      {!has2FA ? (
+      {is2FAStatusLoading ? (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loading size="lg" text="Verificando configuración 2FA..." />
+        </div>
+      ) : !is2FAEnabled ? (
         <TwoFactorRequiredNotice />
       ) : (
         <SecureRoute requireAdmin={false}>

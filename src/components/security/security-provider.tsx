@@ -9,13 +9,16 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Shield, Smartphone, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
+import Link from 'next/link'
 
 interface SecurityContextType {
   is2FAEnabled: boolean
   isVerified: boolean
+  is2FAStatusLoading: boolean
   requireVerification: () => Promise<boolean>
   setup2FA: () => Promise<void>
   disable2FA: () => Promise<void>
+  refresh2FAStatus: () => Promise<void>
 }
 
 const SecurityContext = createContext<SecurityContextType | null>(null)
@@ -33,9 +36,10 @@ interface SecurityProviderProps {
 }
 
 export function SecurityProvider({ children }: SecurityProviderProps) {
-  const { user, profile } = useAuth()
+  const { user, profile, refresh: refreshAuthProfile } = useAuth()
   const [is2FAEnabled, setIs2FAEnabled] = useState(false)
   const [isVerified, setIsVerified] = useState(false)
+  const [is2FAStatusLoading, setIs2FAStatusLoading] = useState(true)
   const [showVerificationDialog, setShowVerificationDialog] = useState(false)
   const [showSetupDialog, setShowSetupDialog] = useState(false)
   const [verificationCode, setVerificationCode] = useState('')
@@ -45,12 +49,19 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
   const [error, setError] = useState('')
 
   const checkTwoFactorStatus = useCallback(async () => {
-    if (!user?.id) return
-    
+    if (!user?.id) {
+      setIs2FAEnabled(false)
+      setIsVerified(false)
+      setIs2FAStatusLoading(false)
+      return
+    }
+
+    setIs2FAStatusLoading(true)
+
     try {
       const enabled = await TwoFactorService.is2FAEnabled(user.id)
       setIs2FAEnabled(enabled)
-      
+
       if (enabled) {
         const validityMinutes = getTwoFactorValidityMinutes(profile?.role)
         const recentlyVerified = await TwoFactorService.isRecentlyVerified(
@@ -58,11 +69,17 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
           validityMinutes
         )
         setIsVerified(recentlyVerified)
+      } else {
+        setIsVerified(false)
       }
     } catch (error) {
       console.error('Error checking 2FA status:', error)
+      setIs2FAEnabled(profile?.totp_enabled === true)
+      setIsVerified(false)
+    } finally {
+      setIs2FAStatusLoading(false)
     }
-  }, [user?.id, profile?.role])
+  }, [user?.id, profile?.role, profile?.totp_enabled])
 
   // Check 2FA status on mount
   useEffect(() => {
@@ -76,6 +93,7 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
 
     // Check if user has 2FA enabled
     const enabled = await TwoFactorService.is2FAEnabled(user.id)
+    setIs2FAEnabled(enabled)
     if (!enabled) {
       // If user is admin and doesn't have 2FA, allow them to set it up
       const userRole = profile?.role
@@ -126,10 +144,13 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
       const result = await TwoFactorService.verifyTOTP(user.id, verificationCode.trim())
       
       if (result.isValid) {
+        setIs2FAEnabled(true)
         setIsVerified(true)
         setShowVerificationDialog(false)
         setVerificationCode('')
         toast.success('Verificación exitosa')
+
+        await refreshAuthProfile()
         
         if (verificationResolver) {
           verificationResolver(true)
@@ -184,6 +205,7 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
         setVerificationCode('')
         setSetupData(null)
         toast.success('2FA configurado exitosamente')
+        await refreshAuthProfile()
       } else {
         setError(result.message)
       }
@@ -206,6 +228,7 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
         setIs2FAEnabled(false)
         setIsVerified(false)
         toast.success('2FA deshabilitado')
+        await refreshAuthProfile()
       } else {
         toast.error('Error al deshabilitar 2FA')
       }
@@ -219,9 +242,11 @@ export function SecurityProvider({ children }: SecurityProviderProps) {
   const contextValue: SecurityContextType = {
     is2FAEnabled,
     isVerified,
+    is2FAStatusLoading,
     requireVerification,
     setup2FA,
-    disable2FA
+    disable2FA,
+    refresh2FAStatus: checkTwoFactorStatus,
   }
 
   return (
@@ -395,7 +420,8 @@ interface SecureRouteProps {
 
 export function SecureRoute({ children, requireAdmin = false }: SecureRouteProps) {
   const { profile, hasRole } = useAuth()
-  const { is2FAEnabled, isVerified, requireVerification, setup2FA } = useSecurityContext()
+  const { is2FAEnabled, isVerified, is2FAStatusLoading, requireVerification, setup2FA } =
+    useSecurityContext()
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [isChecking, setIsChecking] = useState(true)
   const [showSetupPrompt, setShowSetupPrompt] = useState(false)
@@ -437,12 +463,11 @@ export function SecureRoute({ children, requireAdmin = false }: SecureRouteProps
   }, [requireAdmin, hasRole, is2FAEnabled, isVerified, requireVerification])
 
   useEffect(() => {
-    if (profile) {
-      checkAuthorization()
-    }
-  }, [profile?.id, is2FAEnabled, isVerified]) // Dependencias específicas para evitar loops
+    if (!profile?.id || is2FAStatusLoading) return
+    void checkAuthorization()
+  }, [profile?.id, is2FAEnabled, isVerified, is2FAStatusLoading, checkAuthorization])
 
-  if (isChecking) {
+  if (isChecking || is2FAStatusLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center space-y-4">
@@ -454,15 +479,27 @@ export function SecureRoute({ children, requireAdmin = false }: SecureRouteProps
   }
 
   if (!isAuthorized) {
+    const needsVerificationOnly = is2FAEnabled && !isVerified
+
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center space-y-4 max-w-md">
+        <div className="text-center space-y-4 max-w-md px-4">
           <Shield className="h-12 w-12 text-muted-foreground mx-auto" />
-          <h2 className="text-2xl font-bold">Acceso Restringido</h2>
+          <h2 className="text-2xl font-bold">
+            {needsVerificationOnly ? 'Verificación 2FA requerida' : 'Acceso Restringido'}
+          </h2>
           <p className="text-muted-foreground">
-            Este módulo requiere autenticación de dos factores (2FA) habilitada.
-            Contacta al administrador para configurarla.
+            {needsVerificationOnly
+              ? 'Tu 2FA está configurado. Ingresa el código de tu autenticador para acceder a las credenciales.'
+              : 'Este módulo requiere autenticación de dos factores (2FA) habilitada. Configúrala en Configuración.'}
           </p>
+          {needsVerificationOnly ? (
+            <Button onClick={() => void checkAuthorization()}>Verificar con código 2FA</Button>
+          ) : (
+            <Button asChild>
+              <Link href="/dashboard/configuracion">Ir a Configuración</Link>
+            </Button>
+          )}
         </div>
       </div>
     )
