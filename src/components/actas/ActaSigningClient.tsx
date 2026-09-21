@@ -50,7 +50,7 @@ export default function ActaSigningClient({ token }: Props) {
           cliente_cedula: cedula,
           cliente_firma_dataurl: dataUrl,
         })
-      }, { message: 'Enviando firma...' })
+      }, { message: 'Enviando firma...', requireSession: false })
       setDone(true)
     } catch {
       // handled by hook

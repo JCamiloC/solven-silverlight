@@ -3,7 +3,12 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
-import { ensureFreshSession } from '@/lib/auth/ensure-fresh-session'
+import { toast } from 'sonner'
+import { hasSupabaseAuthCookieHint } from '@/lib/auth/auth-cookie'
+import {
+  ensureSessionBeforeMutation,
+  SESSION_EXPIRED_MUTATION_MSG,
+} from '@/lib/auth/mutation-session-guard'
 
 type LockKind = 'action' | 'navigation'
 
@@ -16,6 +21,8 @@ interface LockEntry {
 interface LockOptions {
   message?: string
   timeoutMs?: number
+  /** Por defecto true si hay cookie Supabase; false para acciones públicas (firma acta). */
+  requireSession?: boolean
 }
 
 interface InteractionLockContextValue {
@@ -78,14 +85,22 @@ export function InteractionLockProvider({ children }: { children: ReactNode }) {
 
   const withActionLock = useCallback(async <T,>(action: () => Promise<T>, options?: LockOptions): Promise<T> => {
     const lockId = lockAction(options)
+    const shouldCheckSession =
+      options?.requireSession !== false && hasSupabaseAuthCookieHint()
     try {
-      const sessionOk = await ensureFreshSession()
-      if (!sessionOk) {
-        throw new Error(
-          'Tu sesión expiró o no se pudo renovar. Copia los datos del formulario, recarga e inicia sesión de nuevo.'
-        )
+      if (shouldCheckSession) {
+        const sessionOk = await ensureSessionBeforeMutation()
+        if (!sessionOk) {
+          toast.error(SESSION_EXPIRED_MUTATION_MSG)
+          throw new Error(SESSION_EXPIRED_MUTATION_MSG)
+        }
       }
       return await action()
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('verificación de sesión')) {
+        toast.error(error.message)
+      }
+      throw error
     } finally {
       unlock(lockId)
     }

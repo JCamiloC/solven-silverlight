@@ -1,8 +1,13 @@
 'use client'
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { useState } from 'react'
+import { toast } from 'sonner'
+import {
+  ensureSessionBeforeMutation,
+  SESSION_EXPIRED_MUTATION_MSG,
+} from '@/lib/auth/mutation-session-guard'
 import { isAbortLikeError } from '@/lib/query-errors'
 
 export function ReactQueryProvider({ children }: { children: React.ReactNode }) {
@@ -13,6 +18,26 @@ export function ReactQueryProvider({ children }: { children: React.ReactNode }) 
   const [queryClient] = useState(
     () =>
       new QueryClient({
+        mutationCache: new MutationCache({
+          onMutate: async (_variables, mutation) => {
+            if (mutation.meta?.skipSessionRefresh) return
+            try {
+              const ok = await ensureSessionBeforeMutation()
+              if (!ok) {
+                toast.error(SESSION_EXPIRED_MUTATION_MSG)
+                throw new Error(SESSION_EXPIRED_MUTATION_MSG)
+              }
+            } catch (error) {
+              if (
+                error instanceof Error &&
+                error.message.includes('verificación de sesión')
+              ) {
+                toast.error(error.message)
+              }
+              throw error
+            }
+          },
+        }),
         defaultOptions: {
           queries: {
             staleTime: 60 * 1000,

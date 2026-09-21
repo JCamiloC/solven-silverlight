@@ -5,6 +5,7 @@ import { useInteractionLock } from '@/components/providers/interaction-lock-prov
 interface ActionLockOptions {
   message?: string
   timeoutMs?: number
+  requireSession?: boolean
 }
 
 export function useActionLock() {

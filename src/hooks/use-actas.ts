@@ -48,6 +48,7 @@ export function useSignActa() {
   const qc = useQueryClient()
 
   return useMutation({
+    meta: { skipSessionRefresh: true },
     mutationFn: async (data: any) => {
       const response = await fetch('/api/actas/sign-public', {
         method: 'POST',

@@ -7,6 +7,8 @@ import { toQueryError } from '@/lib/query-errors'
 const QUERY_TIMEOUT_MS = 45_000
 const MUTATION_TIMEOUT_MS = 75_000
 const STORAGE_TIMEOUT_MS = 120_000
+/** Evita getSession/refresh colgados (formularios en “guardando…” infinito). */
+const AUTH_FETCH_TIMEOUT_MS = 20_000
 
 function isAuthRequest(url: string): boolean {
   return url.includes('/auth/v1/')
@@ -79,14 +81,9 @@ export function createClient() {
       fetch: (url, options = {}) => {
         const requestUrl = typeof url === 'string' ? url : url.toString()
         const isSupabaseRequest = Boolean(supabaseUrl && requestUrl.startsWith(supabaseUrl))
+        const isAuth = isAuthRequest(requestUrl)
+        const timeoutMs = isAuth ? AUTH_FETCH_TIMEOUT_MS : resolveTimeoutMs(requestUrl, options)
 
-        // Auth (getSession/refresh): fetch plano. Contarlo como actividad
-        // reprogramaba timeouts y competía con GoTrue.
-        if (isAuthRequest(requestUrl)) {
-          return fetch(url, options)
-        }
-
-        const timeoutMs = resolveTimeoutMs(requestUrl, options)
         const controller = new AbortController()
         const timeoutId = setTimeout(() => {
           controller.abort(new Error(`Request timeout after ${timeoutMs}ms`))
@@ -115,7 +112,7 @@ export function createClient() {
           )
         }
 
-        if (isSupabaseRequest) {
+        if (isSupabaseRequest && !isAuth) {
           beginSessionRequest()
         }
 
@@ -124,7 +121,6 @@ export function createClient() {
           signal: controller.signal,
         })
           .catch((error) => {
-            // Cancelación real del caller (React Query unmount): preservar AbortError
             if (externalSignal?.aborted) {
               throw error
             }
@@ -132,7 +128,7 @@ export function createClient() {
           })
           .finally(() => {
             clearTimeout(timeoutId)
-            if (isSupabaseRequest) {
+            if (isSupabaseRequest && !isAuth) {
               endSessionRequest()
             }
           })

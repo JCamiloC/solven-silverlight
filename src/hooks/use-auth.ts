@@ -287,14 +287,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return
         }
 
-        if (!sessionOk && hasSupabaseAuthCookieHint()) {
-          setAndCacheAuthState({
-            ...authStateCache,
-            loading: false,
-            initialized: true,
-          })
-          bootstrappedRef.current = true
-          return
+        if (hasSupabaseAuthCookieHint()) {
+          const { data: refreshData } = await supabase.auth.refreshSession()
+          if (!isMounted) return
+          if (refreshData.session?.user) {
+            await applySession(refreshData.session.user)
+            return
+          }
         }
 
         if (!session?.user && bootstrappedRef.current && authStateCache.user) {
@@ -384,25 +383,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [getProfile, router, setAndCacheAuthState, supabase])
 
-  // Pestaña en segundo plano: Chrome pausa el autoRefresh. Al volver, renovar JWT
-  // sin recargar perfil ni re-renderizar el árbol.
-  useEffect(() => {
-    if (!authState.user) return
-
-    const onVisible = () => {
-      if (document.visibilityState !== 'visible') return
-      void ensureFreshSession()
-    }
-
-    document.addEventListener('visibilitychange', onVisible)
-    window.addEventListener('focus', onVisible)
-
-    return () => {
-      document.removeEventListener('visibilitychange', onVisible)
-      window.removeEventListener('focus', onVisible)
-    }
-  }, [authState.user])
-
   const signOut = useCallback(async () => {
     const clearLocalAuthState = () => {
       setAndCacheAuthState({
@@ -437,10 +417,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const refresh = useCallback(async () => {
     try {
-      const {
+      let {
         data: { session },
         error,
       } = await supabase.auth.getSession()
+
+      if (!session?.user && hasSupabaseAuthCookieHint()) {
+        await ensureFreshSession()
+        const retry = await supabase.auth.getSession()
+        session = retry.data.session
+        error = retry.error
+      }
 
       if (error) {
         setAndCacheAuthState({
@@ -482,6 +469,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
       })
     }
   }, [getProfile, setAndCacheAuthState, supabase])
+
+  // Pestaña en segundo plano: Chrome pausa el autoRefresh. Al volver, renovar JWT.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      if (authState.user) {
+        void ensureFreshSession()
+      } else if (hasSupabaseAuthCookieHint()) {
+        void refresh()
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [authState.user, refresh])
 
   const hasRole = useCallback((roles: UserRole[]): boolean => {
     if (!authState.profile) return false
