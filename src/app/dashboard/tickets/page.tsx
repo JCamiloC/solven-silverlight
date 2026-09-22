@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { TicketTable } from '@/components/tickets'
-import { useTickets, useMyTickets } from '@/hooks/use-tickets'
+import { useTickets, useMyTickets, useClientTickets } from '@/hooks/use-tickets'
 import { useAuth } from '@/hooks/use-auth'
 import { Plus, FileText, Loader2 } from 'lucide-react'
 import { TicketReportPDF } from '@/lib/services/ticket-report-pdf'
@@ -27,13 +27,6 @@ export default function TicketsPage() {
   const router = useRouter()
   const { user, isClient, isAdmin, isLeader, isSupport } = useAuth()
   
-  // Si es cliente, usa useMyTickets, sino usa useTickets
-  const { data: allTickets, isLoading: loadingAll } = useTickets()
-  const { data: myTickets, isLoading: loadingMy } = useMyTickets(user?.id || '')
-  
-  const tickets = isClient() ? myTickets : allTickets
-  const isLoading = isClient() ? loadingMy : loadingAll
-
   const [generatingReport, setGeneratingReport] = useState(false)
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
   const [filteredTickets, setFilteredTickets] = useState<TicketWithRelations[]>([])
@@ -42,6 +35,27 @@ export default function TicketsPage() {
     startDate: '',
     endDate: '',
   })
+
+  const staffClientFilterId =
+    tableFilters.selectedClient !== 'all' ? tableFilters.selectedClient : ''
+
+  // Cliente portal: tickets de su empresa. Staff: todos (500 más recientes) o por cliente al filtrar.
+  const { data: allTickets, isLoading: loadingAll } = useTickets()
+  const { data: myTickets, isLoading: loadingMy } = useMyTickets(user?.id || '')
+  const { data: clientFilteredTickets, isLoading: loadingClientFiltered } =
+    useClientTickets(staffClientFilterId)
+
+  const tickets = isClient()
+    ? myTickets
+    : staffClientFilterId
+      ? clientFilteredTickets
+      : allTickets
+
+  const isLoading = isClient()
+    ? loadingMy
+    : staffClientFilterId
+      ? loadingClientFiltered
+      : loadingAll
 
   useEffect(() => {
     setFilteredTickets(tickets || [])
