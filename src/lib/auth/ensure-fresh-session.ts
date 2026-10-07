@@ -1,10 +1,12 @@
 import { createClient } from '@/lib/supabase/client'
 import { hasSupabaseAuthCookieHint } from '@/lib/auth/auth-cookie'
 
-const REFRESH_IF_EXPIRES_IN_SECONDS = 120
-const SESSION_CHECK_TIMEOUT_MS = 8_000
+/** Renovar con margen amplio (formularios 10–15 min entre campos). */
+const REFRESH_IF_EXPIRES_IN_SECONDS = 10 * 60
+const SESSION_CHECK_TIMEOUT_MS = 15_000
 /** Si un ensure previo se colgó, no bloquear guardados nuevos indefinidamente. */
-const IN_FLIGHT_STALE_MS = 12_000
+/** Debe ser mayor que SESSION_CHECK_TIMEOUT_MS para no soltar refresh duplicados. */
+const IN_FLIGHT_STALE_MS = 25_000
 
 let inFlight: Promise<boolean> | null = null
 let inFlightStartedAt = 0
@@ -62,11 +64,10 @@ export async function ensureFreshSession(): Promise<boolean> {
         try {
           const refreshed = await tryRefreshSession()
           if (refreshed) return true
-          if (expiresIn > 30) return true
         } catch {
-          if (expiresIn > 30) return true
+          // refresh falló; solo confiar en token si aún no venció
         }
-        return false
+        return expiresIn > 15
       }
 
       if (hasSupabaseAuthCookieHint()) {

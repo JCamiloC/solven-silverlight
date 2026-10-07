@@ -19,6 +19,7 @@ import {
   formatMinutesToReadable,
 } from '@/lib/services/ticket-kpi-report-utils'
 import { getReportLogoForWord } from '@/lib/services/report-logo'
+import type { VisitReportRow } from '@/lib/services/visit-report-pdf'
 
 interface KpiReportWordOptions {
   clientName: string
@@ -27,6 +28,7 @@ interface KpiReportWordOptions {
   startDate?: string
   endDate?: string
   assignedUserNames?: Record<string, string>
+  visitHistory?: VisitReportRow[]
 }
 
 const getReportMonthLabel = (startDate?: string, endDate?: string) => {
@@ -84,6 +86,28 @@ export class TicketKpiReportWord {
           })
         ),
       ]
+
+      const visitHistory = options.visitHistory || []
+      const includeClient = Boolean(options.isGeneralReport)
+      const visitTableRows =
+        visitHistory.length > 0
+          ? [
+              new TableRow({
+                children: (includeClient
+                  ? ['FECHA', 'CLIENTE', 'TIPO', 'ESTADO', 'TECNICO', 'DETALLE']
+                  : ['FECHA', 'TIPO', 'ESTADO', 'TECNICO', 'EQUIPOS', 'DETALLE']
+                ).map((header) => createHeaderCell(header)),
+              }),
+              ...visitHistory.map((row) =>
+                new TableRow({
+                  children: (includeClient
+                    ? [row.fecha, row.cliente, row.tipo, row.estado, row.tecnico, row.detalle]
+                    : [row.fecha, row.tipo, row.estado, row.tecnico, row.equipos, row.detalle]
+                  ).map((cell) => createBodyCell(cell)),
+                })
+              ),
+            ]
+          : []
 
       const doc = new Document({
         sections: [
@@ -163,8 +187,26 @@ export class TicketKpiReportWord {
               }),
               new Paragraph({
                 text: '- Productividad: Durante el mes de marzo se aprovisionaron 2 equipos nuevos, 2 docking station y 2 cargadores adicionales (para la direccion ejecutiva), ademas se han programado revisiones sobre equipos, infraestructura general y copias de seguridad en el servidor de aplicaciones, asi como ajustes en las politicas de dominio, para un total de 10 atenciones en sitio. Como ultimo anexo, se programaron 4 visitas al domicilio del director ejecutivo para la instalacion de 2 Access Point como solucion de red y la entrega de un equipo para uso personal junto con su respectivo docking.',
-                spacing: { after: 180 },
+                spacing: { after: 120 },
               }),
+              new Paragraph({
+                children: [new TextRun({ text: 'Historico de visitas', bold: true })],
+                spacing: { before: 120, after: 80 },
+              }),
+              ...(visitHistory.length === 0
+                ? [
+                    new Paragraph({
+                      text: 'No se registraron visitas en el periodo seleccionado.',
+                      spacing: { after: 180 },
+                    }),
+                  ]
+                : [
+                    new Table({
+                      width: { size: 100, type: WidthType.PERCENTAGE },
+                      rows: visitTableRows,
+                    }),
+                    new Paragraph({ text: '', spacing: { after: 180 } }),
+                  ]),
               new Paragraph({ text: 'Rodrigo Andres Quintero G.', spacing: { after: 80 } }),
               new Paragraph({ text: 'Director General - Silverlight Colombia' }),
             ],

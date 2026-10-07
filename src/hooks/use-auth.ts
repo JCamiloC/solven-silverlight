@@ -10,6 +10,7 @@ import { isAbortLikeError } from '@/lib/query-errors'
 import { ensureFreshSession } from '@/lib/auth/ensure-fresh-session'
 import { hasSupabaseAuthCookieHint } from '@/lib/auth/auth-cookie'
 import { isAuthRoutePath } from '@/lib/auth/auth-routes'
+import { useSessionHeartbeat } from '@/hooks/use-session-heartbeat'
 
 interface AuthState {
   user: User | null
@@ -296,11 +297,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         }
 
-        if (!session?.user && bootstrappedRef.current && authStateCache.user) {
-          setAndCacheAuthState({ ...authStateCache, loading: false, initialized: true })
-          return
-        }
-
         await applySession(null)
       } catch (error) {
         console.error('[useAuth] Error recovering session:', error)
@@ -446,37 +442,65 @@ export function AuthProvider({ children }: AuthProviderProps) {
           loading: false,
           initialized: true,
         })
-      } else if (!authStateCache.user) {
+      } else if (hasSupabaseAuthCookieHint()) {
+        const { data: refreshData } = await supabase.auth.refreshSession()
+        if (refreshData.session?.user) {
+          const profile = await getProfile(refreshData.session.user)
+          setAndCacheAuthState({
+            user: refreshData.session.user,
+            profile,
+            loading: false,
+            initialized: true,
+          })
+        } else {
+          setAndCacheAuthState({
+            user: null,
+            profile: null,
+            loading: false,
+            initialized: true,
+          })
+        }
+      } else {
         setAndCacheAuthState({
           user: null,
           profile: null,
           loading: false,
           initialized: true,
         })
-      } else {
-        setAndCacheAuthState({
-          ...authStateCache,
-          loading: false,
-          initialized: true,
-        })
       }
     } catch (error) {
       console.error('[useAuth] Exception refreshing:', error)
+      if (hasSupabaseAuthCookieHint() && !isAbortLikeError(error)) {
+        try {
+          const { data: refreshData } = await supabase.auth.refreshSession()
+          if (refreshData.session?.user) {
+            const profile = await getProfile(refreshData.session.user)
+            setAndCacheAuthState({
+              user: refreshData.session.user,
+              profile,
+              loading: false,
+              initialized: true,
+            })
+            return
+          }
+        } catch {
+          // fall through to clear
+        }
+      }
       setAndCacheAuthState({
-        ...authStateCache,
+        user: null,
+        profile: null,
         loading: false,
         initialized: true,
       })
     }
   }, [getProfile, setAndCacheAuthState, supabase])
 
-  // Pestaña en segundo plano: Chrome pausa el autoRefresh. Al volver, renovar JWT.
+  // Sin user pero con cookie: recuperar sesión al volver a la pestaña (heartbeat cubre user activo).
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return
-      if (authState.user) {
-        void ensureFreshSession()
-      } else if (hasSupabaseAuthCookieHint()) {
+      if (!authState.user && hasSupabaseAuthCookieHint()) {
         void refresh()
       }
     }
@@ -489,6 +513,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       window.removeEventListener('focus', onVisible)
     }
   }, [authState.user, refresh])
+
+  useSessionHeartbeat(Boolean(authState.user))
 
   const hasRole = useCallback((roles: UserRole[]): boolean => {
     if (!authState.profile) return false

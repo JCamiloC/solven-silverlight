@@ -19,7 +19,7 @@ import { TicketReportWord } from '@/lib/services/ticket-report-word'
 import { TicketKpiReportPDF } from '@/lib/services/ticket-kpi-report-pdf'
 import { TicketKpiReportWord } from '@/lib/services/ticket-kpi-report-word'
 import { buildTicketKpiReportData } from '@/lib/services/ticket-kpi-report-utils'
-import { VisitReportPDF, VisitReportRow } from '@/lib/services/visit-report-pdf'
+import { VisitReportPDF, VisitReportRow, buildVisitReportRows } from '@/lib/services/visit-report-pdf'
 import { VisitReportWord } from '@/lib/services/visit-report-word'
 import { VisitDetailPDF } from '@/lib/services/visit-detail-pdf'
 import type { TicketWithRelations } from '@/lib/services/tickets'
@@ -226,34 +226,47 @@ export default function ReportsPage() {
     })
   }, [visits, filters, shouldFetchVisits])
 
+  const clientNameById = useMemo(
+    () => new Map((clients || []).map((client) => [client.id, client.name])),
+    [clients]
+  )
+
   const visitExportRows = useMemo<VisitReportRow[]>(() => {
-    const clientMap = new Map((clients || []).map((client) => [client.id, client.name]))
-
-    return visitRows.map((visit) => {
-      const technician = visit.tecnico
-        ? `${visit.tecnico.first_name || ''} ${visit.tecnico.last_name || ''}`.trim() || '-'
-        : '-'
-
-      const equipmentList =
-        visit.equipos.length > 0
-          ? visit.equipos
-              .map((equipment) => equipment.hardware?.name || equipment.hardware_nombre_manual || 'Sin especificar')
-              .join(', ')
-          : 'Sin equipo asociado'
-
-      return {
-        id: visit.id,
-        fecha: new Date(visit.fecha_visita).toLocaleDateString('es-CO'),
-        cliente: clientMap.get(visit.client_id) || 'Cliente desconocido',
-        tipo: visitTypeLabels[visit.tipo] || visit.tipo,
-        estado: visitStatusLabels[visit.estado] || visit.estado,
-        tecnico: technician,
-        equipos: equipmentList,
-        detalle: visit.detalle || '-',
-        recomendaciones: visit.recomendaciones || '-',
-      }
+    return buildVisitReportRows(visitRows, {
+      getClientName: (id) => clientNameById.get(id) || 'Cliente desconocido',
+      visitTypeLabels,
+      visitStatusLabels,
     })
-  }, [visitRows, clients])
+  }, [visitRows, clientNameById])
+
+  const visitsInReportRange = useMemo(() => {
+    return visits
+      .filter((visit) => {
+        const byClient = filters.clientId === 'all' || visit.client_id === filters.clientId
+        const byDate = inDateRange(visit.fecha_visita, filters.startDate, filters.endDate)
+        return byClient && byDate
+      })
+      .sort(
+        (a, b) => new Date(b.fecha_visita).getTime() - new Date(a.fecha_visita).getTime()
+      )
+  }, [visits, filters])
+
+  const kpiVisitExportRows = useMemo<VisitReportRow[]>(() => {
+    if (!shouldFetchKpis) return []
+    return buildVisitReportRows(visitsInReportRange, {
+      getClientName: (id) => clientNameById.get(id) || 'Cliente desconocido',
+      visitTypeLabels,
+      visitStatusLabels,
+    })
+  }, [visitsInReportRange, clientNameById, shouldFetchKpis])
+
+  const kpiVisitRowsForExport = useMemo<VisitReportRow[]>(() => {
+    return buildVisitReportRows(visitsInReportRange, {
+      getClientName: (id) => clientNameById.get(id) || 'Cliente desconocido',
+      visitTypeLabels,
+      visitStatusLabels,
+    })
+  }, [visitsInReportRange, clientNameById])
 
   const reportTitleBase =
     filters.clientId === 'all'
@@ -385,6 +398,7 @@ export default function ReportsPage() {
           startDate: filters.startDate,
           endDate: filters.endDate,
           assignedUserNames: assignedUserMap,
+          visitHistory: kpiVisitRowsForExport,
         })
       } else {
         await TicketKpiReportWord.generateReport(ticketRows, {
@@ -394,6 +408,7 @@ export default function ReportsPage() {
           startDate: filters.startDate,
           endDate: filters.endDate,
           assignedUserNames: assignedUserMap,
+          visitHistory: kpiVisitRowsForExport,
         })
       }
       toast.success(`Reporte KPI en ${format.toUpperCase()} generado`)
@@ -995,6 +1010,45 @@ export default function ReportsPage() {
                         ))}
                       </TableBody>
                     </Table>
+                  </div>
+
+                  <div className="space-y-2 pt-2">
+                    <h3 className="font-semibold text-base">Histórico de visitas</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {kpiVisitExportRows.length} visita(s) en el mismo periodo (incluidas al exportar PDF/Word).
+                    </p>
+                    {kpiVisitExportRows.length > 0 ? (
+                      <div className="rounded-md border overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>FECHA</TableHead>
+                              {filters.clientId === 'all' && <TableHead>CLIENTE</TableHead>}
+                              <TableHead>TIPO</TableHead>
+                              <TableHead>ESTADO</TableHead>
+                              <TableHead>TÉCNICO</TableHead>
+                              <TableHead className="min-w-[200px]">DETALLE</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {kpiVisitExportRows.map((row) => (
+                              <TableRow key={row.id}>
+                                <TableCell>{row.fecha}</TableCell>
+                                {filters.clientId === 'all' && <TableCell>{row.cliente}</TableCell>}
+                                <TableCell>{row.tipo}</TableCell>
+                                <TableCell>{row.estado}</TableCell>
+                                <TableCell>{row.tecnico}</TableCell>
+                                <TableCell className="whitespace-normal break-words">{row.detalle}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No hay visitas registradas en el rango seleccionado.
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>

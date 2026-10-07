@@ -6,6 +6,7 @@ import {
   formatMinutesToReadable,
 } from '@/lib/services/ticket-kpi-report-utils'
 import { getReportLogoForPdf } from '@/lib/services/report-logo'
+import type { VisitReportRow } from '@/lib/services/visit-report-pdf'
 
 interface KpiReportOptions {
   clientName: string
@@ -15,6 +16,7 @@ interface KpiReportOptions {
   startDate?: string
   endDate?: string
   assignedUserNames?: Record<string, string>
+  visitHistory?: VisitReportRow[]
 }
 
 const getReportMonthLabel = (startDate?: string, endDate?: string) => {
@@ -229,6 +231,59 @@ export class TicketKpiReportPDF {
 
       writeWrappedText('- Productividad: Durante el mes de marzo se aprovisionaron 2 equipos nuevos, 2 docking station y 2 cargadores adicionales (para la direccion ejecutiva), ademas se han programado revisiones sobre equipos, infraestructura general y copias de seguridad en el servidor de aplicaciones, asi como ajustes en las politicas de dominio, para un total de 10 atenciones en sitio. Como ultimo anexo, se programaron 4 visitas al domicilio del director ejecutivo para la instalacion de 2 Access Point como solucion de red y la entrega de un equipo para uso personal junto con su respectivo docking.', margin, maxWidth)
       yPos += 8
+
+      const visitHistory = options.visitHistory || []
+      ensureSpace(24)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(41, 128, 185)
+      doc.setFontSize(12)
+      doc.text('Historico de visitas', margin, yPos)
+      yPos += 4
+      doc.setTextColor(0, 0, 0)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+
+      if (visitHistory.length === 0) {
+        ensureSpace(8)
+        doc.text('No se registraron visitas en el periodo seleccionado.', margin, yPos)
+        yPos += 8
+      } else {
+        const includeClient = Boolean(options.isGeneralReport)
+        const head = includeClient
+          ? ['FECHA', 'CLIENTE', 'TIPO', 'ESTADO', 'TECNICO', 'DETALLE']
+          : ['FECHA', 'TIPO', 'ESTADO', 'TECNICO', 'EQUIPOS', 'DETALLE']
+        const body = visitHistory.map((row) =>
+          includeClient
+            ? [row.fecha, row.cliente, row.tipo, row.estado, row.tecnico, row.detalle]
+            : [row.fecha, row.tipo, row.estado, row.tecnico, row.equipos, row.detalle]
+        )
+
+        autoTable(doc, {
+          startY: yPos,
+          head: [head],
+          body,
+          theme: 'striped',
+          headStyles: {
+            fillColor: [41, 128, 185],
+            textColor: 255,
+            fontSize: 7,
+            fontStyle: 'bold',
+          },
+          bodyStyles: {
+            fontSize: 7,
+            overflow: 'linebreak',
+            cellPadding: 2,
+          },
+          styles: {
+            overflow: 'linebreak',
+            valign: 'middle',
+          },
+          margin: { left: margin, right: margin },
+        })
+
+        yPos = (doc as any).lastAutoTable?.finalY || yPos + 20
+        yPos += 8
+      }
 
       ensureSpace(12)
       doc.setFont('helvetica', 'bold')

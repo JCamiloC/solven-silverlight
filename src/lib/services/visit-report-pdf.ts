@@ -1,6 +1,7 @@
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { getReportLogoForPdf } from '@/lib/services/report-logo'
+import type { ClientVisit } from '@/types'
 
 export interface VisitReportRow {
   id: string
@@ -12,6 +13,43 @@ export interface VisitReportRow {
   equipos: string
   detalle: string
   recomendaciones: string
+}
+
+export function buildVisitReportRows(
+  visits: ClientVisit[],
+  options: {
+    getClientName: (clientId: string) => string
+    visitTypeLabels: Record<string, string>
+    visitStatusLabels: Record<string, string>
+  }
+): VisitReportRow[] {
+  return visits.map((visit) => {
+    const technician = visit.tecnico
+      ? `${visit.tecnico.first_name || ''} ${visit.tecnico.last_name || ''}`.trim() || '-'
+      : '-'
+
+    const equipmentList =
+      visit.equipos.length > 0
+        ? visit.equipos
+            .map(
+              (equipment) =>
+                equipment.hardware?.name || equipment.hardware_nombre_manual || 'Sin especificar'
+            )
+            .join(', ')
+        : 'Sin equipo asociado'
+
+    return {
+      id: visit.id,
+      fecha: new Date(visit.fecha_visita).toLocaleDateString('es-CO'),
+      cliente: options.getClientName(visit.client_id),
+      tipo: options.visitTypeLabels[visit.tipo] || visit.tipo,
+      estado: options.visitStatusLabels[visit.estado] || visit.estado,
+      tecnico: technician,
+      equipos: equipmentList,
+      detalle: visit.detalle || '-',
+      recomendaciones: visit.recomendaciones || '-',
+    }
+  })
 }
 
 export class VisitReportPDF {

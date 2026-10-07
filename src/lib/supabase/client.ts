@@ -84,31 +84,13 @@ export function createClient() {
         const isAuth = isAuthRequest(requestUrl)
         const timeoutMs = isAuth ? AUTH_FETCH_TIMEOUT_MS : resolveTimeoutMs(requestUrl, options)
 
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => {
-          controller.abort(new Error(`Request timeout after ${timeoutMs}ms`))
-        }, timeoutMs)
-
         const externalSignal = options.signal
-        if (externalSignal) {
-          if (externalSignal.aborted) {
-            clearTimeout(timeoutId)
-            const reason = externalSignal.reason
-            return Promise.reject(
-              reason instanceof Error
-                ? reason
-                : new DOMException('The operation was aborted.', 'AbortError')
-            )
-          }
-          externalSignal.addEventListener(
-            'abort',
-            () => {
-              controller.abort(
-                externalSignal.reason ??
-                  new DOMException('The operation was aborted.', 'AbortError')
-              )
-            },
-            { once: true }
+        if (externalSignal?.aborted) {
+          const reason = externalSignal.reason
+          return Promise.reject(
+            reason instanceof Error
+              ? reason
+              : new DOMException('The operation was aborted.', 'AbortError')
           )
         }
 
@@ -116,10 +98,49 @@ export function createClient() {
           beginSessionRequest()
         }
 
-        return fetch(url, {
-          ...options,
-          signal: controller.signal,
-        })
+        const runAttempt = async (allow401Retry: boolean): Promise<Response> => {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => {
+            controller.abort(new Error(`Request timeout after ${timeoutMs}ms`))
+          }, timeoutMs)
+
+          if (externalSignal) {
+            externalSignal.addEventListener(
+              'abort',
+              () => {
+                controller.abort(
+                  externalSignal.reason ??
+                    new DOMException('The operation was aborted.', 'AbortError')
+                )
+              },
+              { once: true }
+            )
+          }
+
+          try {
+            const response = await fetch(url, {
+              ...options,
+              signal: controller.signal,
+            })
+
+            if (
+              allow401Retry &&
+              response.status === 401 &&
+              isSupabaseRequest &&
+              !isAuth
+            ) {
+              const { ensureFreshSession } = await import('@/lib/auth/ensure-fresh-session')
+              const ok = await ensureFreshSession()
+              if (ok) return runAttempt(false)
+            }
+
+            return response
+          } finally {
+            clearTimeout(timeoutId)
+          }
+        }
+
+        return runAttempt(true)
           .catch((error) => {
             if (externalSignal?.aborted) {
               throw error
@@ -127,7 +148,6 @@ export function createClient() {
             throw toQueryError(error)
           })
           .finally(() => {
-            clearTimeout(timeoutId)
             if (isSupabaseRequest && !isAuth) {
               endSessionRequest()
             }
