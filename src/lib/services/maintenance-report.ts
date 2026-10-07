@@ -266,11 +266,6 @@ export class MaintenanceReportService {
           doc.internal.pageSize.getHeight() - 10,
           { align: 'right' }
         )
-        doc.text(
-          `Generado: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`,
-          margin,
-          doc.internal.pageSize.getHeight() - 10
-        )
       }
 
       // Descargar PDF

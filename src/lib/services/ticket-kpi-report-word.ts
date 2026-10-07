@@ -131,11 +131,6 @@ export class TicketKpiReportWord {
               new Paragraph({
                 text: 'REPORTE DE KPIS',
                 alignment: AlignmentType.CENTER,
-                spacing: { after: 120 },
-              }),
-              new Paragraph({
-                text: `Generado: ${format(new Date(), "d 'de' MMMM 'de' yyyy", { locale: es })}`,
-                alignment: AlignmentType.CENTER,
                 spacing: { after: 240 },
               }),
               new Paragraph({ text: `Bogota, ${format(new Date(), "d 'de' MMMM 'de' yyyy", { locale: es })}` }),

@@ -68,12 +68,9 @@ export class VisitDetailPDF {
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(11)
     doc.text(clientName, pageWidth / 2, 21, { align: 'center' })
-    doc.text(`Generado: ${format(new Date(), "dd 'de' MMMM yyyy, HH:mm", { locale: es })}`, pageWidth / 2, 28, {
-      align: 'center',
-    })
 
     doc.setTextColor(0, 0, 0)
-    yPos = 45
+    yPos = 40
 
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(13)

@@ -100,11 +100,6 @@ export class VisitReportWord {
             new Paragraph({
               text: subtitle,
               alignment: AlignmentType.CENTER,
-              spacing: { after: 100 },
-            }),
-            new Paragraph({
-              text: `Generado: ${format(new Date(), "dd 'de' MMMM yyyy, HH:mm", { locale: es })}`,
-              alignment: AlignmentType.CENTER,
               spacing: { after: 250 },
             }),
             new Table({

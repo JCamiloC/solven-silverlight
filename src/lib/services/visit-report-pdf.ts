@@ -88,7 +88,6 @@ export class VisitReportPDF {
     doc.setFont('helvetica', 'normal')
     const subtitle = reportPeriodLabel ? `${title} - ${reportPeriodLabel}` : title
     doc.text(subtitle, pageWidth / 2, logoHeight + 30, { align: 'center' })
-    doc.text(`Generado: ${format(new Date(), "dd 'de' MMMM yyyy, HH:mm", { locale: es })}`, pageWidth / 2, logoHeight + 36, { align: 'center' })
 
     const body = rows.map((row) => [
       row.fecha,

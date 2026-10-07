@@ -72,11 +72,8 @@ export class TicketDetailPDF {
       doc.setFontSize(12)
       doc.text(clientName, 105, 38, { align: 'center' })
 
-      doc.setFontSize(9)
-      doc.text(`Generado: ${format(new Date(), "dd 'de' MMMM yyyy, HH:mm", { locale: es })}`, 105, 45, { align: 'center' })
-
       doc.setTextColor(0, 0, 0)
-      yPos = 60
+      yPos = 52
 
       // ==========================================
       // INFORMACIÓN DEL TICKET

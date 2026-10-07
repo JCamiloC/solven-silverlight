@@ -87,9 +87,6 @@ export class TicketKpiReportPDF {
       doc.text('REPORTE DE KPIS', pageWidth / 2, logoHeight + 24, { align: 'center' })
       yPos += 8
 
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(10)
-      doc.text(`Generado: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, pageWidth / 2, logoHeight + 30, { align: 'center' })
       doc.setTextColor(0, 0, 0)
       yPos = 64
 

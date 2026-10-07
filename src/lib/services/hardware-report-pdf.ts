@@ -70,11 +70,8 @@ export class HardwareReportPDF {
       doc.setFont('helvetica', 'normal')
       doc.text(clientName, 105, 28, { align: 'center' })
 
-      doc.setFontSize(10)
-      doc.text(`Generado: ${format(new Date(), "dd 'de' MMMM yyyy, HH:mm", { locale: es })}`, 105, 35, { align: 'center' })
-
       doc.setTextColor(0, 0, 0)
-      yPos = 50
+      yPos = 45
 
       // ==========================================
       // MÉTRICAS PRINCIPALES
