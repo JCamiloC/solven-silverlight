@@ -43,7 +43,7 @@ export class TicketReportPDF {
 
       const logo = await getReportLogoForPdf(38)
       const logoHeight = logo?.height || 0
-      const headerHeight = 48
+      const headerHeight = 52
       const contentTop = headerHeight + 10
       const titleBase = isGeneralReport ? 'Reporte General' : clientName
       const subtitle = reportPeriodLabel ? `${titleBase} - ${reportPeriodLabel}` : titleBase
@@ -361,14 +361,15 @@ export class TicketReportPDF {
       doc.addImage(logo.dataUrl, 'PNG', 10, 8, logo.width, logo.height)
     }
 
+    const textX = pageWidth / 2
     doc.setTextColor(255, 255, 255)
-    doc.setFontSize(22)
+    doc.setFontSize(20)
     doc.setFont('helvetica', 'bold')
-    doc.text(mainTitle, pageWidth / 2, Math.max(logoHeight + 18, 22), { align: 'center' })
+    doc.text(mainTitle, textX, 30, { align: 'center' })
 
-    doc.setFontSize(12)
+    doc.setFontSize(11)
     doc.setFont('helvetica', 'normal')
-    doc.text(subtitle, pageWidth / 2, Math.max(logoHeight + 28, 32), { align: 'center' })
+    doc.text(subtitle, textX, 42, { align: 'center' })
   }
 
   /**

@@ -4,7 +4,6 @@ import { saveAs } from 'file-saver'
 import {
   AlignmentType,
   Document,
-  HeadingLevel,
   ImageRun,
   Packer,
   Paragraph,
@@ -122,16 +121,43 @@ export class TicketReportWord {
                     }),
                   ]
                 : []),
-              new Paragraph({
-                text: mainTitle,
-                heading: HeadingLevel.HEADING_1,
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 80 },
-              }),
-              new Paragraph({
-                text: subtitle,
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 280 },
+              new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [
+                  new TableRow({
+                    children: [
+                      new TableCell({
+                        shading: { fill: '2980B9', type: ShadingType.CLEAR },
+                        columnSpan: 1,
+                        children: [
+                          new Paragraph({
+                            alignment: AlignmentType.CENTER,
+                            spacing: { before: 120, after: 80 },
+                            children: [
+                              new TextRun({
+                                text: mainTitle,
+                                bold: true,
+                                size: 32,
+                                color: 'FFFFFF',
+                              }),
+                            ],
+                          }),
+                          new Paragraph({
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 120 },
+                            children: [
+                              new TextRun({
+                                text: subtitle,
+                                size: 22,
+                                color: 'FFFFFF',
+                              }),
+                            ],
+                          }),
+                        ],
+                      }),
+                    ],
+                  }),
+                ],
               }),
               new Paragraph({
                 children: [new TextRun({ text: 'MÉTRICAS PRINCIPALES', bold: true, color: '2980B9' })],
