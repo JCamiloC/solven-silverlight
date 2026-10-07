@@ -4,10 +4,10 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import { usePathname } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { hasSupabaseAuthCookieHint } from '@/lib/auth/auth-cookie'
 import {
   ensureSessionBeforeMutation,
   isLikelySessionError,
+  resetSessionEnsureDedupe,
   SESSION_RETRY_SAVE_MSG,
   SESSION_VERIFY_SLOW_MSG,
 } from '@/lib/auth/mutation-session-guard'
@@ -91,16 +91,17 @@ export function InteractionLockProvider({ children }: { children: ReactNode }) {
       ...options,
       message: options?.message || DEFAULT_MESSAGE,
     })
-    const shouldCheckSession =
-      options?.requireSession !== false && hasSupabaseAuthCookieHint()
+    const shouldCheckSession = options?.requireSession !== false
     try {
       if (shouldCheckSession) {
         try {
           const sessionOk = await ensureSessionBeforeMutation()
           if (!sessionOk) {
+            resetSessionEnsureDedupe()
             throw new Error(SESSION_RETRY_SAVE_MSG)
           }
         } catch (error) {
+          resetSessionEnsureDedupe()
           if (error instanceof Error && error.message === SESSION_VERIFY_SLOW_MSG) {
             toast.error(SESSION_VERIFY_SLOW_MSG)
           }

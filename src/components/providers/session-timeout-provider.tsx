@@ -3,6 +3,7 @@
 import { createContext, useContext, ReactNode, useMemo } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { useSessionTimeout } from '@/hooks/use-session-timeout'
+import { useSessionResumeCheck } from '@/hooks/use-session-resume-check'
 import { SessionWarningDialog } from '@/components/auth/session-warning-dialog'
 import { getSessionTimeoutMinutes, SESSION_CONFIG } from '@/lib/session-config'
 
@@ -29,6 +30,8 @@ export function SessionTimeoutProvider({
     [profile?.role]
   )
 
+  const sessionActive = enabled && !!user
+
   const {
     resetTimeout,
     forceLogout,
@@ -38,8 +41,10 @@ export function SessionTimeoutProvider({
   } = useSessionTimeout({
     timeoutMinutes,
     warningMinutes: SESSION_CONFIG.WARNING_MINUTES,
-    enabled: enabled && !!user,
+    enabled: sessionActive,
   })
+
+  useSessionResumeCheck(sessionActive)
 
   return (
     <SessionTimeoutContext.Provider value={{ resetTimeout, forceLogout }}>

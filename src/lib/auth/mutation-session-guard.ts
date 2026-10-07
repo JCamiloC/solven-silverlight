@@ -1,5 +1,4 @@
-import { hasSupabaseAuthCookieHint } from '@/lib/auth/auth-cookie'
-import { ensureSessionForSave } from '@/lib/auth/ensure-fresh-session'
+import { ensureSessionForSave, validateSessionUsable } from '@/lib/auth/ensure-fresh-session'
 
 /** Mostrar solo si fallaron todos los reintentos automáticos de refresh. */
 export const SESSION_RETRY_SAVE_MSG =
@@ -11,10 +10,15 @@ export const SESSION_VERIFY_SLOW_MSG =
 /** @deprecated usar SESSION_RETRY_SAVE_MSG */
 export const SESSION_EXPIRED_MUTATION_MSG = SESSION_RETRY_SAVE_MSG
 
-const ENSURE_SESSION_RACE_MS = 28_000
-const ENSURE_DEDUPE_MS = 8_000
+const ENSURE_SESSION_RACE_MS = 35_000
+/** Evita doble ensure lock + MutationCache en el mismo guardado. */
+const ENSURE_DEDUPE_MS = 2_500
 
 let lastSuccessfulEnsureAt = 0
+
+export function resetSessionEnsureDedupe() {
+  lastSuccessfulEnsureAt = 0
+}
 
 export function isLikelySessionError(error: unknown): boolean {
   if (!error) return false
@@ -32,6 +36,7 @@ export function isLikelySessionError(error: unknown): boolean {
     lower.includes('sesión') ||
     lower.includes('not authenticated') ||
     lower.includes('invalid claim') ||
+    lower.includes('refresh token') ||
     (typeof error === 'object' &&
       error !== null &&
       'status' in error &&
@@ -44,10 +49,9 @@ export function isLikelySessionError(error: unknown): boolean {
  */
 export async function ensureSessionBeforeMutation(): Promise<boolean> {
   if (typeof window === 'undefined') return true
-  if (!hasSupabaseAuthCookieHint()) return true
 
   if (Date.now() - lastSuccessfulEnsureAt < ENSURE_DEDUPE_MS) {
-    return true
+    return validateSessionUsable()
   }
 
   try {
@@ -60,9 +64,12 @@ export async function ensureSessionBeforeMutation(): Promise<boolean> {
 
     if (ok) {
       lastSuccessfulEnsureAt = Date.now()
+    } else {
+      resetSessionEnsureDedupe()
     }
     return ok
   } catch (error) {
+    resetSessionEnsureDedupe()
     if (error instanceof Error && error.message === SESSION_VERIFY_SLOW_MSG) {
       throw error
     }

@@ -129,8 +129,8 @@ export function createClient() {
               isSupabaseRequest &&
               !isAuth
             ) {
-              const { ensureFreshSession } = await import('@/lib/auth/ensure-fresh-session')
-              const ok = await ensureFreshSession()
+              const { ensureSessionForSave } = await import('@/lib/auth/ensure-fresh-session')
+              const ok = await ensureSessionForSave()
               if (ok) return runAttempt(false)
             }
 

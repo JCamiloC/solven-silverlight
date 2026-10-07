@@ -10,6 +10,7 @@ const SAVE_REFRESH_ATTEMPTS = 3
 
 let inFlight: Promise<boolean> | null = null
 let inFlightStartedAt = 0
+let refreshInFlight: Promise<boolean> | null = null
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -44,12 +45,49 @@ function notifySessionRefreshed() {
   window.dispatchEvent(new CustomEvent('solven:session-refreshed'))
 }
 
-async function tryRefreshSession(): Promise<boolean> {
+/** Valida contra Auth (no solo getSession en memoria). */
+export async function validateSessionUsable(): Promise<boolean> {
   const supabase = createClient()
-  const { data, error } = await withTimeout(supabase.auth.refreshSession(), SESSION_CHECK_TIMEOUT_MS)
-  const ok = Boolean(data.session?.access_token) && !error
-  if (ok) notifySessionRefreshed()
-  return ok
+  try {
+    const {
+      data: { user },
+      error,
+    } = await withTimeout(supabase.auth.getUser(), SESSION_CHECK_TIMEOUT_MS)
+    return Boolean(user?.id) && !error
+  } catch {
+    return false
+  }
+}
+
+async function tryRefreshSession(): Promise<boolean> {
+  if (refreshInFlight) {
+    return refreshInFlight
+  }
+
+  refreshInFlight = (async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await withTimeout(
+        supabase.auth.refreshSession(),
+        SESSION_CHECK_TIMEOUT_MS
+      )
+      if (error || !data.session?.access_token) {
+        return false
+      }
+
+      const valid = await validateSessionUsable()
+      if (valid) {
+        notifySessionRefreshed()
+      }
+      return valid
+    } catch {
+      return false
+    } finally {
+      refreshInFlight = null
+    }
+  })()
+
+  return refreshInFlight
 }
 
 /**
@@ -72,31 +110,43 @@ export async function ensureFreshSession(): Promise<boolean> {
 
       if (!error && session?.access_token) {
         const expiresIn = (session.expires_at ?? 0) - Math.floor(Date.now() / 1000)
-        if (expiresIn > REFRESH_IF_EXPIRES_IN_SECONDS) return true
+        if (expiresIn > REFRESH_IF_EXPIRES_IN_SECONDS) {
+          return validateSessionUsable()
+        }
 
         try {
           const refreshed = await tryRefreshSession()
           if (refreshed) return true
         } catch {
-          // refresh falló; solo confiar en token si aún no venció
+          // refresh falló; validar si el access token sigue aceptado
         }
-        return expiresIn > 15
+
+        if (expiresIn > 15) {
+          return validateSessionUsable()
+        }
+        return false
+      }
+
+      try {
+        const refreshed = await tryRefreshSession()
+        if (refreshed) return true
+      } catch {
+        // siguiente fallback
       }
 
       if (hasSupabaseAuthCookieHint()) {
         return tryRefreshSession()
       }
 
-      return false
+      return validateSessionUsable()
     } catch {
-      if (hasSupabaseAuthCookieHint()) {
-        try {
-          return await tryRefreshSession()
-        } catch {
-          return false
-        }
+      try {
+        const refreshed = await tryRefreshSession()
+        if (refreshed) return true
+      } catch {
+        return false
       }
-      return false
+      return validateSessionUsable()
     }
   })()
 
@@ -112,13 +162,12 @@ export async function ensureFreshSession(): Promise<boolean> {
  */
 export async function ensureSessionForSave(): Promise<boolean> {
   if (typeof window === 'undefined') return true
-  if (!hasSupabaseAuthCookieHint()) return true
 
   abortStaleSessionCheck()
 
   for (let attempt = 0; attempt < SAVE_REFRESH_ATTEMPTS; attempt++) {
     if (attempt > 0) {
-      await sleep(350 * attempt)
+      await sleep(400 * attempt)
       abortStaleSessionCheck()
     }
 
@@ -137,5 +186,5 @@ export async function ensureSessionForSave(): Promise<boolean> {
     }
   }
 
-  return false
+  return validateSessionUsable()
 }

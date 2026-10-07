@@ -41,7 +41,7 @@ import {
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 
-type ReportType = 'mantenimiento' | 'tickets' | 'visitas' | 'kpis' | null
+type ReportType = 'mantenimiento' | 'tickets' | 'visitas' | 'tickets_visitas' | 'kpis' | null
 
 interface SharedReportFilters {
   clientId: string
@@ -150,6 +150,7 @@ export default function ReportsPage() {
   const [isExportingVisits, setIsExportingVisits] = useState(false)
   const [isExportingVisitDetail, setIsExportingVisitDetail] = useState(false)
   const [isExportingKpis, setIsExportingKpis] = useState(false)
+  const [isExportingTicketsVisits, setIsExportingTicketsVisits] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailType, setDetailType] = useState<ReportType>(null)
   const [selectedMaintenanceRow, setSelectedMaintenanceRow] = useState<MaintenanceReportRow | null>(null)
@@ -167,6 +168,7 @@ export default function ReportsPage() {
   const [shouldFetchTickets, setShouldFetchTickets] = useState(false)
   const [shouldFetchVisits, setShouldFetchVisits] = useState(false)
   const [shouldFetchKpis, setShouldFetchKpis] = useState(false)
+  const [shouldFetchTicketsVisits, setShouldFetchTicketsVisits] = useState(false)
 
   const { data: clients } = useClients()
   const { data: tickets = [], isLoading: ticketsLoading } = useTickets()
@@ -194,14 +196,16 @@ export default function ReportsPage() {
   const selectedClient = clients?.find((c) => c.id === filters.clientId)
 
   const ticketRows = useMemo(() => {
-    if (!shouldFetchTickets && !shouldFetchKpis) return [] as TicketWithRelations[]
+    if (!shouldFetchTickets && !shouldFetchKpis && !shouldFetchTicketsVisits) {
+      return [] as TicketWithRelations[]
+    }
 
     return tickets.filter((ticket) => {
       const byClient = filters.clientId === 'all' || ticket.client_id === filters.clientId
       const byDate = inDateRange(ticket.created_at, filters.startDate, filters.endDate)
       return byClient && byDate
     })
-  }, [tickets, filters, shouldFetchTickets, shouldFetchKpis])
+  }, [tickets, filters, shouldFetchTickets, shouldFetchKpis, shouldFetchTicketsVisits])
 
   const assignedUserMap = useMemo(() => {
     return assignableUsers.reduce<Record<string, string>>((acc, user) => {
@@ -217,14 +221,14 @@ export default function ReportsPage() {
   }, [ticketRows, assignedUserMap, shouldFetchKpis])
 
   const visitRows = useMemo(() => {
-    if (!shouldFetchVisits) return [] as typeof visits
+    if (!shouldFetchVisits && !shouldFetchTicketsVisits) return [] as typeof visits
 
     return visits.filter((visit) => {
       const byClient = filters.clientId === 'all' || visit.client_id === filters.clientId
       const byDate = inDateRange(visit.fecha_visita, filters.startDate, filters.endDate)
       return byClient && byDate
     })
-  }, [visits, filters, shouldFetchVisits])
+  }, [visits, filters, shouldFetchVisits, shouldFetchTicketsVisits])
 
   const clientNameById = useMemo(
     () => new Map((clients || []).map((client) => [client.id, client.name])),
@@ -279,6 +283,7 @@ export default function ReportsPage() {
     setShouldFetchTickets(false)
     setShouldFetchVisits(false)
     setShouldFetchKpis(false)
+    setShouldFetchTicketsVisits(false)
   }
 
   const handleGenerateReport = () => {
@@ -298,6 +303,11 @@ export default function ReportsPage() {
 
     if (selectedReport === 'visitas') {
       setShouldFetchVisits(true)
+      return
+    }
+
+    if (selectedReport === 'tickets_visitas') {
+      setShouldFetchTicketsVisits(true)
       return
     }
 
@@ -374,6 +384,46 @@ export default function ReportsPage() {
       toast.error('No se pudo exportar el reporte de visitas')
     } finally {
       setIsExportingVisits(false)
+    }
+  }
+
+  const handleExportTicketsVisitsReport = async (format: 'pdf' | 'word') => {
+    if (!ticketRows.length && !visitExportRows.length) {
+      toast.error('No hay tickets ni visitas para exportar en el periodo')
+      return
+    }
+
+    setIsExportingTicketsVisits(true)
+    const periodSlug = getPeriodSlug(filters)
+    const periodLabel = getPeriodLabel(filters)
+    const isGeneral = filters.clientId === 'all'
+
+    try {
+      if (format === 'pdf') {
+        await TicketReportPDF.generateReport(
+          ticketRows,
+          reportTitleBase,
+          isGeneral,
+          periodSlug,
+          periodLabel,
+          visitExportRows
+        )
+      } else {
+        await TicketReportWord.generateReport(
+          ticketRows,
+          reportTitleBase,
+          isGeneral,
+          periodSlug,
+          periodLabel,
+          visitExportRows
+        )
+      }
+      toast.success(`Reporte de tickets y visitas en ${format.toUpperCase()} generado`)
+    } catch (error) {
+      console.error('Error exportando reporte conjunto:', error)
+      toast.error('No se pudo exportar el reporte de tickets y visitas')
+    } finally {
+      setIsExportingTicketsVisits(false)
     }
   }
 
@@ -478,7 +528,7 @@ export default function ReportsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
               <Card 
                 className={`cursor-pointer transition-all hover:shadow-md ${selectedReport === 'mantenimiento' ? 'ring-2 ring-primary' : ''}`}
                 onClick={() => {
@@ -528,6 +578,24 @@ export default function ReportsPage() {
                     <h3 className="font-semibold text-lg">Reporte de Visitas</h3>
                     <p className="text-sm text-muted-foreground">
                       Seguimiento de visitas técnicas por cliente y periodo
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card
+                className={`cursor-pointer transition-all hover:shadow-md ${selectedReport === 'tickets_visitas' ? 'ring-2 ring-primary' : ''}`}
+                onClick={() => {
+                  setSelectedReport('tickets_visitas')
+                  setShouldFetchTicketsVisits(false)
+                }}
+              >
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center text-center space-y-2">
+                    <FileText className="h-12 w-12 text-primary" />
+                    <h3 className="font-semibold text-lg">Tickets y Visitas</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Un solo informe con listado de tickets y visitas del periodo
                     </p>
                   </div>
                 </CardContent>
@@ -731,6 +799,41 @@ export default function ReportsPage() {
                         disabled={isExportingVisits || visitExportRows.length === 0}
                       >
                         {isExportingVisits ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileText className="mr-2 h-4 w-4" />
+                        )}
+                        Exportar PDF
+                      </Button>
+                    </>
+                  )}
+
+                  {selectedReport === 'tickets_visitas' && shouldFetchTicketsVisits && (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleExportTicketsVisitsReport('word')}
+                        disabled={
+                          isExportingTicketsVisits ||
+                          (ticketRows.length === 0 && visitExportRows.length === 0)
+                        }
+                      >
+                        {isExportingTicketsVisits ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileText className="mr-2 h-4 w-4" />
+                        )}
+                        Exportar Word
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleExportTicketsVisitsReport('pdf')}
+                        disabled={
+                          isExportingTicketsVisits ||
+                          (ticketRows.length === 0 && visitExportRows.length === 0)
+                        }
+                      >
+                        {isExportingTicketsVisits ? (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         ) : (
                           <FileText className="mr-2 h-4 w-4" />
@@ -972,6 +1075,122 @@ export default function ReportsPage() {
               </Card>
             )}
 
+            {selectedReport === 'tickets_visitas' &&
+              shouldFetchTicketsVisits &&
+              (ticketRows.length > 0 || visitRows.length > 0) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Resultados del Reporte</CardTitle>
+                  <CardDescription>
+                    {ticketRows.length} ticket(s) y {visitRows.length} visita(s) entre {filters.startDate} y{' '}
+                    {filters.endDate}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-8">
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-base">Tickets</h3>
+                    {ticketRows.length > 0 ? (
+                      <div className="rounded-md border overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>ID</TableHead>
+                              <TableHead>Cliente</TableHead>
+                              <TableHead className="min-w-[240px]">Título</TableHead>
+                              <TableHead>Prioridad</TableHead>
+                              <TableHead>Estado</TableHead>
+                              <TableHead>Responsable</TableHead>
+                              <TableHead>Fecha</TableHead>
+                              <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {ticketRows.map((ticket) => {
+                              const clientName =
+                                clients?.find((client) => client.id === ticket.client_id)?.name || 'N/A'
+
+                              return (
+                                <TableRow key={ticket.id}>
+                                  <TableCell>{ticket.ticket_number || `#${ticket.id.slice(-8)}`}</TableCell>
+                                  <TableCell>{clientName}</TableCell>
+                                  <TableCell className="max-w-[280px] whitespace-normal break-words" title={ticket.title}>
+                                    {ticket.title}
+                                  </TableCell>
+                                  <TableCell>{priorityLabels[ticket.priority] || ticket.priority}</TableCell>
+                                  <TableCell>{statusLabels[ticket.status as string] || ticket.status}</TableCell>
+                                  <TableCell>{getAssignedUserName(ticket.assigned_to)}</TableCell>
+                                  <TableCell>{new Date(ticket.created_at).toLocaleDateString('es-CO')}</TableCell>
+                                  <TableCell className="text-right">
+                                    <Button variant="ghost" size="sm" onClick={() => openTicketDetail(ticket)}>
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      Ver detalle
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No hay tickets en el rango seleccionado.</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-base">Visitas</h3>
+                    {visitRows.length > 0 ? (
+                      <div className="rounded-md border overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Fecha</TableHead>
+                              <TableHead>Cliente</TableHead>
+                              <TableHead>Tipo</TableHead>
+                              <TableHead>Estado</TableHead>
+                              <TableHead>Técnico</TableHead>
+                              <TableHead className="min-w-[220px]">Detalle</TableHead>
+                              <TableHead className="text-right whitespace-nowrap">Acciones</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {visitRows.map((visit) => {
+                              const clientName =
+                                clients?.find((client) => client.id === visit.client_id)?.name || 'N/A'
+                              const technician = visit.tecnico
+                                ? `${visit.tecnico.first_name || ''} ${visit.tecnico.last_name || ''}`.trim() || '-'
+                                : '-'
+
+                              return (
+                                <TableRow key={visit.id}>
+                                  <TableCell>{new Date(visit.fecha_visita).toLocaleDateString('es-CO')}</TableCell>
+                                  <TableCell>{clientName}</TableCell>
+                                  <TableCell>{visitTypeLabels[visit.tipo] || visit.tipo}</TableCell>
+                                  <TableCell>{visitStatusLabels[visit.estado] || visit.estado}</TableCell>
+                                  <TableCell>{technician}</TableCell>
+                                  <TableCell className="max-w-[260px] whitespace-normal break-words" title={visit.detalle}>
+                                    {visit.detalle}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button variant="ghost" size="sm" onClick={() => openVisitDetail(visit)}>
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      Ver detalle
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No hay visitas en el rango seleccionado.</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {selectedReport === 'kpis' && shouldFetchKpis && kpiReportData && kpiReportData.rows.length > 0 && (
               <Card>
                 <CardHeader>
@@ -1084,6 +1303,21 @@ export default function ReportsPage() {
                 <CardContent className="py-10">
                   <div className="text-center text-muted-foreground">
                     <p>No se encontraron visitas en el rango de fechas seleccionado.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {selectedReport === 'tickets_visitas' &&
+              shouldFetchTicketsVisits &&
+              ticketRows.length === 0 &&
+              visitRows.length === 0 &&
+              !ticketsLoading &&
+              !visitsLoading && (
+              <Card>
+                <CardContent className="py-10">
+                  <div className="text-center text-muted-foreground">
+                    <p>No se encontraron tickets ni visitas en el rango de fechas seleccionado.</p>
                   </div>
                 </CardContent>
               </Card>

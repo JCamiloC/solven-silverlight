@@ -7,6 +7,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { TicketWithRelations } from '@/lib/services/tickets'
 import { getReportLogoForPdf } from '@/lib/services/report-logo'
+import type { VisitReportRow } from '@/lib/services/visit-report-pdf'
 
 export class TicketReportPDF {
   /**
@@ -17,8 +18,10 @@ export class TicketReportPDF {
     clientName: string,
     isGeneralReport: boolean = false,
     reportPeriodSlug?: string,
-    reportPeriodLabel?: string
+    reportPeriodLabel?: string,
+    visitRows?: VisitReportRow[]
   ): Promise<void> {
+    const isCombined = visitRows !== undefined
     try {
       // Importar jsPDF
       const jsPDFModule = await import('jspdf')
@@ -34,43 +37,20 @@ export class TicketReportPDF {
       const pageHeight = doc.internal.pageSize.height
       const pageWidth = doc.internal.pageSize.width
       const margin = 15
-      const maxWidth = 180
 
       // Calcular estadísticas
       const stats = this.calculateStats(tickets)
 
-      // ==========================================
-      // ENCABEZADO PRINCIPAL
-      // ==========================================
       const logo = await getReportLogoForPdf(38)
       const logoHeight = logo?.height || 0
-      const headerHeight = 54
-
-      doc.setFillColor(41, 128, 185)
-      doc.rect(0, 0, pageWidth, headerHeight, 'F')
-
-      if (logo) {
-        doc.setFillColor(255, 255, 255)
-        doc.roundedRect(8, 6, logo.width + 4, logo.height + 4, 2, 2, 'F')
-        doc.addImage(logo.dataUrl, 'PNG', 10, 8, logo.width, logo.height)
-      }
-      
-      doc.setTextColor(255, 255, 255)
-      doc.setFontSize(26)
-      doc.setFont('helvetica', 'bold')
-      doc.text('REPORTE DE TICKETS', pageWidth / 2, logoHeight + 24, { align: 'center' })
-      
-      doc.setFontSize(14)
-      doc.setFont('helvetica', 'normal')
+      const headerHeight = 48
+      const contentTop = headerHeight + 10
       const titleBase = isGeneralReport ? 'Reporte General' : clientName
-      const title = reportPeriodLabel ? `${titleBase} - ${reportPeriodLabel}` : titleBase
-      doc.text(title, pageWidth / 2, logoHeight + 32, { align: 'center' })
-
-      doc.setFontSize(10)
-      doc.text(`Generado: ${format(new Date(), "dd 'de' MMMM yyyy, HH:mm", { locale: es })}`, pageWidth / 2, logoHeight + 38, { align: 'center' })
+      const subtitle = reportPeriodLabel ? `${titleBase} - ${reportPeriodLabel}` : titleBase
+      const mainTitle = isCombined ? 'REPORTE DE TICKETS Y VISITAS' : 'REPORTE DE TICKETS'
 
       doc.setTextColor(0, 0, 0)
-      yPos = headerHeight + 10
+      yPos = contentTop
 
       // ==========================================
       // MÉTRICAS PRINCIPALES
@@ -126,7 +106,7 @@ export class TicketReportPDF {
       const checkNewPage = (neededSpace: number) => {
         if (yPos + neededSpace > pageHeight - 20) {
           doc.addPage()
-          yPos = 20
+          yPos = contentTop
           return true
         }
         return false
@@ -156,7 +136,9 @@ export class TicketReportPDF {
         doc.setTextColor(0, 0, 0)
         doc.setFontSize(10)
         doc.setFont('helvetica', 'normal')
-        doc.text(`${item.label}: ${item.value} (${((item.value / stats.total) * 100).toFixed(1)}%)`, margin + 15, yPos + 4)
+        const priorityPct =
+          stats.total > 0 ? ((item.value / stats.total) * 100).toFixed(1) : '0.0'
+        doc.text(`${item.label}: ${item.value} (${priorityPct}%)`, margin + 15, yPos + 4)
         
         yPos += 8
       })
@@ -188,7 +170,9 @@ export class TicketReportPDF {
         doc.setTextColor(0, 0, 0)
         doc.setFontSize(10)
         doc.setFont('helvetica', 'normal')
-        doc.text(`${item.label}: ${item.value} (${((item.value / stats.total) * 100).toFixed(1)}%)`, margin + 15, yPos + 4)
+        const categoryPct =
+          stats.total > 0 ? ((item.value / stats.total) * 100).toFixed(1) : '0.0'
+        doc.text(`${item.label}: ${item.value} (${categoryPct}%)`, margin + 15, yPos + 4)
         
         yPos += 8
       })
@@ -205,6 +189,15 @@ export class TicketReportPDF {
       doc.text('LISTADO DE TICKETS', margin, yPos)
       yPos += 5
 
+      if (tickets.length === 0) {
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(80, 80, 80)
+        doc.text('No se registraron tickets en el periodo seleccionado.', margin, yPos)
+        yPos += 12
+        doc.setTextColor(0, 0, 0)
+      }
+
       const tableData = tickets.map(ticket => [
         ticket.ticket_number || `#${ticket.id.slice(-8)}`,
         format(new Date(ticket.created_at), 'dd/MM/yyyy', { locale: es }),
@@ -214,72 +207,168 @@ export class TicketReportPDF {
         this.getStatusLabel(ticket.status),
       ])
 
-      autoTable(doc, {
-        startY: yPos,
-        head: [['N° Ticket', 'Fecha', 'Título', 'Usuario afectado', 'Prioridad', 'Estado']],
-        body: tableData,
-        theme: 'striped',
-        headStyles: {
-          fillColor: [41, 128, 185],
-          textColor: 255,
-          fontSize: 9,
-          fontStyle: 'bold',
-        },
-        bodyStyles: {
-          fontSize: 8,
-          overflow: 'linebreak',
-        },
-        styles: {
-          overflow: 'linebreak',
-          cellPadding: 2,
-          valign: 'middle',
-        },
-        columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 22 },
-          2: { cellWidth: 60 },
-          3: { cellWidth: 22 },
-          4: { cellWidth: 22 },
-          5: { cellWidth: 25 },
-        },
-        margin: { left: margin, right: margin },
-      })
+      if (tableData.length > 0) {
+        autoTable(doc, {
+          startY: yPos,
+          head: [['N° Ticket', 'Fecha', 'Título', 'Usuario afectado', 'Prioridad', 'Estado']],
+          body: tableData,
+          theme: 'striped',
+          headStyles: {
+            fillColor: [41, 128, 185],
+            textColor: 255,
+            fontSize: 9,
+            fontStyle: 'bold',
+          },
+          bodyStyles: {
+            fontSize: 8,
+            overflow: 'linebreak',
+          },
+          styles: {
+            overflow: 'linebreak',
+            cellPadding: 2,
+            valign: 'middle',
+          },
+          columnStyles: {
+            0: { cellWidth: 25 },
+            1: { cellWidth: 22 },
+            2: { cellWidth: 60 },
+            3: { cellWidth: 22 },
+            4: { cellWidth: 22 },
+            5: { cellWidth: 25 },
+          },
+          margin: { top: contentTop, left: margin, right: margin, bottom: 18 },
+        })
 
-      // Actualizar yPos después de la tabla
-      yPos = (doc as any).lastAutoTable?.finalY || yPos + 20
+        yPos = (doc as any).lastAutoTable?.finalY || yPos + 20
+      }
 
-      // ==========================================
-      // PIE DE PÁGINA
-      // ==========================================
+      if (isCombined && visitRows) {
+        checkNewPage(60)
+        doc.setFontSize(14)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(41, 128, 185)
+        doc.text('LISTADO DE VISITAS', margin, yPos)
+        yPos += 5
+
+        if (visitRows.length === 0) {
+          doc.setFontSize(10)
+          doc.setFont('helvetica', 'normal')
+          doc.setTextColor(80, 80, 80)
+          doc.text('No se registraron visitas en el periodo seleccionado.', margin, yPos)
+          yPos += 12
+          doc.setTextColor(0, 0, 0)
+        } else {
+          const includeClient = isGeneralReport
+          const visitHead = includeClient
+            ? ['Fecha', 'Cliente', 'Tipo', 'Estado', 'Técnico', 'Equipos', 'Detalle']
+            : ['Fecha', 'Tipo', 'Estado', 'Técnico', 'Equipos', 'Detalle', 'Recomendaciones']
+
+          const visitBody = visitRows.map((row) =>
+            includeClient
+              ? [row.fecha, row.cliente, row.tipo, row.estado, row.tecnico, row.equipos, row.detalle]
+              : [
+                  row.fecha,
+                  row.tipo,
+                  row.estado,
+                  row.tecnico,
+                  row.equipos,
+                  row.detalle,
+                  row.recomendaciones,
+                ]
+          )
+
+          autoTable(doc, {
+            startY: yPos,
+            head: [visitHead],
+            body: visitBody,
+            theme: 'striped',
+            headStyles: {
+              fillColor: [41, 128, 185],
+              textColor: 255,
+              fontSize: 8,
+              fontStyle: 'bold',
+            },
+            bodyStyles: {
+              fontSize: 7,
+              overflow: 'linebreak',
+              cellPadding: 2,
+            },
+            styles: {
+              overflow: 'linebreak',
+              valign: 'middle',
+            },
+            margin: { top: contentTop, left: margin, right: margin, bottom: 18 },
+          })
+
+          yPos = (doc as any).lastAutoTable?.finalY || yPos + 20
+        }
+      }
+
       const totalPages = (doc.internal as any).getNumberOfPages()
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i)
-        if (logo) {
-          doc.setFillColor(255, 255, 255)
-          doc.roundedRect(8, 6, logo.width + 4, logo.height + 4, 2, 2, 'F')
-          doc.addImage(logo.dataUrl, 'PNG', 10, 8, logo.width, logo.height)
-        }
+        this.drawPageHeader(doc, {
+          pageWidth,
+          headerHeight,
+          logo,
+          logoHeight,
+          mainTitle,
+          subtitle,
+        })
         doc.setFontSize(8)
         doc.setTextColor(128, 128, 128)
-        doc.text(
-          `Página ${i} de ${totalPages}`,
-          105,
-          pageHeight - 10,
-          { align: 'center' }
-        )
+        doc.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, {
+          align: 'center',
+        })
       }
 
       // Guardar PDF
       const periodSegment = reportPeriodSlug ? `-${reportPeriodSlug}` : ''
-      const fileName = isGeneralReport 
-        ? `reporte-general-tickets${periodSegment}-${format(new Date(), 'yyyy-MM-dd')}.pdf`
-        : `reporte-tickets-${clientName.replace(/\s+/g, '-').toLowerCase()}${periodSegment}-${format(new Date(), 'yyyy-MM-dd')}.pdf`
+      const fileName = isCombined
+        ? isGeneralReport
+          ? `reporte-general-tickets-visitas${periodSegment}-${format(new Date(), 'yyyy-MM-dd')}.pdf`
+          : `reporte-tickets-visitas-${clientName.replace(/\s+/g, '-').toLowerCase()}${periodSegment}-${format(new Date(), 'yyyy-MM-dd')}.pdf`
+        : isGeneralReport
+          ? `reporte-general-tickets${periodSegment}-${format(new Date(), 'yyyy-MM-dd')}.pdf`
+          : `reporte-tickets-${clientName.replace(/\s+/g, '-').toLowerCase()}${periodSegment}-${format(new Date(), 'yyyy-MM-dd')}.pdf`
       
       doc.save(fileName)
     } catch (error) {
       console.error('Error generando PDF:', error)
       throw error
     }
+  }
+
+  private static drawPageHeader(
+    doc: any,
+    options: {
+      pageWidth: number
+      headerHeight: number
+      logo: Awaited<ReturnType<typeof getReportLogoForPdf>>
+      logoHeight: number
+      mainTitle: string
+      subtitle: string
+    }
+  ) {
+    const { pageWidth, headerHeight, logo, logoHeight, mainTitle, subtitle } = options
+
+    doc.setFillColor(41, 128, 185)
+    doc.rect(0, 0, pageWidth, headerHeight, 'F')
+
+    if (logo) {
+      doc.setFillColor(255, 255, 255)
+      doc.roundedRect(8, 6, logo.width + 4, logo.height + 4, 2, 2, 'F')
+      doc.addImage(logo.dataUrl, 'PNG', 10, 8, logo.width, logo.height)
+    }
+
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(22)
+    doc.setFont('helvetica', 'bold')
+    doc.text(mainTitle, pageWidth / 2, Math.max(logoHeight + 18, 22), { align: 'center' })
+
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'normal')
+    doc.text(subtitle, pageWidth / 2, Math.max(logoHeight + 28, 32), { align: 'center' })
   }
 
   /**
