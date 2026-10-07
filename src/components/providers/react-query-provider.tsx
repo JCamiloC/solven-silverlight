@@ -6,7 +6,8 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import {
   ensureSessionBeforeMutation,
-  SESSION_EXPIRED_MUTATION_MSG,
+  SESSION_RETRY_SAVE_MSG,
+  SESSION_VERIFY_SLOW_MSG,
 } from '@/lib/auth/mutation-session-guard'
 import { isAbortLikeError } from '@/lib/query-errors'
 
@@ -24,15 +25,15 @@ export function ReactQueryProvider({ children }: { children: React.ReactNode }) 
             try {
               const ok = await ensureSessionBeforeMutation()
               if (!ok) {
-                toast.error(SESSION_EXPIRED_MUTATION_MSG)
-                throw new Error(SESSION_EXPIRED_MUTATION_MSG)
+                throw new Error(SESSION_RETRY_SAVE_MSG)
               }
             } catch (error) {
               if (
                 error instanceof Error &&
-                error.message.includes('verificación de sesión')
+                (error.message === SESSION_VERIFY_SLOW_MSG ||
+                  error.message === SESSION_RETRY_SAVE_MSG)
               ) {
-                toast.error(error.message)
+                throw error
               }
               throw error
             }

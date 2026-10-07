@@ -5,9 +5,9 @@ import { ensureFreshSession } from '@/lib/auth/ensure-fresh-session'
 import { SESSION_CONFIG } from '@/lib/session-config'
 
 /** Renueva JWT en segundo plano mientras el usuario trabaja en formularios largos. */
-const HEARTBEAT_INTERVAL_MS = 4 * 60 * 1000
+const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000
 /** Tras esta pausa sin eventos DOM, forzar refresh al volver a interactuar. */
-const IDLE_BEFORE_ACTIVITY_REFRESH_MS = 2 * 60 * 1000
+const IDLE_BEFORE_ACTIVITY_REFRESH_MS = 45 * 1000
 
 /**
  * Mantiene alineado el JWT de Supabase con la sesión visible en React.

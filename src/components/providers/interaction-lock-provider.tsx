@@ -7,8 +7,11 @@ import { toast } from 'sonner'
 import { hasSupabaseAuthCookieHint } from '@/lib/auth/auth-cookie'
 import {
   ensureSessionBeforeMutation,
-  SESSION_EXPIRED_MUTATION_MSG,
+  isLikelySessionError,
+  SESSION_RETRY_SAVE_MSG,
+  SESSION_VERIFY_SLOW_MSG,
 } from '@/lib/auth/mutation-session-guard'
+import { runWithSessionRetry } from '@/lib/auth/run-with-session-retry'
 
 type LockKind = 'action' | 'navigation'
 
@@ -84,21 +87,35 @@ export function InteractionLockProvider({ children }: { children: ReactNode }) {
   }, [createLock])
 
   const withActionLock = useCallback(async <T,>(action: () => Promise<T>, options?: LockOptions): Promise<T> => {
-    const lockId = lockAction(options)
+    const lockId = lockAction({
+      ...options,
+      message: options?.message || DEFAULT_MESSAGE,
+    })
     const shouldCheckSession =
       options?.requireSession !== false && hasSupabaseAuthCookieHint()
     try {
       if (shouldCheckSession) {
-        const sessionOk = await ensureSessionBeforeMutation()
-        if (!sessionOk) {
-          toast.error(SESSION_EXPIRED_MUTATION_MSG)
-          throw new Error(SESSION_EXPIRED_MUTATION_MSG)
+        try {
+          const sessionOk = await ensureSessionBeforeMutation()
+          if (!sessionOk) {
+            throw new Error(SESSION_RETRY_SAVE_MSG)
+          }
+        } catch (error) {
+          if (error instanceof Error && error.message === SESSION_VERIFY_SLOW_MSG) {
+            toast.error(SESSION_VERIFY_SLOW_MSG)
+          }
+          throw error
         }
+        return await runWithSessionRetry(action)
       }
       return await action()
     } catch (error) {
-      if (error instanceof Error && error.message.includes('verificación de sesión')) {
+      if (error instanceof Error && error.message === SESSION_RETRY_SAVE_MSG) {
         toast.error(error.message)
+      } else if (error instanceof Error && error.message === SESSION_VERIFY_SLOW_MSG) {
+        // Ya mostrado en el bloque de ensureSessionBeforeMutation
+      } else if (isLikelySessionError(error)) {
+        toast.error(SESSION_RETRY_SAVE_MSG)
       }
       throw error
     } finally {

@@ -516,6 +516,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useSessionHeartbeat(Boolean(authState.user))
 
+  useEffect(() => {
+    const onSessionRefreshed = () => {
+      void refresh()
+    }
+    window.addEventListener('solven:session-refreshed', onSessionRefreshed)
+    return () => window.removeEventListener('solven:session-refreshed', onSessionRefreshed)
+  }, [refresh])
+
   const hasRole = useCallback((roles: UserRole[]): boolean => {
     if (!authState.profile) return false
     return roles.includes(authState.profile.role)
