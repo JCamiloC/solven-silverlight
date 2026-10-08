@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { clientService, ClientInsert, ClientUpdate } from '@/services/clients'
 import { Client } from '@/types'
 import { toast } from 'sonner'
+import { useAuth } from '@/hooks/use-auth'
+import { SupportAgentClientsService } from '@/lib/services/support-agent-clients'
 
 export const clientKeys = {
   all: ['clients'] as const,
@@ -10,9 +12,13 @@ export const clientKeys = {
 }
 
 export function useClients() {
+  const { profile } = useAuth()
+
   return useQuery({
-    queryKey: clientKeys.list(),
-    queryFn: clientService.getAll,
+    queryKey: [...clientKeys.list(), profile?.role, profile?.id],
+    queryFn: () =>
+      SupportAgentClientsService.getAccessibleClients(profile?.role, profile?.id),
+    enabled: Boolean(profile?.role),
     staleTime: 5 * 60 * 1000,
   })
 }

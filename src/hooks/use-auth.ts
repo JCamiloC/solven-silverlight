@@ -9,8 +9,10 @@ import { clearSupabaseAuthStorage, destroyClientSession } from '@/lib/auth/sessi
 import { isAbortLikeError } from '@/lib/query-errors'
 import { ensureFreshSession } from '@/lib/auth/ensure-fresh-session'
 import { hasSupabaseAuthCookieHint } from '@/lib/auth/auth-cookie'
+import { withAsyncTimeout } from '@/lib/auth/session-with-timeout'
 import { isAuthRoutePath } from '@/lib/auth/auth-routes'
 import { useSessionHeartbeat } from '@/hooks/use-session-heartbeat'
+import { buildFallbackProfile } from '@/lib/auth/fallback-profile'
 
 interface AuthState {
   user: User | null
@@ -40,30 +42,12 @@ let authStateCache: AuthState = {
   initialized: false,
 }
 const CACHE_DURATION = 5 * 60 * 1000
-const AUTH_BOOTSTRAP_TIMEOUT_MS = 15_000
+const AUTH_BOOTSTRAP_TIMEOUT_MS = 5_000
+const GET_SESSION_BOOTSTRAP_MS = 8_000
+const REFRESH_SESSION_BOOTSTRAP_MS = 10_000
+const PROFILE_FETCH_MS = 10_000
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-const buildFallbackProfile = (user: User): Profile => {
-  const metadata = user.user_metadata || {}
-  const roleFromMeta = metadata.role as UserRole | undefined
-  const firstName = (metadata.first_name as string | undefined) || 'Usuario'
-  const lastName = (metadata.last_name as string | undefined) || 'Sin perfil'
-
-  return {
-    id: user.id,
-    user_id: user.id,
-    client_id: metadata.client_id as string | undefined,
-    email: user.email || '',
-    first_name: firstName,
-    last_name: lastName,
-    role: roleFromMeta || 'agente_soporte',
-    avatar_url: metadata.avatar_url as string | undefined,
-    totp_enabled: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }
-}
 
 function resolveInitialAuthState(): AuthState {
   if (typeof window === 'undefined') {
@@ -171,12 +155,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (!isMounted || bootstrappedRef.current) return
 
       console.warn('[useAuth] Loading timeout, forcing initialized state')
-      setAndCacheAuthState({
-        ...authStateCache,
-        loading: false,
-        initialized: true,
-      })
-      bootstrappedRef.current = true
+      void (async () => {
+        if (!authStateCache.user && hasSupabaseAuthCookieHint()) {
+          try {
+            const { data: refreshData } = await withAsyncTimeout(
+              supabase.auth.refreshSession(),
+              REFRESH_SESSION_BOOTSTRAP_MS,
+              'refreshSession (timeout fallback)'
+            )
+            if (refreshData.session?.user && isMounted) {
+              await applySession(refreshData.session.user, { refetchProfile: true })
+              return
+            }
+          } catch (error) {
+            console.warn('[useAuth] Timeout fallback refresh failed:', error)
+          }
+        }
+
+        if (!isMounted) return
+        const timedUser = authStateCache.user
+        setAndCacheAuthState({
+          user: timedUser,
+          profile:
+            authStateCache.profile ??
+            (timedUser ? buildFallbackProfile(timedUser) : null),
+          loading: false,
+          initialized: true,
+        })
+        bootstrappedRef.current = true
+      })()
     }, AUTH_BOOTSTRAP_TIMEOUT_MS)
 
     const applySession = async (
@@ -191,8 +198,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const sameUser = authStateCache.user?.id === sessionUser.id
         let profile = sameUser ? authStateCache.profile : null
 
+        if (!profile) {
+          profile = buildFallbackProfile(sessionUser)
+          setAndCacheAuthState({
+            user: sessionUser,
+            profile,
+            loading: true,
+            initialized: true,
+          })
+          bootstrappedRef.current = true
+          if (loadingTimeoutRef.current) {
+            clearTimeout(loadingTimeoutRef.current)
+            loadingTimeoutRef.current = null
+          }
+        }
+
         if (!profile || refetchProfile) {
-          profile = await getProfile(sessionUser)
+          let fetched: Profile | null = null
+          try {
+            fetched = await withAsyncTimeout(
+              getProfile(sessionUser),
+              PROFILE_FETCH_MS,
+              'Profile fetch'
+            )
+          } catch (error) {
+            console.warn('[useAuth] Profile fetch skipped:', error)
+          }
+          profile = fetched ?? profile ?? buildFallbackProfile(sessionUser)
         }
 
         if (!isMounted || gen !== applyGenRef.current) return
@@ -201,7 +233,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           sameUser &&
           authStateCache.profile?.id === profile?.id &&
           authStateCache.loading === false &&
-          authStateCache.initialized
+          authStateCache.initialized &&
+          !refetchProfile
         ) {
           bootstrappedRef.current = true
           return
@@ -247,8 +280,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         if (onAuthPage) {
+          const forceCleanSession =
+            typeof window !== 'undefined' &&
+            (window.location.search.includes('logout=1') ||
+              window.location.search.includes('reason=expired') ||
+              window.location.search.includes('reason=timeout'))
+
+          if (forceCleanSession) {
+            clearSupabaseAuthStorage()
+          }
+
           // No getSession(): en prod compite con signIn y deja el botón en loader.
-          // onAuthStateChange detectará sesión existente y redirige al dashboard.
           setAndCacheAuthState({
             user: null,
             profile: null,
@@ -263,37 +305,50 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return
         }
 
-        const {
-          data: { session: existingSession },
-        } = await supabase.auth.getSession()
-
-        if (!isMounted) return
-
-        if (existingSession?.user) {
-          await applySession(existingSession.user)
-          return
+        if (hasSupabaseAuthCookieHint()) {
+          setAndCacheAuthState({
+            ...authStateCache,
+            loading: true,
+            initialized: true,
+          })
         }
 
-        const sessionOk = await ensureFreshSession()
+        let sessionUser: User | null = null
+
+        try {
+          const {
+            data: { session: existingSession },
+          } = await withAsyncTimeout(
+            supabase.auth.getSession(),
+            GET_SESSION_BOOTSTRAP_MS,
+            'getSession'
+          )
+          sessionUser = existingSession?.user ?? null
+        } catch (error) {
+          console.warn('[useAuth] getSession slow or failed:', error)
+        }
+
         if (!isMounted) return
 
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-
-        if (!isMounted) return
-
-        if (session?.user) {
-          await applySession(session.user)
+        if (sessionUser) {
+          await applySession(sessionUser, { refetchProfile: true })
           return
         }
 
         if (hasSupabaseAuthCookieHint()) {
-          const { data: refreshData } = await supabase.auth.refreshSession()
-          if (!isMounted) return
-          if (refreshData.session?.user) {
-            await applySession(refreshData.session.user)
-            return
+          try {
+            const { data: refreshData } = await withAsyncTimeout(
+              supabase.auth.refreshSession(),
+              REFRESH_SESSION_BOOTSTRAP_MS,
+              'refreshSession'
+            )
+            if (!isMounted) return
+            if (refreshData.session?.user) {
+              await applySession(refreshData.session.user, { refetchProfile: true })
+              return
+            }
+          } catch (error) {
+            console.warn('[useAuth] refreshSession failed:', error)
           }
         }
 
@@ -341,8 +396,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (event === 'INITIAL_SESSION') {
           // getSession() a veces emite null mientras refresca el JWT vencido.
-          // recoverSession es la autoridad del arranque.
-          if (!recoveringRef.current && !bootstrappedRef.current) {
+          if (
+            !session?.user &&
+            !recoveringRef.current &&
+            !bootstrappedRef.current &&
+            !hasSupabaseAuthCookieHint()
+          ) {
             await applySession(null)
           }
           return
@@ -401,7 +460,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       profileCache = {}
       inFlightProfile = {}
       clearLocalAuthState()
-      await destroyClientSession(supabase)
+      await destroyClientSession(supabase, { preferLocal: true })
       redirectToLogin()
     } catch (error) {
       console.error('[useAuth] Error in signOut:', error)
@@ -411,7 +470,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [router, setAndCacheAuthState, supabase])
 
+  const purgeStaleAuthClientState = useCallback(() => {
+    profileCache = {}
+    inFlightProfile = {}
+    clearSupabaseAuthStorage()
+    setAndCacheAuthState({
+      user: null,
+      profile: null,
+      loading: false,
+      initialized: true,
+    })
+  }, [setAndCacheAuthState])
+
   const refresh = useCallback(async () => {
+    const hadCookieHint = hasSupabaseAuthCookieHint()
     try {
       let {
         data: { session },
@@ -426,16 +498,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       if (error) {
-        setAndCacheAuthState({
-          ...authStateCache,
-          loading: false,
-          initialized: true,
-        })
+        if (hadCookieHint || hasSupabaseAuthCookieHint()) {
+          purgeStaleAuthClientState()
+        } else {
+          setAndCacheAuthState({
+            ...authStateCache,
+            loading: false,
+            initialized: true,
+          })
+        }
         return
       }
 
       if (session?.user) {
-        const profile = await getProfile(session.user)
+        const interim = authStateCache.profile ?? buildFallbackProfile(session.user)
+        setAndCacheAuthState({
+          user: session.user,
+          profile: interim,
+          loading: true,
+          initialized: true,
+        })
+        const profile = (await getProfile(session.user)) ?? interim
         setAndCacheAuthState({
           user: session.user,
           profile,
@@ -445,7 +528,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } else if (hasSupabaseAuthCookieHint()) {
         const { data: refreshData } = await supabase.auth.refreshSession()
         if (refreshData.session?.user) {
-          const profile = await getProfile(refreshData.session.user)
+          const interim =
+            authStateCache.profile ?? buildFallbackProfile(refreshData.session.user)
+          setAndCacheAuthState({
+            user: refreshData.session.user,
+            profile: interim,
+            loading: true,
+            initialized: true,
+          })
+          const profile = (await getProfile(refreshData.session.user)) ?? interim
           setAndCacheAuthState({
             user: refreshData.session.user,
             profile,
@@ -453,12 +544,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             initialized: true,
           })
         } else {
-          setAndCacheAuthState({
-            user: null,
-            profile: null,
-            loading: false,
-            initialized: true,
-          })
+          purgeStaleAuthClientState()
         }
       } else {
         setAndCacheAuthState({
@@ -487,14 +573,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
           // fall through to clear
         }
       }
-      setAndCacheAuthState({
-        user: null,
-        profile: null,
-        loading: false,
-        initialized: true,
-      })
+      if (hadCookieHint || hasSupabaseAuthCookieHint()) {
+        purgeStaleAuthClientState()
+      } else {
+        setAndCacheAuthState({
+          user: null,
+          profile: null,
+          loading: false,
+          initialized: true,
+        })
+      }
     }
-  }, [getProfile, setAndCacheAuthState, supabase])
+  }, [getProfile, purgeStaleAuthClientState, setAndCacheAuthState, supabase])
 
   // Sin user pero con cookie: recuperar sesión al volver a la pestaña (heartbeat cubre user activo).
   useEffect(() => {
@@ -524,10 +614,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => window.removeEventListener('solven:session-refreshed', onSessionRefreshed)
   }, [refresh])
 
-  const hasRole = useCallback((roles: UserRole[]): boolean => {
-    if (!authState.profile) return false
-    return roles.includes(authState.profile.role)
-  }, [authState.profile])
+  const hasRole = useCallback(
+    (roles: UserRole[]): boolean => {
+      const effective =
+        authState.profile ??
+        (authState.user ? buildFallbackProfile(authState.user) : null)
+      if (!effective) return false
+      return roles.includes(effective.role)
+    },
+    [authState.profile, authState.user]
+  )
 
   const isAdmin = useCallback(() => hasRole(['administrador']), [hasRole])
   const isLeader = useCallback(() => hasRole(['administrador', 'lider_soporte']), [hasRole])

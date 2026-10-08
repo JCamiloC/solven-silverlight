@@ -14,6 +14,7 @@ import { clearSupabaseAuthStorage } from '@/lib/auth/session-cleanup'
 import { useAuth } from '@/hooks/use-auth'
 import { isSupabaseConfigured } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
 const POST_LOGIN_PATH = '/dashboard'
@@ -26,9 +27,13 @@ function LoginForm() {
   const [sessionMessage, setSessionMessage] = useState('')
   const searchParams = useSearchParams()
   const supabase = createClient()
-  const { user, initialized } = useAuth()
+  const router = useRouter()
+  const { user, initialized, refresh } = useAuth()
   const supabaseConfigured = isSupabaseConfigured()
   const fromLogout = searchParams.get('logout') === '1'
+  const reason = searchParams.get('reason')
+  const sessionExpired = reason === 'expired' || reason === 'timeout'
+  const blockAutoLogin = fromLogout || sessionExpired
 
   const shouldRetryWithCleanup = (error: unknown) => {
     if (!(error instanceof Error)) return false
@@ -44,27 +49,31 @@ function LoginForm() {
   }
 
   useEffect(() => {
-    const reason = searchParams.get('reason')
-
     if (fromLogout) {
       clearSupabaseAuthStorage()
       void supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+      void refresh()
       setSessionMessage('Sesión cerrada correctamente. Puedes iniciar sesión nuevamente.')
       return
     }
 
-    if (reason === 'timeout') {
-      setSessionMessage('Tu sesión ha expirado por inactividad. Por favor, inicia sesión nuevamente.')
-    } else if (reason === 'expired') {
-      setSessionMessage('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.')
+    if (sessionExpired) {
+      clearSupabaseAuthStorage()
+      void supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+      void refresh()
+      setSessionMessage(
+        reason === 'timeout'
+          ? 'Tu sesión ha expirado por inactividad. Por favor, inicia sesión nuevamente.'
+          : 'Tu sesión ha expirado. Por favor, inicia sesión nuevamente.'
+      )
     }
-  }, [searchParams, fromLogout, supabase.auth])
+  }, [searchParams, fromLogout, sessionExpired, reason, supabase.auth, refresh])
 
   useEffect(() => {
-    if (fromLogout) return
+    if (blockAutoLogin) return
     if (!initialized || !user?.id) return
-    window.location.replace(POST_LOGIN_PATH)
-  }, [initialized, user?.id, fromLogout])
+    router.replace(POST_LOGIN_PATH)
+  }, [initialized, user?.id, blockAutoLogin, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -82,7 +91,7 @@ function LoginForm() {
       if (user?.id) {
         const sameUser = user.email?.toLowerCase() === email.trim().toLowerCase()
         if (sameUser) {
-          window.location.replace(POST_LOGIN_PATH)
+          router.replace(POST_LOGIN_PATH)
           return
         }
       }
@@ -109,7 +118,8 @@ function LoginForm() {
         throw new Error('No se pudo establecer la sesión. Intenta nuevamente.')
       }
 
-      window.location.replace(POST_LOGIN_PATH)
+      await refresh()
+      router.replace(POST_LOGIN_PATH)
     } catch (err) {
       const raw = err instanceof Error ? err.message : 'Error al iniciar sesión'
       setError(raw)
@@ -137,7 +147,7 @@ function LoginForm() {
     )
   }
 
-  if (user?.id && !fromLogout) {
+  if (user?.id && !blockAutoLogin) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <NavigationLoader />

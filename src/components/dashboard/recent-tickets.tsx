@@ -3,19 +3,42 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useTickets } from '@/hooks/use-tickets'
+import { useClientTickets, useTickets } from '@/hooks/use-tickets'
 import { useAuth } from '@/hooks/use-auth'
 import { AlertTriangle, CheckCircle, Clock, ArrowRight } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import Link from 'next/link'
 
-export function RecentTickets() {
-  const { profile } = useAuth()
-  const { data: tickets, isLoading } = useTickets()
+interface RecentTicketsProps {
+  clientId?: string
+}
 
-  // Get recent tickets (last 5)
-  const recentTickets = tickets?.slice(0, 5) || []
+export function RecentTickets({ clientId }: RecentTicketsProps) {
+  const { profile } = useAuth()
+  const scopedClientId = clientId ?? profile?.client_id ?? ''
+  const isClientScope = Boolean(scopedClientId && profile?.role === 'cliente')
+
+  const { data: allTickets, isLoading: loadingAll } = useTickets({
+    enabled: !isClientScope,
+  })
+  const { data: clientTickets, isLoading: loadingClient } = useClientTickets(
+    isClientScope ? scopedClientId : ''
+  )
+
+  const tickets = isClientScope ? clientTickets : allTickets
+  const isLoading = isClientScope ? loadingClient : loadingAll
+
+  const recentTickets =
+    tickets
+      ?.slice()
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 5) || []
+
+  const ticketsListHref =
+    isClientScope && scopedClientId
+      ? `/dashboard/clientes/${scopedClientId}/tickets`
+      : '/dashboard/tickets'
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -65,11 +88,13 @@ export function RecentTickets() {
           <div>
             <CardTitle>Tickets Recientes</CardTitle>
             <CardDescription>
-              Últimos tickets {profile?.role === 'cliente' ? 'creados por usted' : 'del sistema'}
+              {profile?.role === 'cliente'
+                ? 'Últimos tickets de su empresa'
+                : 'Últimos tickets del sistema'}
             </CardDescription>
           </div>
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/dashboard/tickets">
+            <Link href={ticketsListHref}>
               Ver todos
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
@@ -89,10 +114,14 @@ export function RecentTickets() {
         ) : recentTickets.length > 0 ? (
           <div className="space-y-4">
             {recentTickets.map((ticket) => (
-              <div key={ticket.id} className="flex items-center justify-between space-x-4">
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center space-x-2">
-                    <p className="text-sm font-medium leading-none">
+              <Link
+                key={ticket.id}
+                href={`/dashboard/tickets/${ticket.id}`}
+                className="flex items-center justify-between space-x-4 rounded-md p-2 -mx-2 hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex-1 space-y-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium leading-none truncate">
                       {ticket.ticket_number || `#${ticket.id.slice(0, 8)}`} - {ticket.title}
                     </p>
                     {getStatusBadge(ticket.status)}
@@ -102,7 +131,7 @@ export function RecentTickets() {
                     {ticket.category} • {format(new Date(ticket.created_at), 'dd/MM/yyyy', { locale: es })}
                   </p>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         ) : (

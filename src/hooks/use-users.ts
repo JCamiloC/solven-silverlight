@@ -11,11 +11,12 @@ const QUERY_KEYS = {
 /**
  * Hook para obtener todos los usuarios
  */
-export function useUsers() {
+export function useUsers(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: QUERY_KEYS.users,
     queryFn: () => UsersService.getAll(),
     staleTime: 5 * 60 * 1000, // 5 minutos
+    enabled: options?.enabled ?? true,
   })
 }
 

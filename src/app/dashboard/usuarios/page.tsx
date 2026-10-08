@@ -50,6 +50,14 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { TablePagination } from '@/components/ui/table-pagination'
+import { Checkbox } from '@/components/ui/checkbox'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { SupportAgentClientsService } from '@/lib/services/support-agent-clients'
+import { useSetSupportAgentClients } from '@/hooks/use-support-agent-clients'
+import {
+  canDeleteUsers as canDeleteUsersByRole,
+  canManageUsers as canManageUsersByRole,
+} from '@/lib/auth/staff-client-access'
 
 export default function UsersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -62,8 +70,9 @@ export default function UsersPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [selectedRole, setSelectedRole] = useState<User['role']>('cliente')
   const [selectedClientId, setSelectedClientId] = useState<string>('')
+  const [selectedAgentClientIds, setSelectedAgentClientIds] = useState<string[]>([])
 
-  const { user: currentUser, hasRole, loading } = useAuth()
+  const { user: currentUser, profile, loading } = useAuth()
   const { data: users = [], isLoading: usersLoading } = useUsers()
   const { data: clients = [] } = useClients()
   
@@ -71,16 +80,17 @@ export default function UsersPage() {
   const updateUserMutation = useUpdateUser()
   const deleteUserMutation = useDeleteUser()
   const inviteUserMutation = useInviteUser()
+  const setAgentClientsMutation = useSetSupportAgentClients()
   const { data: pendingUsers = [] } = usePendingUsers()
 
   const [userToDelete, setUserToDelete] = useState<User | null>(null)
 
   // Permisos
-  const canManageUsers = hasRole(['administrador', 'lider_soporte'])
-  const canViewUsers = hasRole(['administrador', 'lider_soporte'])
-  const canCreateUsers = hasRole(['administrador', 'lider_soporte'])
-  const canEditUsers = hasRole(['administrador', 'lider_soporte'])
-  const canDeleteUsers = hasRole(['administrador', 'lider_soporte'])
+  const canManageUsers = canManageUsersByRole(profile?.role)
+  const canViewUsers = canManageUsersByRole(profile?.role)
+  const canCreateUsers = canManageUsersByRole(profile?.role)
+  const canEditUsers = canManageUsersByRole(profile?.role)
+  const canDeleteUsers = canDeleteUsersByRole(profile?.role)
 
   // Mostrar loading mientras se verifica autenticación
   if (loading) {
@@ -101,7 +111,7 @@ export default function UsersPage() {
           <Users className="h-12 w-12 text-muted-foreground mx-auto" />
           <h2 className="text-2xl font-bold">Acceso Restringido</h2>
           <p className="text-muted-foreground">
-            Solo los administradores pueden acceder a la gestión de usuarios.
+            Solo administradores y líderes de soporte pueden acceder a la gestión de usuarios.
           </p>
         </div>
       </div>
@@ -185,6 +195,7 @@ export default function UsersPage() {
     setSelectedUser(null)
     setSelectedRole('cliente')
     setSelectedClientId('')
+    setSelectedAgentClientIds([])
     setIsDialogOpen(true)
   }
 
@@ -214,12 +225,36 @@ export default function UsersPage() {
     })
   }
 
-  const handleEdit = (user: User) => {
+  const handleEdit = async (user: User) => {
     if (!canEditUsers) return
     setSelectedUser(user)
     setSelectedRole(user.role)
     setSelectedClientId(user.client_id || '')
+    if (user.role === 'agente_soporte') {
+      const ids = await SupportAgentClientsService.getClientIdsForProfile(user.id)
+      setSelectedAgentClientIds(ids)
+    } else {
+      setSelectedAgentClientIds([])
+    }
     setIsDialogOpen(true)
+  }
+
+  const toggleAgentClient = (clientId: string, checked: boolean) => {
+    setSelectedAgentClientIds((prev) => {
+      if (checked) return [...new Set([...prev, clientId])]
+      return prev.filter((id) => id !== clientId)
+    })
+  }
+
+  const persistAgentClientAssignments = async (profileId: string, role: User['role']) => {
+    if (role === 'agente_soporte') {
+      await setAgentClientsMutation.mutateAsync({
+        profileId,
+        clientIds: selectedAgentClientIds,
+      })
+      return
+    }
+    await SupportAgentClientsService.setClientIdsForProfile(profileId, [])
   }
 
   const handleDelete = (user: User) => {
@@ -254,6 +289,11 @@ export default function UsersPage() {
       client_id: selectedRole === 'cliente' ? selectedClientId : '',
     }
 
+    if (selectedRole === 'agente_soporte' && selectedAgentClientIds.length === 0) {
+      alert('Selecciona al menos una empresa para el agente de soporte.')
+      return
+    }
+
     if (selectedUser) {
       // Actualizar usuario existente (sin password)
       const { password, email, ...updateData } = userData
@@ -273,25 +313,52 @@ export default function UsersPage() {
         payload.role = selectedRole
       }
 
-      updateUserMutation.mutate({
-        id: selectedUser.id,
-        data: payload
-      }, {
-        onSuccess: () => {
-          setIsDialogOpen(false)
-          setSelectedUser(null)
-          setSelectedRole('cliente')
-          setSelectedClientId('')
+      updateUserMutation.mutate(
+        {
+          id: selectedUser.id,
+          data: payload,
+        },
+        {
+          onSuccess: async () => {
+            try {
+              await persistAgentClientAssignments(selectedUser.id, selectedRole)
+            } catch (error) {
+              console.error(error)
+              alert(
+                error instanceof Error
+                  ? error.message
+                  : 'Usuario guardado, pero falló la asignación de empresas.'
+              )
+            }
+            setIsDialogOpen(false)
+            setSelectedUser(null)
+            setSelectedRole('cliente')
+            setSelectedClientId('')
+            setSelectedAgentClientIds([])
+          },
         }
-      })
+      )
     } else {
       // Crear nuevo usuario con email y password
       createUserMutation.mutate(userData as any, {
-        onSuccess: () => {
+        onSuccess: async (createdUser) => {
+          try {
+            if (createdUser?.id) {
+              await persistAgentClientAssignments(createdUser.id, selectedRole)
+            }
+          } catch (error) {
+            console.error(error)
+            alert(
+              error instanceof Error
+                ? error.message
+                : 'Usuario creado, pero falló la asignación de empresas.'
+            )
+          }
           setIsDialogOpen(false)
           setSelectedRole('cliente')
           setSelectedClientId('')
-        }
+          setSelectedAgentClientIds([])
+        },
       })
     }
   }
@@ -563,6 +630,9 @@ export default function UsersPage() {
                     if (nextRole !== 'cliente') {
                       setSelectedClientId('')
                     }
+                    if (nextRole !== 'agente_soporte') {
+                      setSelectedAgentClientIds([])
+                    }
                   }}
                   disabled={!!selectedUser && selectedUser.id === currentUser?.id}
                 >
@@ -593,29 +663,61 @@ export default function UsersPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="client_id">Cliente (Empresa) {selectedRole === 'cliente' ? '*' : '(Opcional)'}</Label>
-              <Select 
-                value={selectedClientId} 
-                onValueChange={setSelectedClientId}
-                required={selectedRole === 'cliente'}
-                disabled={selectedRole !== 'cliente'}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Selecciona la empresa cliente a la que pertenece este usuario
-              </p>
-            </div>
+            {selectedRole === 'cliente' && (
+              <div className="space-y-2">
+                <Label htmlFor="client_id">Cliente (Empresa) *</Label>
+                <Select
+                  value={selectedClientId}
+                  onValueChange={setSelectedClientId}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Empresa a la que pertenece este usuario cliente
+                </p>
+              </div>
+            )}
+
+            {selectedRole === 'agente_soporte' && (
+              <div className="space-y-2">
+                <Label>Empresas asignadas al agente *</Label>
+                <ScrollArea className="h-48 rounded-md border p-3">
+                  <div className="space-y-3 pr-2">
+                    {clients.map((client) => {
+                      const checked = selectedAgentClientIds.includes(client.id)
+                      return (
+                        <label
+                          key={client.id}
+                          className="flex items-center gap-2 text-sm cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(value) =>
+                              toggleAgentClient(client.id, value === true)
+                            }
+                          />
+                          <span>{client.name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </ScrollArea>
+                <p className="text-xs text-muted-foreground">
+                  El agente solo verá y gestionará las empresas marcadas ({selectedAgentClientIds.length}{' '}
+                  seleccionada(s)).
+                </p>
+              </div>
+            )}
             
             <div className="flex justify-end space-x-2">
               <Button 
@@ -626,13 +728,18 @@ export default function UsersPage() {
                   setSelectedUser(null)
                   setSelectedRole('cliente')
                   setSelectedClientId('')
+                  setSelectedAgentClientIds([])
                 }}
               >
                 Cancelar
               </Button>
               <Button 
                 type="submit"
-                disabled={createUserMutation.isPending || updateUserMutation.isPending}
+                disabled={
+                  createUserMutation.isPending ||
+                  updateUserMutation.isPending ||
+                  setAgentClientsMutation.isPending
+                }
               >
                 {(createUserMutation.isPending || updateUserMutation.isPending) && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

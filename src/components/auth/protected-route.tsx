@@ -7,8 +7,12 @@ import { hasSupabaseAuthCookieHint } from '@/lib/auth/auth-cookie'
 import { UserRole } from '@/types'
 import { Loading } from '@/components/ui/loading'
 import { Button } from '@/components/ui/button'
+import {
+  resolveEffectiveProfile,
+  userHasAllowedRole,
+} from '@/lib/auth/fallback-profile'
 
-const SESSION_SYNC_TIMEOUT_MS = 12_000
+const SESSION_SYNC_TIMEOUT_MS = 8_000
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -21,7 +25,7 @@ export function ProtectedRoute({
   allowedRoles = [],
   requireAuth = true,
 }: ProtectedRouteProps) {
-  const { user, profile, initialized, hasRole, refresh } = useAuth()
+  const { user, profile, initialized, refresh, signOut } = useAuth()
   const router = useRouter()
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [syncStalled, setSyncStalled] = useState(false)
@@ -48,14 +52,16 @@ export function ProtectedRoute({
       return
     }
 
-    if (allowedRoles.length > 0 && user && profile && !hasRole(allowedRoles)) {
+    const effectiveProfile = resolveEffectiveProfile(user, profile)
+    if (
+      allowedRoles.length > 0 &&
+      user &&
+      effectiveProfile &&
+      !userHasAllowedRole(user, profile, allowedRoles)
+    ) {
       setIsRedirecting(true)
-      if (profile.role === 'cliente') {
-        if (profile.client_id) {
-          router.replace(`/dashboard/clientes/${profile.client_id}`)
-        } else {
-          router.replace('/dashboard/tickets')
-        }
+      if (effectiveProfile.role === 'cliente') {
+        router.replace('/dashboard')
       } else {
         router.replace('/dashboard')
       }
@@ -63,7 +69,6 @@ export function ProtectedRoute({
   }, [
     user,
     profile,
-    hasRole,
     allowedRoles,
     requireAuth,
     router,
@@ -83,18 +88,34 @@ export function ProtectedRoute({
     return () => clearTimeout(timer)
   }, [initialized, user, syncAttempted])
 
+  const handleForceLogout = useCallback(async () => {
+    try {
+      await signOut()
+    } catch {
+      window.location.assign('/auth/login?logout=1')
+    }
+  }, [signOut])
+
   if (!initialized) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loading size="lg" text="Verificando autenticación..." />
+      <div className="flex min-h-[50vh] items-center justify-center p-6">
+        <Loading size="lg" text="Conectando sesión..." />
       </div>
     )
   }
 
   if (user) {
-    if (allowedRoles.length > 0 && profile && !hasRole(allowedRoles)) {
-      return null
+    if (
+      allowedRoles.length > 0 &&
+      !userHasAllowedRole(user, profile, allowedRoles)
+    ) {
+      return (
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <Loading size="lg" text="Redirigiendo..." />
+        </div>
+      )
     }
+
     return <>{children}</>
   }
 
@@ -118,6 +139,9 @@ export function ProtectedRoute({
               >
                 Ir a iniciar sesión
               </Button>
+              <Button type="button" variant="destructive" onClick={() => void handleForceLogout()}>
+                Cerrar sesión
+              </Button>
             </div>
           </div>
         </div>
@@ -125,8 +149,11 @@ export function ProtectedRoute({
     }
 
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loading size="lg" text="Verificando autenticación..." />
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 p-6">
+        <Loading size="lg" text="Restaurando sesión..." />
+        <Button type="button" variant="link" onClick={() => void handleForceLogout()}>
+          Cerrar sesión
+        </Button>
       </div>
     )
   }

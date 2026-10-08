@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Search, Building2, X } from 'lucide-react'
 import React from 'react'
@@ -28,6 +28,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { useClients, useCreateClient } from '@/hooks/use-clients'
 import { useActionLock } from '@/hooks/use-action-lock'
+import { useAuth } from '@/hooks/use-auth'
+import { canCreateClientCompany } from '@/lib/auth/staff-client-access'
 import { Client, ClientType } from '@/types'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -39,6 +41,8 @@ export default function ClientesPage() {
   const { data: clients, isLoading, error } = useClients()
   const { mutateAsync: createClient, isPending: isCreating } = useCreateClient()
   const { runWithLock, isLocked } = useActionLock()
+  const { profile } = useAuth()
+  const showCreateClient = canCreateClientCompany(profile?.role)
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
@@ -55,18 +59,36 @@ export default function ClientesPage() {
   })
   const [formError, setFormError] = useState('')
 
-  const filteredClients = clients?.filter((client) => {
-    const search = searchTerm.toLowerCase()
-    const nit = (client.nit || '').toLowerCase()
-    return (
-      client.name.toLowerCase().includes(search) ||
-      client.email.toLowerCase().includes(search) ||
-      client.contact_person.toLowerCase().includes(search) ||
-      (client.phone && client.phone.includes(search)) ||
-      nit.includes(search) ||
-      nit.replace(/[^0-9]/g, '').includes(search.replace(/[^0-9]/g, ''))
-    )
-  }) || []
+  const filteredClients = useMemo(() => {
+    const list = clients ?? []
+    const trimmed = searchTerm.trim()
+    if (!trimmed) return list
+
+    const search = trimmed.toLowerCase()
+    const searchDigits = trimmed.replace(/[^0-9]/g, '')
+
+    return list.filter((client) => {
+      const name = (client.name ?? '').toLowerCase()
+      const email = (client.email ?? '').toLowerCase()
+      const contact = (client.contact_person ?? '').toLowerCase()
+      const phone = client.phone ?? ''
+      const nit = (client.nit ?? '').toLowerCase()
+      const nitDigits = nit.replace(/[^0-9]/g, '')
+
+      return (
+        name.includes(search) ||
+        email.includes(search) ||
+        contact.includes(search) ||
+        phone.toLowerCase().includes(search) ||
+        nit.includes(search) ||
+        (searchDigits.length > 0 && nitDigits.includes(searchDigits))
+      )
+    })
+  }, [clients, searchTerm])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm])
 
   const totalPages = Math.max(1, Math.ceil(filteredClients.length / itemsPerPage))
   const paginatedClients = filteredClients.slice(
@@ -149,13 +171,17 @@ export default function ClientesPage() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Clientes</h1>
             <p className="text-sm sm:text-base text-muted-foreground">
-              Gestión de clientes y sus recursos
+              {profile?.role === 'agente_soporte'
+                ? 'Empresas asignadas a tu perfil de agente'
+                : 'Gestión de clientes y sus recursos'}
             </p>
           </div>
-          <Button onClick={() => setShowCreateDialog(true)} className="w-full sm:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
-            Nuevo Cliente
-          </Button>
+          {showCreateClient && (
+            <Button onClick={() => setShowCreateDialog(true)} className="w-full sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              Nuevo Cliente
+            </Button>
+          )}
         </div>
 
         {/* Búsqueda */}

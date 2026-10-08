@@ -124,6 +124,12 @@ const allNavigationItems: NavigationItem[] = [
     roles: ['administrador', 'lider_soporte', 'agente_soporte'],
   },
   {
+    name: 'Dashboard',
+    href: '/dashboard',
+    icon: LayoutDashboard,
+    roles: ['cliente'],
+  },
+  {
     name: 'Mi Empresa',
     href: '/dashboard/clientes', // Se ajustará dinámicamente para clientes
     icon: Building2,
@@ -154,7 +160,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
         async () => {
           await signOut()
         },
-        { message: 'Cerrando sesión...' }
+        { message: 'Cerrando sesión...', requireSession: false }
       )
     } catch (error) {
       console.error('Error signing out:', error)

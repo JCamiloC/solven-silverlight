@@ -133,7 +133,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
     if (estado === 'falta_cliente' || estado === 'pendiente') {
       return (
         <Badge variant="secondary" className="bg-amber-100 text-amber-900 hover:bg-amber-100 font-normal">
-          Falta cliente
+          Pendiente firma
         </Badge>
       )
     }
@@ -728,7 +728,7 @@ export function HardwareTable({ data, isLoading, clientId, readOnly = false }: H
         toast.success('Link de firma enviado por correo', {
           description: staffEmail
             ? `Enviado a ${hardware.correo_responsable}. También te llegó confirmación a ${staffEmail} con el mismo link.`
-            : `Enviado a ${hardware.correo_responsable}. Estado: Falta firma del cliente.`,
+            : `Enviado a ${hardware.correo_responsable}. Estado: pendiente firma de quien recibe.`,
         })
       }, 700)
 

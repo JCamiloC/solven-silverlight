@@ -37,7 +37,7 @@ export function Header() {
         async () => {
           await signOut()
         },
-        { message: 'Cerrando sesión...' }
+        { message: 'Cerrando sesión...', requireSession: false }
       )
     } catch (error) {
       console.error('Error signing out:', error)

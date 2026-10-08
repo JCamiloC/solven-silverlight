@@ -98,7 +98,7 @@ export async function POST(request: Request) {
             <strong>${hardwareLabel}</strong> a <strong>${body.to.trim()}</strong>
             ${body.recipientName ? `(${body.recipientName})` : ''}.
           </p>
-          <p><strong>Estado:</strong> Falta firma del cliente.</p>
+          <p><strong>Estado:</strong> Pendiente firma de quien recibe el equipo.</p>
           <p>Puedes verificar el mismo enlace aquí:</p>
           <p>
             <a href="${body.signingUrl}" style="color: #2563eb;">${body.signingUrl}</a>

@@ -2,39 +2,84 @@ import { useAuth } from './use-auth'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { toast } from 'sonner'
+import {
+  canCreateClientCompany,
+  canDeleteClientCompany,
+  hasFullClientCatalogAccess,
+} from '@/lib/auth/staff-client-access'
+import { useSupportAgentClientIds } from '@/hooks/use-support-agent-clients'
 
 /**
  * Hook para gestionar permisos de clientes
  * Valida que un cliente solo acceda a su propia información
- * y proporciona flags para controlar la UI (lectura/escritura)
+ * y que el agente de soporte solo vea empresas asignadas.
  */
 export function useClientPermissions() {
   const { profile } = useAuth()
   const params = useParams()
   const router = useRouter()
-  
+
   const clientId = params.id as string
   const isClientUser = profile?.role === 'cliente'
+  const isSupportAgent = profile?.role === 'agente_soporte'
   const isOwnClient = profile?.client_id === clientId
-  
-  // Validar acceso automáticamente solo si es cliente
+
+  const { data: assignedClientIds = [], isLoading: assignmentsLoading } = useSupportAgentClientIds(
+    profile?.id,
+    isSupportAgent
+  )
+
+  const isAssignedSupportClient =
+    !isSupportAgent || !clientId || assignedClientIds.includes(clientId)
+
   useEffect(() => {
-    // Solo validar si es usuario cliente Y hay un clientId en la URL
     if (isClientUser && clientId && !isOwnClient) {
       toast.error('No tienes permiso para ver esta información')
-      // Redirigir al cliente a su propia página
       if (profile?.client_id) {
         router.push(`/dashboard/clientes/${profile.client_id}`)
       }
+      return
     }
-  }, [isClientUser, isOwnClient, clientId, profile, router])
-  
+
+    if (
+      isSupportAgent &&
+      clientId &&
+      !assignmentsLoading &&
+      assignedClientIds.length > 0 &&
+      !assignedClientIds.includes(clientId)
+    ) {
+      toast.error('No tienes asignada esta empresa')
+      router.push('/dashboard/clientes')
+    }
+
+    if (isSupportAgent && clientId && !assignmentsLoading && assignedClientIds.length === 0) {
+      toast.error('No tienes empresas asignadas. Contacta a un administrador.')
+      router.push('/dashboard/clientes')
+    }
+  }, [
+    isClientUser,
+    isOwnClient,
+    clientId,
+    profile,
+    router,
+    isSupportAgent,
+    assignmentsLoading,
+    assignedClientIds,
+  ])
+
+  const staffCanManage =
+    hasFullClientCatalogAccess(profile?.role) ||
+    (isSupportAgent && isAssignedSupportClient && !assignmentsLoading)
+
   return {
-    isClientUser,      // Es un usuario con rol cliente
-    isOwnClient,       // El cliente está viendo su propia página
-    canEdit: !isClientUser,    // Puede editar (staff)
-    canDelete: !isClientUser,  // Puede eliminar (staff)
-    canCreate: !isClientUser,  // Puede crear (staff)
-    readOnly: isClientUser,    // Modo solo lectura (cliente)
+    isClientUser,
+    isSupportAgent,
+    isOwnClient,
+    isAssignedSupportClient,
+    assignedClientIds,
+    canEdit: staffCanManage && !isClientUser,
+    canDelete: canDeleteClientCompany(profile?.role),
+    canCreate: canCreateClientCompany(profile?.role),
+    readOnly: isClientUser,
   }
 }

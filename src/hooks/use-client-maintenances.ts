@@ -10,6 +10,8 @@ export const clientMaintenanceKeys = {
   all: ['client-maintenances'] as const,
   byClientYear: (clientId: string, year: number) => [...clientMaintenanceKeys.all, clientId, year] as const,
   upcoming: (limit: number) => [...clientMaintenanceKeys.all, 'upcoming', limit] as const,
+  upcomingForClient: (clientId: string, limit: number) =>
+    [...clientMaintenanceKeys.all, 'upcoming', clientId, limit] as const,
 }
 
 export function useClientMaintenances(clientId: string, year: number) {
@@ -28,6 +30,15 @@ export function useUpcomingClientMaintenances(limit = 5, enabled = true) {
     enabled,
     staleTime: 60 * 1000,
     refetchInterval: 2 * 60 * 1000,
+  })
+}
+
+export function useUpcomingClientMaintenancesForClient(clientId: string, limit = 5) {
+  return useQuery<UpcomingClientMaintenance[]>({
+    queryKey: clientMaintenanceKeys.upcomingForClient(clientId, limit),
+    queryFn: () => clientMaintenancesService.listUpcomingForClient(clientId, limit),
+    enabled: !!clientId,
+    staleTime: 60 * 1000,
   })
 }
 

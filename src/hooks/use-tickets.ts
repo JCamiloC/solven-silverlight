@@ -22,11 +22,12 @@ const QUERY_KEYS = {
 }
 
 // Hook para obtener todos los tickets
-export function useTickets() {
+export function useTickets(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: QUERY_KEYS.tickets,
     queryFn: () => TicketsService.getAll(),
     staleTime: 2 * 60 * 1000,
+    enabled: options?.enabled ?? true,
   })
 }
 

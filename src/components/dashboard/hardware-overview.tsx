@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useHardwareAssets } from '@/hooks/use-hardware'
 import { useSoftwareStats } from '@/hooks/use-software'
+import { useCustomApplicationsStats } from '@/hooks/use-custom-applications'
 import { useAccessStats } from '@/hooks/use-access-credentials'
 import { useAuth } from '@/hooks/use-auth'
 import { useUsers } from '@/hooks/use-users'
@@ -18,45 +19,57 @@ import {
 import Link from 'next/link'
 
 export function HardwareOverview() {
-  const { data: assets, isLoading } = useHardwareAssets()
-  const { data: softwareStats } = useSoftwareStats()
+  const { data: assets, isLoading: loadingHardware } = useHardwareAssets()
+  const { data: softwareStats, isLoading: loadingSoftwareStats } = useSoftwareStats()
+  const { data: customAppStats, isLoading: loadingCustomAppStats } = useCustomApplicationsStats()
   const { data: accessStats, error: accessError } = useAccessStats()
   const { hasRole } = useAuth()
   const isAdmin = hasRole(['administrador'])
+  const showStaffUsers = hasRole(['administrador', 'lider_soporte'])
 
-  const { data: users = [] } = useUsers()
+  const { data: users = [] } = useUsers({ enabled: showStaffUsers })
   const activeUsersCount = users.length
 
-  // Get system status overview
+  const hardwareCount = assets?.length ?? 0
+  const licenseCount = softwareStats?.total ?? 0
+  const customAppCount = customAppStats?.total ?? 0
+  const softwareTotal = licenseCount + customAppCount
+  const accessActiveCount = accessError ? 0 : (accessStats?.active ?? 0)
+  const isLoading = loadingHardware || loadingSoftwareStats || loadingCustomAppStats
+
   const systemStatus = [
     {
       name: 'Hardware',
       icon: HardDrive,
-      status: 'Operativo',
-      count: assets?.length || 0,
+      status: `${hardwareCount} activos`,
+      count: hardwareCount,
       variant: 'secondary' as const,
     },
     {
       name: 'Software',
       icon: Monitor,
-      status: 'Operativo',
-      count: softwareStats?.active || 0,
+      status: `${customAppCount} apps · ${licenseCount} licencias`,
+      count: softwareTotal,
       variant: 'secondary' as const,
     },
     {
       name: 'Accesos',
       icon: Key,
-      status: isAdmin ? 'Operativo' : 'Restringido',
-      count: isAdmin ? (accessError ? 0 : (accessStats?.active || 0)) : 0,
+      status: isAdmin ? `${accessActiveCount} credenciales activas` : 'Solo administrador',
+      count: isAdmin ? accessActiveCount : 0,
       variant: 'secondary' as const,
     },
-    {
-      name: 'Usuarios',
-      icon: Users,
-      status: `${activeUsersCount} registrados`,
-      count: activeUsersCount,
-      variant: 'secondary' as const,
-    },
+    ...(showStaffUsers
+      ? [
+          {
+            name: 'Usuarios',
+            icon: Users,
+            status: `${activeUsersCount} en plataforma`,
+            count: activeUsersCount,
+            variant: 'secondary' as const,
+          },
+        ]
+      : []),
   ]
 
   return (

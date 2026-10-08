@@ -60,6 +60,42 @@ class ClientMaintenancesService {
     return (data || []) as ClientMaintenanceSchedule[]
   }
 
+  async listUpcomingForClient(clientId: string, limit = 5): Promise<UpcomingClientMaintenance[]> {
+    if (!clientId) return []
+
+    const supabase = createClient()
+    const today = new Date().toISOString().slice(0, 10)
+
+    const { data, error } = await supabase
+      .from('client_maintenance_schedule')
+      .select('id, client_id, year, slot_number, expected_date, status, notes, clients(name)')
+      .eq('client_id', clientId)
+      .in('status', ['pendiente', 'reprogramado'])
+      .gte('expected_date', today)
+      .order('expected_date', { ascending: true })
+      .limit(limit)
+
+    if (error) throw this.toError(error, 'No se pudo consultar los mantenimientos próximos')
+
+    return ((data || []) as Array<Record<string, unknown>>).map((row) => {
+      const rawClient = row.clients as { name?: string } | Array<{ name?: string }> | null | undefined
+      const clientName = Array.isArray(rawClient)
+        ? rawClient[0]?.name || 'Cliente sin nombre'
+        : rawClient?.name || 'Cliente sin nombre'
+
+      return {
+        id: String(row.id || ''),
+        client_id: String(row.client_id || ''),
+        client_name: clientName,
+        year: Number(row.year || 0),
+        slot_number: Number(row.slot_number || 0),
+        expected_date: String(row.expected_date || ''),
+        status: (row.status as ClientMaintenanceStatus) || 'pendiente',
+        notes: (row.notes as string | null | undefined) || null,
+      }
+    })
+  }
+
   async listUpcoming(limit = 5): Promise<UpcomingClientMaintenance[]> {
     const supabase = createClient()
     const today = new Date().toISOString().slice(0, 10)
