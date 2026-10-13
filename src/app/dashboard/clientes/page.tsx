@@ -29,6 +29,7 @@ import { ProtectedRoute } from '@/components/auth/protected-route'
 import { useClients, useCreateClient } from '@/hooks/use-clients'
 import { useActionLock } from '@/hooks/use-action-lock'
 import { useAuth } from '@/hooks/use-auth'
+import { resolveEffectiveProfile } from '@/lib/auth/fallback-profile'
 import { canCreateClientCompany } from '@/lib/auth/staff-client-access'
 import { Client, ClientType } from '@/types'
 import { format } from 'date-fns'
@@ -41,8 +42,30 @@ export default function ClientesPage() {
   const { data: clients, isLoading, error } = useClients()
   const { mutateAsync: createClient, isPending: isCreating } = useCreateClient()
   const { runWithLock, isLocked } = useActionLock()
-  const { profile } = useAuth()
-  const showCreateClient = canCreateClientCompany(profile?.role)
+  const { user, profile, initialized } = useAuth()
+  const effectiveProfile = resolveEffectiveProfile(user, profile)
+
+  useEffect(() => {
+    if (!initialized) return
+    if (effectiveProfile?.role !== 'cliente') return
+    if (effectiveProfile.client_id) {
+      router.replace(`/dashboard/clientes/${effectiveProfile.client_id}`)
+    } else {
+      router.replace('/dashboard')
+    }
+  }, [initialized, effectiveProfile?.role, effectiveProfile?.client_id, router])
+
+  if (initialized && effectiveProfile?.role === 'cliente') {
+    return (
+      <ProtectedRoute allowedRoles={['cliente']}>
+        <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
+          Redirigiendo a tu empresa...
+        </div>
+      </ProtectedRoute>
+    )
+  }
+
+  const showCreateClient = canCreateClientCompany(effectiveProfile?.role)
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10

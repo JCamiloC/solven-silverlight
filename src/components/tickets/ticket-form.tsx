@@ -39,6 +39,7 @@ import { useCustomApplicationsByClient } from '@/hooks/use-custom-applications'
 import { useAccessCredentialsByClient } from '@/hooks/use-access-credentials'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+import { Checkbox } from '@/components/ui/checkbox'
 import { AlertCircle, Upload, X } from 'lucide-react'
 
 const ticketFormSchema = z.object({
@@ -66,6 +67,7 @@ const ticketFormSchema = z.object({
   software_id: z.string().optional(),
   software_source: z.enum(['license', 'custom_app']).optional(),
   access_credential_id: z.string().optional(),
+  security_incident: z.boolean().optional(),
 })
 
 type TicketFormValues = z.infer<typeof ticketFormSchema>
@@ -143,6 +145,7 @@ export function TicketForm({
       software_id: undefined,
       software_source: undefined,
       access_credential_id: undefined,
+      security_incident: false,
     },
   })
 
@@ -274,6 +277,7 @@ export function TicketForm({
           category: data.category,
           priority: data.priority,
           assigned_to: data.assigned_to || undefined,
+          security_incident: Boolean(data.security_incident),
         }
 
         // Solo permitir cambiar estado si tiene permisos
@@ -320,6 +324,7 @@ export function TicketForm({
           attachment_url: attachmentData.url,
           attachment_name: attachmentData.name,
           attachment_size: attachmentData.size,
+          security_incident: Boolean(data.security_incident),
         }
 
         // Si se especificó una fecha de creación personalizada, agregarla
@@ -643,6 +648,29 @@ export function TicketForm({
                 />
               )}
             </div>
+
+            {!isClient && (
+              <FormField
+                control={form.control}
+                name="security_incident"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start gap-3 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={Boolean(field.value)}
+                        onCheckedChange={(checked) => field.onChange(checked === true)}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Incidente de seguridad</FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        Marca este ticket si debe contarse en la metrica de seguridad del reporte KPI.
+                      </p>
+                    </div>
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Selector dinámico según categoría */}
             {selectedCategory === 'hardware' && selectedClientId && (

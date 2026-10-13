@@ -17,6 +17,8 @@ const QUERY_KEYS = {
   ticket: (id: string) => ['tickets', id] as const,
   stats: ['tickets', 'stats'] as const,
   clientTickets: (clientId: string) => ['tickets', 'client', clientId] as const,
+  reportTickets: (clientId: string, startDate: string, endDate: string) =>
+    ['tickets', 'report', clientId, startDate, endDate] as const,
   myTickets: ['tickets', 'my'] as const,
   pendingUpdates: ['tickets', 'pending-updates'] as const,
 }
@@ -28,6 +30,23 @@ export function useTickets(options?: { enabled?: boolean }) {
     queryFn: () => TicketsService.getAll(),
     staleTime: 2 * 60 * 1000,
     enabled: options?.enabled ?? true,
+  })
+}
+
+/** Tickets filtrados por cliente y fechas (reportes / KPIs). */
+export function useReportTickets(options: {
+  clientId: string
+  startDate: string
+  endDate: string
+  enabled: boolean
+}) {
+  const { clientId, startDate, endDate, enabled } = options
+
+  return useQuery({
+    queryKey: QUERY_KEYS.reportTickets(clientId, startDate, endDate),
+    queryFn: () => TicketsService.getForReport({ clientId, startDate, endDate }),
+    enabled: enabled && Boolean(startDate && endDate),
+    staleTime: 60 * 1000,
   })
 }
 

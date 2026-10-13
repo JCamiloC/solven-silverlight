@@ -19,6 +19,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { usePageTitle } from '@/hooks/use-page-title'
 import { useActionLock } from '@/hooks/use-action-lock'
 import { useRouter } from 'next/navigation'
+import { ThemeToggle } from '@/components/theme/theme-toggle'
 
 export function Header() {
   const notifications = [
@@ -93,6 +94,7 @@ export function Header() {
         <div className="flex flex-1 items-center justify-end ml-4">
           {/* Right side items */}
           <div className="flex items-center space-x-2">
+            <ThemeToggle />
             {/* Notifications */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

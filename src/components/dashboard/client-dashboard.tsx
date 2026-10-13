@@ -34,6 +34,7 @@ import { useSoftwareByClient } from '@/hooks/use-software'
 import { useCustomApplicationsByClient } from '@/hooks/use-custom-applications'
 import { useUpcomingClientMaintenancesForClient } from '@/hooks/use-client-maintenances'
 import { RecentTickets } from './recent-tickets'
+import { ExpirationAlertsPanel } from './expiration-alerts-panel'
 import { Loading } from '@/components/ui/loading'
 
 const STATUS_COLORS: Record<string, string> = {
@@ -376,6 +377,13 @@ export function ClientDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <ExpirationAlertsPanel
+        title="Alertas de tu empresa"
+        description="Vencimientos de equipos, licencias y mantenimientos programados pendientes"
+        limit={10}
+        enabled={!!clientId}
+      />
 
       <Card>
         <CardHeader>

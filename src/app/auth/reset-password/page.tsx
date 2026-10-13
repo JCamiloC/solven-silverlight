@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { CheckCircle, Eye, EyeOff } from 'lucide-react'
+import { ThemeToggle } from '@/components/theme/theme-toggle'
 
 function ResetPasswordForm() {
   const [password, setPassword] = useState('')
@@ -169,10 +170,13 @@ function ResetPasswordForm() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="relative flex min-h-screen items-center justify-center p-4">
+        <div className="absolute top-4 right-4 z-10">
+          <ThemeToggle />
+        </div>
         <div className="w-full max-w-md space-y-6">
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-slate-800">Solven</h1>
+            <h1 className="text-3xl font-bold text-foreground">Solven</h1>
             <p className="text-muted-foreground">Sistema de Gestión Integral</p>
           </div>
           
@@ -208,10 +212,13 @@ function ResetPasswordForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="relative flex min-h-screen items-center justify-center p-4">
+      <div className="absolute top-4 right-4 z-10">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-slate-800">Solven</h1>
+          <h1 className="text-3xl font-bold text-foreground">Solven</h1>
           <p className="text-muted-foreground">Sistema de Gestión Integral</p>
         </div>
         
@@ -316,7 +323,10 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="relative flex min-h-screen items-center justify-center p-4">
+        <div className="absolute top-4 right-4 z-10">
+          <ThemeToggle />
+        </div>
         <div className="w-full max-w-md">
           <Card>
             <CardContent className="pt-6">

@@ -4,7 +4,8 @@ import { SecuritySettings } from '@/components/security/security-settings'
 import { UserProfile } from '@/components/security/user-profile'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { User, Shield } from 'lucide-react'
+import { User, Shield, Palette } from 'lucide-react'
+import { AppearanceSettings } from '@/components/theme/appearance-settings'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 
 export default function ConfiguracionPage() {
@@ -32,6 +33,21 @@ export default function ConfiguracionPage() {
         </CardHeader>
         <CardContent>
           <UserProfile />
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="h-5 w-5" />
+            Apariencia
+          </CardTitle>
+          <CardDescription>Tema claro u oscuro en todo el sistema</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AppearanceSettings />
         </CardContent>
       </Card>
 

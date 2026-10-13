@@ -15,8 +15,10 @@ import {
 } from 'docx'
 import type { TicketWithRelations } from '@/lib/services/tickets'
 import {
+  buildKpiNarrativeParagraphs,
   buildTicketKpiReportData,
   formatMinutesToReadable,
+  getKpiReportPeriodLabel,
 } from '@/lib/services/ticket-kpi-report-utils'
 import { getReportLogoForWord } from '@/lib/services/report-logo'
 import type { VisitReportRow } from '@/lib/services/visit-report-pdf'
@@ -29,13 +31,6 @@ interface KpiReportWordOptions {
   endDate?: string
   assignedUserNames?: Record<string, string>
   visitHistory?: VisitReportRow[]
-}
-
-const getReportMonthLabel = (startDate?: string, endDate?: string) => {
-  if (startDate && endDate && startDate.slice(0, 7) === endDate.slice(0, 7)) {
-    return format(new Date(`${startDate}T00:00:00`), 'MMMM yyyy', { locale: es })
-  }
-  return 'el periodo seleccionado'
 }
 
 const createHeaderCell = (text: string) =>
@@ -57,8 +52,10 @@ export class TicketKpiReportWord {
     try {
       const report = buildTicketKpiReportData(tickets, options.assignedUserNames)
       const logo = await getReportLogoForWord(170)
-      const monthLabel = getReportMonthLabel(options.startDate, options.endDate)
+      const monthLabel = getKpiReportPeriodLabel(options.startDate, options.endDate)
       const clientLabel = options.isGeneralReport ? 'Todos los clientes' : options.clientName
+      const visitHistory = options.visitHistory || []
+      const narratives = buildKpiNarrativeParagraphs(report, visitHistory, monthLabel)
 
       const kpiTableRows = [
         new TableRow({
@@ -87,7 +84,6 @@ export class TicketKpiReportWord {
         ),
       ]
 
-      const visitHistory = options.visitHistory || []
       const includeClient = Boolean(options.isGeneralReport)
       const visitTableRows =
         visitHistory.length > 0
@@ -167,7 +163,7 @@ export class TicketKpiReportWord {
                 text: 'Con base en la informacion contenida anteriormente y respondiendo a las metricas de exito propuestas en los SLAs, a continuacion, presentamos el comportamiento de la operacion durante el mes:',
                 spacing: { after: 100 },
               }),
-              new Paragraph({ text: '- Disponibilidad de servicios: No se registraron eventos nivel Critico P1; lo cual se traduce en que no hubo interrupciones del servicio, continuando con la disponibilidad del servicio en un nivel superior al 97.5% propuesto para los periodos operativos.' }),
+              new Paragraph({ text: narratives.availability }),
               new Paragraph({
                 text: `- Cumplimiento en Tiempos de resolucion: ${report.resolutionCompliance.percentage}% (${report.resolutionCompliance.within}/${report.resolutionCompliance.evaluated}) de los casos se resolvieron dentro de los tiempos propuestos en los SLA, dentro de los cuales se dividieron en:`,
               }),
@@ -177,11 +173,9 @@ export class TicketKpiReportWord {
               new Paragraph({
                 text: `- Cumplimiento en Tiempos de respuesta: ${report.responseCompliance.percentage}% (${report.responseCompliance.within}/${report.responseCompliance.evaluated}) dentro del tiempo objetivo por nivel (promedio general de respuesta: ${formatMinutesToReadable(report.responseCompliance.averageMinutes)}).`,
               }),
+              new Paragraph({ text: narratives.security }),
               new Paragraph({
-                text: '- Seguridad: No se presento ningun incidente de seguridad mayor que afectara la operacion, se implementaron nuevas politicas con mayor restriccion sobre la navegacion en redes sociales y el bloqueo del uso de dispositivos de almacenamiento externo por USB.',
-              }),
-              new Paragraph({
-                text: '- Productividad: Durante el mes de marzo se aprovisionaron 2 equipos nuevos, 2 docking station y 2 cargadores adicionales (para la direccion ejecutiva), ademas se han programado revisiones sobre equipos, infraestructura general y copias de seguridad en el servidor de aplicaciones, asi como ajustes en las politicas de dominio, para un total de 10 atenciones en sitio. Como ultimo anexo, se programaron 4 visitas al domicilio del director ejecutivo para la instalacion de 2 Access Point como solucion de red y la entrega de un equipo para uso personal junto con su respectivo docking.',
+                text: narratives.productivity,
                 spacing: { after: 120 },
               }),
               new Paragraph({

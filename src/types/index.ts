@@ -495,6 +495,7 @@ export interface Ticket {
   assigned_to?: string
   created_by: string
   usuario_afectado?: string
+  security_incident?: boolean
   resolved_at?: string
   tiempo_respuesta?: string
   tiempo_solucion?: string

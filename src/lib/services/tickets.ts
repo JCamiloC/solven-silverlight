@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import { toQueryError } from '@/lib/query-errors'
+import { getLocalDayBounds } from '@/lib/utils/ticket-date-range'
 
 export interface Ticket {
   id: string
@@ -27,6 +28,7 @@ export interface Ticket {
   software_id?: string
   software_source?: 'license' | 'custom_app'
   access_credential_id?: string
+  security_incident?: boolean
   // Campos de notificaciones
   has_update?: boolean
   last_update_by?: string
@@ -52,6 +54,7 @@ export interface TicketInsert {
   software_id?: string
   software_source?: 'license' | 'custom_app'
   access_credential_id?: string
+  security_incident?: boolean
 }
 
 export interface TicketUpdate {
@@ -74,6 +77,7 @@ export interface TicketUpdate {
   software_id?: string
   software_source?: 'license' | 'custom_app'
   access_credential_id?: string
+  security_incident?: boolean
   has_update?: boolean
   last_update_by?: string
   last_update_type?: 'comment' | 'status_change' | 'assignment'
@@ -116,9 +120,10 @@ export interface TicketWithRelations extends Ticket {
  * Debe ser un literal para que supabase-js pueda inferir el tipo del select.
  */
 export const TICKET_LIST_COLUMNS =
-  'id,ticket_number,client_id,title,description,priority,status,category,assigned_to,created_by,usuario_afectado,resolved_at,tiempo_respuesta,tiempo_solucion,created_at,updated_at,contact_email,attachment_url,attachment_name,attachment_size,hardware_id,software_id,software_source,access_credential_id,has_update,last_update_by,last_update_type' as const
+  'id,ticket_number,client_id,title,description,priority,status,category,assigned_to,created_by,usuario_afectado,resolved_at,tiempo_respuesta,tiempo_solucion,created_at,updated_at,contact_email,attachment_url,attachment_name,attachment_size,hardware_id,software_id,software_source,access_credential_id,security_incident,has_update,last_update_by,last_update_type' as const
 
 const TICKET_LIST_LIMIT = 500
+const REPORT_TICKET_LIMIT = 2000
 
 export class TicketsService {
   static async getAll(): Promise<TicketWithRelations[]> {
@@ -132,6 +137,40 @@ export class TicketsService {
 
     if (error) {
       console.error('Error fetching tickets:', error)
+      throw toQueryError(error)
+    }
+
+    return (data || []) as TicketWithRelations[]
+  }
+
+  /**
+   * Tickets para reportes/KPIs: filtra por rango de fechas (día local) y opcionalmente por cliente.
+   * Evita depender de los 500 tickets más recientes de todo el sistema.
+   */
+  static async getForReport(filters: {
+    clientId: string
+    startDate: string
+    endDate: string
+  }): Promise<TicketWithRelations[]> {
+    const supabase = createClient()
+    const { start, end } = getLocalDayBounds(filters.startDate, filters.endDate)
+
+    let query = supabase
+      .from('tickets')
+      .select(TICKET_LIST_COLUMNS)
+      .gte('created_at', start.toISOString())
+      .lte('created_at', end.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(REPORT_TICKET_LIMIT)
+
+    if (filters.clientId && filters.clientId !== 'all') {
+      query = query.eq('client_id', filters.clientId)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching tickets for report:', error)
       throw toQueryError(error)
     }
 

@@ -59,7 +59,7 @@ export default function ActaSigningClient({ token }: Props) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="flex items-center gap-2 text-slate-600">
           <Loader2 className="h-5 w-5 animate-spin" />
           Cargando acta...
@@ -70,8 +70,8 @@ export default function ActaSigningClient({ token }: Props) {
 
   if (isError || !acta) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-        <div className="max-w-md w-full rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full rounded-xl border border-border bg-card p-6 text-center shadow-sm">
           <h1 className="text-lg font-semibold text-slate-900">Link no válido</h1>
           <p className="mt-2 text-sm text-slate-600">
             {(error as Error)?.message ||
@@ -90,8 +90,8 @@ export default function ActaSigningClient({ token }: Props) {
 
   if (done || acta.estado_firma === 'completo') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-        <div className="max-w-md w-full rounded-xl border border-emerald-100 bg-white p-8 text-center shadow-sm">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full rounded-xl border border-emerald-200/60 dark:border-emerald-900 bg-card p-8 text-center shadow-sm">
           <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600" />
           <h1 className="mt-4 text-xl font-semibold text-slate-900">Firma registrada</h1>
           <p className="mt-2 text-sm text-slate-600">
@@ -104,8 +104,8 @@ export default function ActaSigningClient({ token }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4">
-      <div className="max-w-xl mx-auto rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="min-h-screen bg-background py-8 px-4">
+      <div className="max-w-xl mx-auto rounded-xl border border-border bg-card p-6 shadow-sm">
         <div className="flex items-start gap-3 mb-6">
           <div className="rounded-lg bg-blue-50 p-2 text-blue-700">
             <FileSignature className="h-6 w-6" />
@@ -154,7 +154,7 @@ export default function ActaSigningClient({ token }: Props) {
 
           <div>
             <Label>Firma</Label>
-            <div className="border rounded-md p-2 bg-white mt-1">
+            <div className="border rounded-md p-2 bg-background mt-1">
               <SignaturePad ref={sigRef} width={600} height={220} />
             </div>
             <div className="flex gap-2 mt-2">

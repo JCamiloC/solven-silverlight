@@ -9,13 +9,29 @@ export type SmtpConfig = {
   from: string
 }
 
+function resolveSmtpFromAddress(smtpUser: string): string | null {
+  const explicit = process.env.SMTP_FROM_EMAIL?.trim()
+  if (explicit) return explicit
+
+  const legacy = process.env.SMTP_FROM?.trim()
+  if (legacy) {
+    const angle = legacy.match(/<([^>]+)>/)
+    if (angle?.[1]) return angle[1].trim()
+    return legacy
+  }
+
+  // Misma cuenta que ya tiene SMTP (p. ej. desarrollo@silverlight.com.co)
+  if (smtpUser) return smtpUser
+  return null
+}
+
 export function getSmtpConfig(): SmtpConfig | null {
   const host = process.env.SMTP_HOST
   const port = Number(process.env.SMTP_PORT || '587')
   const secure = (process.env.SMTP_SECURE || 'false').toLowerCase() === 'true'
   const user = process.env.SMTP_USER
-  const pass = process.env.SMTP_PASS
-  const from = process.env.SMTP_FROM_EMAIL
+  const pass = process.env.SMTP_PASS ?? process.env.SMTP_PASSWORD
+  const from = user ? resolveSmtpFromAddress(user) : null
 
   if (!host || !user || !pass || !from) return null
 

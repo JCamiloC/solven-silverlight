@@ -196,7 +196,7 @@ export default function ClientCompanySignatureModal({
                   <img
                     src={uploadedSignatureDataUrl}
                     alt="Vista previa de firma cargada"
-                    className="max-h-28 border rounded-md bg-white p-2"
+                    className="max-h-28 border rounded-md bg-background p-2"
                   />
                   <Button type="button" variant="outline" onClick={clearUploadedImage}>
                     Quitar imagen
@@ -206,7 +206,7 @@ export default function ClientCompanySignatureModal({
             </div>
 
             <Label className="text-sm">O dibujar firma manualmente</Label>
-            <div className="border rounded-md p-2 bg-white">
+            <div className="border rounded-md p-2 bg-background">
               <SignaturePad ref={sigRef} width={700} height={220} />
             </div>
             <Button

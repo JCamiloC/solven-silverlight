@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Loader2, FileText, Eye, Download } from 'lucide-react'
 import { useClients } from '@/hooks/use-clients'
 import { useMaintenanceReport, useExportMaintenancePDF, useExportMaintenanceWord } from '@/hooks/use-maintenance-reports'
-import { useTickets } from '@/hooks/use-tickets'
+import { useReportTickets } from '@/hooks/use-tickets'
 import { useAllClientVisits } from '@/hooks/use-visitas'
 import { useAssignableUsers } from '@/hooks/use-users'
 import { MaintenanceReportFilters } from '@/types'
@@ -18,7 +18,11 @@ import { TicketReportPDF } from '@/lib/services/ticket-report-pdf'
 import { TicketReportWord } from '@/lib/services/ticket-report-word'
 import { TicketKpiReportPDF } from '@/lib/services/ticket-kpi-report-pdf'
 import { TicketKpiReportWord } from '@/lib/services/ticket-kpi-report-word'
-import { buildTicketKpiReportData } from '@/lib/services/ticket-kpi-report-utils'
+import {
+  buildKpiNarrativeParagraphs,
+  buildTicketKpiReportData,
+  getKpiReportPeriodLabel,
+} from '@/lib/services/ticket-kpi-report-utils'
 import { VisitReportPDF, VisitReportRow, buildVisitReportRows } from '@/lib/services/visit-report-pdf'
 import { VisitReportWord } from '@/lib/services/visit-report-word'
 import { VisitDetailPDF } from '@/lib/services/visit-detail-pdf'
@@ -171,7 +175,19 @@ export default function ReportsPage() {
   const [shouldFetchTicketsVisits, setShouldFetchTicketsVisits] = useState(false)
 
   const { data: clients } = useClients()
-  const { data: tickets = [], isLoading: ticketsLoading } = useTickets()
+  const shouldLoadReportTickets =
+    shouldFetchTickets || shouldFetchKpis || shouldFetchTicketsVisits
+  const {
+    data: reportTickets = [],
+    isLoading: reportTicketsLoading,
+    isFetching: reportTicketsFetching,
+  } = useReportTickets({
+    clientId: filters.clientId,
+    startDate: filters.startDate,
+    endDate: filters.endDate,
+    enabled: shouldLoadReportTickets,
+  })
+  const reportTicketsBusy = reportTicketsLoading || reportTicketsFetching
   const { data: visits = [], isLoading: visitsLoading } = useAllClientVisits()
   const { data: assignableUsers = [] } = useAssignableUsers()
 
@@ -196,16 +212,11 @@ export default function ReportsPage() {
   const selectedClient = clients?.find((c) => c.id === filters.clientId)
 
   const ticketRows = useMemo(() => {
-    if (!shouldFetchTickets && !shouldFetchKpis && !shouldFetchTicketsVisits) {
+    if (!shouldLoadReportTickets) {
       return [] as TicketWithRelations[]
     }
-
-    return tickets.filter((ticket) => {
-      const byClient = filters.clientId === 'all' || ticket.client_id === filters.clientId
-      const byDate = inDateRange(ticket.created_at, filters.startDate, filters.endDate)
-      return byClient && byDate
-    })
-  }, [tickets, filters, shouldFetchTickets, shouldFetchKpis, shouldFetchTicketsVisits])
+    return reportTickets
+  }, [reportTickets, shouldLoadReportTickets])
 
   const assignedUserMap = useMemo(() => {
     return assignableUsers.reduce<Record<string, string>>((acc, user) => {
@@ -263,6 +274,12 @@ export default function ReportsPage() {
       visitStatusLabels,
     })
   }, [visitsInReportRange, clientNameById, shouldFetchKpis])
+
+  const kpiNarratives = useMemo(() => {
+    if (!kpiReportData) return null
+    const periodLabel = getKpiReportPeriodLabel(filters.startDate, filters.endDate)
+    return buildKpiNarrativeParagraphs(kpiReportData, kpiVisitExportRows, periodLabel)
+  }, [kpiReportData, kpiVisitExportRows, filters.startDate, filters.endDate])
 
   const kpiVisitRowsForExport = useMemo<VisitReportRow[]>(() => {
     return buildVisitReportRows(visitsInReportRange, {
@@ -710,11 +727,14 @@ export default function ReportsPage() {
                       !filters.endDate ||
                       maintenanceLoading ||
                       maintenanceFetching ||
-                      ticketsLoading ||
+                      (shouldLoadReportTickets && reportTicketsBusy) ||
                       visitsLoading
                     }
                   >
-                    {(maintenanceLoading || maintenanceFetching || ticketsLoading || visitsLoading) && (
+                    {(maintenanceLoading ||
+                      maintenanceFetching ||
+                      (shouldLoadReportTickets && reportTicketsBusy) ||
+                      visitsLoading) && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
                     Generar Reporte
@@ -1196,10 +1216,19 @@ export default function ReportsPage() {
                 <CardHeader>
                   <CardTitle>Resultados del Reporte KPI</CardTitle>
                   <CardDescription>
-                    {kpiReportData.rows.length} ticket(s) incluido(s) entre {filters.startDate} y {filters.endDate}
+                    {kpiReportData.rows.length} ticket(s) · P1: {kpiReportData.priorityDistribution.P1} · Seguridad:{' '}
+                    {kpiReportData.securityIncidents} · {filters.startDate} a {filters.endDate}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {kpiNarratives && (
+                    <div className="rounded-md border bg-muted/30 p-4 space-y-2 text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground">Resumen narrativo (exportacion PDF/Word)</p>
+                      <p>{kpiNarratives.availability}</p>
+                      <p>{kpiNarratives.security}</p>
+                      <p>{kpiNarratives.productivity}</p>
+                    </div>
+                  )}
                   <div className="rounded-md border overflow-x-auto">
                     <Table>
                       <TableHeader>
@@ -1288,7 +1317,7 @@ export default function ReportsPage() {
               </Card>
             )}
 
-            {selectedReport === 'tickets' && shouldFetchTickets && ticketRows.length === 0 && !ticketsLoading && (
+            {selectedReport === 'tickets' && shouldFetchTickets && ticketRows.length === 0 && !reportTicketsBusy && (
               <Card>
                 <CardContent className="py-10">
                   <div className="text-center text-muted-foreground">
@@ -1312,7 +1341,7 @@ export default function ReportsPage() {
               shouldFetchTicketsVisits &&
               ticketRows.length === 0 &&
               visitRows.length === 0 &&
-              !ticketsLoading &&
+              !reportTicketsBusy &&
               !visitsLoading && (
               <Card>
                 <CardContent className="py-10">
@@ -1323,7 +1352,7 @@ export default function ReportsPage() {
               </Card>
             )}
 
-            {selectedReport === 'kpis' && shouldFetchKpis && ticketRows.length === 0 && !ticketsLoading && (
+            {selectedReport === 'kpis' && shouldFetchKpis && ticketRows.length === 0 && !reportTicketsBusy && (
               <Card>
                 <CardContent className="py-10">
                   <div className="text-center text-muted-foreground">

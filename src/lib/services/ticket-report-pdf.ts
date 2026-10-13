@@ -41,14 +41,33 @@ export class TicketReportPDF {
       // Calcular estadísticas
       const stats = this.calculateStats(tickets)
 
-      const logo = await getReportLogoForPdf(38)
-      const logoHeight = logo?.height || 0
-      const headerHeight = 52
-      const contentTop = headerHeight + 10
+      const logo = await getReportLogoForPdf(34)
       const titleBase = isGeneralReport ? 'Reporte General' : clientName
       const subtitle = reportPeriodLabel ? `${titleBase} - ${reportPeriodLabel}` : titleBase
       const mainTitle = isCombined ? 'REPORTE DE TICKETS Y VISITAS' : 'REPORTE DE TICKETS'
 
+      const headerLayout = this.measurePageHeader(doc, {
+        pageWidth,
+        margin,
+        logo,
+        mainTitle,
+        subtitle,
+      })
+      const { headerHeight, contentTop } = headerLayout
+
+      const drawHeader = () => {
+        this.drawPageHeader(doc, {
+          pageWidth,
+          margin,
+          headerHeight,
+          logo,
+          mainTitle,
+          subtitle,
+          layout: headerLayout,
+        })
+      }
+
+      drawHeader()
       doc.setTextColor(0, 0, 0)
       yPos = contentTop
 
@@ -106,10 +125,24 @@ export class TicketReportPDF {
       const checkNewPage = (neededSpace: number) => {
         if (yPos + neededSpace > pageHeight - 20) {
           doc.addPage()
+          drawHeader()
           yPos = contentTop
           return true
         }
         return false
+      }
+
+      const ensureContentY = (y: number) => Math.max(y, contentTop)
+
+      const drawSectionTitle = (title: string) => {
+        yPos = ensureContentY(yPos)
+        checkNewPage(24)
+        doc.setFontSize(14)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(41, 128, 185)
+        doc.text(title, margin, yPos)
+        yPos += 12
+        doc.setTextColor(0, 0, 0)
       }
 
       // ==========================================
@@ -182,12 +215,7 @@ export class TicketReportPDF {
       // ==========================================
       // TABLA DE TICKETS
       // ==========================================
-      checkNewPage(60)
-      doc.setFontSize(14)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(41, 128, 185)
-      doc.text('LISTADO DE TICKETS', margin, yPos)
-      yPos += 5
+      drawSectionTitle('LISTADO DE TICKETS')
 
       if (tickets.length === 0) {
         doc.setFontSize(10)
@@ -208,8 +236,9 @@ export class TicketReportPDF {
       ])
 
       if (tableData.length > 0) {
+        const tableStartY = ensureContentY(yPos)
         autoTable(doc, {
-          startY: yPos,
+          startY: tableStartY,
           head: [['N° Ticket', 'Fecha', 'Título', 'Usuario afectado', 'Prioridad', 'Estado']],
           body: tableData,
           theme: 'striped',
@@ -239,16 +268,11 @@ export class TicketReportPDF {
           margin: { top: contentTop, left: margin, right: margin, bottom: 18 },
         })
 
-        yPos = (doc as any).lastAutoTable?.finalY || yPos + 20
+        yPos = ensureContentY(((doc as any).lastAutoTable?.finalY || tableStartY) + 14)
       }
 
       if (isCombined && visitRows) {
-        checkNewPage(60)
-        doc.setFontSize(14)
-        doc.setFont('helvetica', 'bold')
-        doc.setTextColor(41, 128, 185)
-        doc.text('LISTADO DE VISITAS', margin, yPos)
-        yPos += 5
+        drawSectionTitle('LISTADO DE VISITAS')
 
         if (visitRows.length === 0) {
           doc.setFontSize(10)
@@ -277,8 +301,9 @@ export class TicketReportPDF {
                 ]
           )
 
+          const visitTableStartY = ensureContentY(yPos)
           autoTable(doc, {
-            startY: yPos,
+            startY: visitTableStartY,
             head: [visitHead],
             body: visitBody,
             theme: 'striped',
@@ -300,21 +325,14 @@ export class TicketReportPDF {
             margin: { top: contentTop, left: margin, right: margin, bottom: 18 },
           })
 
-          yPos = (doc as any).lastAutoTable?.finalY || yPos + 20
+          yPos = ensureContentY(((doc as any).lastAutoTable?.finalY || visitTableStartY) + 14)
         }
       }
 
       const totalPages = (doc.internal as any).getNumberOfPages()
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i)
-        this.drawPageHeader(doc, {
-          pageWidth,
-          headerHeight,
-          logo,
-          logoHeight,
-          mainTitle,
-          subtitle,
-        })
+        drawHeader()
         doc.setFontSize(8)
         doc.setTextColor(128, 128, 128)
         doc.text(`Página ${i} de ${totalPages}`, pageWidth / 2, pageHeight - 10, {
@@ -339,37 +357,91 @@ export class TicketReportPDF {
     }
   }
 
-  private static drawPageHeader(
+  private static measurePageHeader(
     doc: any,
     options: {
       pageWidth: number
-      headerHeight: number
+      margin: number
       logo: Awaited<ReturnType<typeof getReportLogoForPdf>>
-      logoHeight: number
       mainTitle: string
       subtitle: string
     }
   ) {
-    const { pageWidth, headerHeight, logo, logoHeight, mainTitle, subtitle } = options
+    const { pageWidth, margin, logo, mainTitle, subtitle } = options
+    const logoPad = 8
+    const logoBoxWidth = logo ? logo.width + logoPad * 2 : 0
+    const textX = margin + logoBoxWidth + 6
+    const textMaxWidth = pageWidth - textX - margin
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(15)
+    const titleLines: string[] = doc.splitTextToSize(mainTitle, textMaxWidth)
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    const subtitleLines: string[] = doc.splitTextToSize(subtitle, textMaxWidth)
+
+    const titleLineHeight = 6
+    const subtitleLineHeight = 5
+    const textBlockHeight = titleLines.length * titleLineHeight + subtitleLines.length * subtitleLineHeight + 4
+    const logoBlockHeight = logo ? logo.height + logoPad * 2 : 0
+    const headerHeight = Math.max(48, logoBlockHeight, textBlockHeight) + 10
+    const contentTop = headerHeight + 12
+
+    return {
+      headerHeight,
+      contentTop,
+      logoPad,
+      logoBoxWidth,
+      textX,
+      textMaxWidth,
+      titleLines,
+      subtitleLines,
+      titleLineHeight,
+      subtitleLineHeight,
+    }
+  }
+
+  private static drawPageHeader(
+    doc: any,
+    options: {
+      pageWidth: number
+      margin: number
+      headerHeight: number
+      logo: Awaited<ReturnType<typeof getReportLogoForPdf>>
+      mainTitle: string
+      subtitle: string
+      layout: ReturnType<typeof TicketReportPDF.measurePageHeader>
+    }
+  ) {
+    const { pageWidth, margin, headerHeight, logo, layout } = options
+    const { logoPad, logoBoxWidth, textX, titleLines, subtitleLines, titleLineHeight, subtitleLineHeight } =
+      layout
 
     doc.setFillColor(41, 128, 185)
     doc.rect(0, 0, pageWidth, headerHeight, 'F')
 
     if (logo) {
       doc.setFillColor(255, 255, 255)
-      doc.roundedRect(8, 6, logo.width + 4, logo.height + 4, 2, 2, 'F')
-      doc.addImage(logo.dataUrl, 'PNG', 10, 8, logo.width, logo.height)
+      doc.roundedRect(margin, logoPad, logoBoxWidth, logo.height + logoPad, 2, 2, 'F')
+      doc.addImage(logo.dataUrl, 'PNG', margin + logoPad / 2, logoPad + logoPad / 2, logo.width, logo.height)
     }
 
-    const textX = pageWidth / 2
+    let textY = logoPad + 4
     doc.setTextColor(255, 255, 255)
-    doc.setFontSize(20)
+    doc.setFontSize(15)
     doc.setFont('helvetica', 'bold')
-    doc.text(mainTitle, textX, 30, { align: 'center' })
+    titleLines.forEach((line: string) => {
+      doc.text(line, textX, textY)
+      textY += titleLineHeight
+    })
 
-    doc.setFontSize(11)
+    doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
-    doc.text(subtitle, textX, 42, { align: 'center' })
+    subtitleLines.forEach((line: string) => {
+      doc.text(line, textX, textY)
+      textY += subtitleLineHeight
+    })
   }
 
   /**

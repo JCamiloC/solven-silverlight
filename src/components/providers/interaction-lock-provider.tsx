@@ -159,7 +159,7 @@ export function InteractionLockProvider({ children }: { children: ReactNode }) {
 
       {isLocked && (
         <div className="fixed inset-0 z-[120] bg-black/25 backdrop-blur-[1px] flex items-center justify-center">
-          <div className="bg-white rounded-md shadow-lg px-4 py-3 border border-slate-200 flex items-center gap-2">
+          <div className="bg-popover text-popover-foreground rounded-md shadow-lg px-4 py-3 border border-border flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin text-slate-700" />
             <span className="text-sm text-slate-700">{message}</span>
           </div>

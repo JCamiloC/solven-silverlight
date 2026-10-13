@@ -18,8 +18,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       <NavigationLoader />
       
       {/* Fixed Sidebar - Solo visible en desktop */}
-      <div className={`hidden md:block fixed left-0 top-0 z-30 h-screen p-2 transition-all duration-300 ${sidebarWidth}`}>
-        <div className="w-full h-full bg-white/80 backdrop-blur-sm rounded-[5px] shadow-sm border border-white/20 overflow-hidden">
+        <div className={`hidden md:block fixed left-0 top-0 z-30 h-screen p-2 transition-all duration-300 ${sidebarWidth}`}>
+        <div className="dashboard-shell w-full h-full overflow-hidden">
           <div className="flex flex-col h-full pt-5 pb-4 overflow-y-auto overflow-x-hidden">
             <Sidebar />
           </div>
@@ -30,12 +30,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       <div className={`min-h-screen p-2 sm:p-4 transition-all duration-300 ${mainMargin}`}>
         <div className="flex flex-col min-h-[calc(100vh-1rem)] sm:min-h-[calc(100vh-2rem)] gap-2 sm:gap-4">
           {/* Header Card */}
-          <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-sm rounded-[5px] shadow-sm border border-white/20">
+          <div className="dashboard-shell sticky top-0 z-40">
             <Header />
           </div>
           
           {/* Page content Card */}
-          <div className="flex-1 bg-white/80 backdrop-blur-sm rounded-[5px] shadow-sm border border-white/20 overflow-hidden">
+          <div className="dashboard-shell flex-1 overflow-hidden">
             <main className="h-full overflow-y-auto">
               <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
                 {children}

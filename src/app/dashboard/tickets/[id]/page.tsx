@@ -243,6 +243,13 @@ export default function TicketDetailPage() {
     })
   }
 
+  const handleSecurityIncidentChange = (checked: boolean) => {
+    updateTicketMutation.mutate({
+      id: ticketId,
+      data: { security_incident: checked },
+    })
+  }
+
   const handleCategoryChange = (newCategory: string) => {
     if (!ticket || !canEditCategoryAndHardware) return
 
@@ -381,6 +388,11 @@ export default function TicketDetailPage() {
               {ticket.has_update && (
                 <Badge variant="secondary" className="shrink-0 bg-sky-100 text-sky-800">
                   Nuevo
+                </Badge>
+              )}
+              {ticket.security_incident && (
+                <Badge variant="destructive" className="shrink-0">
+                  Seguridad
                 </Badge>
               )}
             </div>
@@ -685,6 +697,22 @@ export default function TicketDetailPage() {
                                 ))}
                               </SelectContent>
                             </Select>
+                          </div>
+
+                          <div className="space-y-2 md:col-span-2">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                id="security-incident"
+                                checked={Boolean(ticket.security_incident)}
+                                onChange={(e) => handleSecurityIncidentChange(e.target.checked)}
+                                disabled={updateTicketMutation.isPending}
+                                className="rounded"
+                              />
+                              <Label htmlFor="security-incident" className="text-sm font-normal">
+                                Incidente de seguridad (metrica KPI)
+                              </Label>
+                            </div>
                           </div>
 
                           {editableCategory === 'hardware' && (

@@ -132,7 +132,7 @@ export function UserProfile() {
   return (
     <div className="space-y-6">
       {/* User Info Section */}
-      <div className="flex items-center space-x-4 p-4 bg-slate-50 rounded-lg border">
+      <div className="flex items-center space-x-4 p-4 bg-muted/50 rounded-lg border">
         <Avatar className="h-16 w-16">
           <AvatarFallback className="text-lg bg-blue-100 text-blue-700">
             {getUserInitials()}
@@ -239,12 +239,12 @@ export function UserProfile() {
         </div>
 
         {/* Additional Info Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
           <div className="space-y-1">
             <Label className="text-sm font-medium text-muted-foreground">
               ID de Usuario
             </Label>
-            <p className="text-sm font-mono bg-white px-2 py-1 rounded border">
+            <p className="text-sm font-mono bg-background px-2 py-1 rounded border">
               {profile.user_id}
             </p>
           </div>

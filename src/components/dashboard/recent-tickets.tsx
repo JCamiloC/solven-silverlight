@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useClientTickets, useTickets } from '@/hooks/use-tickets'
 import { useAuth } from '@/hooks/use-auth'
+import { resolveEffectiveProfile } from '@/lib/auth/fallback-profile'
 import { AlertTriangle, CheckCircle, Clock, ArrowRight } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -15,9 +16,10 @@ interface RecentTicketsProps {
 }
 
 export function RecentTickets({ clientId }: RecentTicketsProps) {
-  const { profile } = useAuth()
-  const scopedClientId = clientId ?? profile?.client_id ?? ''
-  const isClientScope = Boolean(scopedClientId && profile?.role === 'cliente')
+  const { user, profile } = useAuth()
+  const effectiveProfile = resolveEffectiveProfile(user, profile)
+  const scopedClientId = clientId ?? effectiveProfile?.client_id ?? ''
+  const isClientScope = Boolean(scopedClientId && effectiveProfile?.role === 'cliente')
 
   const { data: allTickets, isLoading: loadingAll } = useTickets({
     enabled: !isClientScope,

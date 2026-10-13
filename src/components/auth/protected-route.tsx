@@ -60,8 +60,8 @@ export function ProtectedRoute({
       !userHasAllowedRole(user, profile, allowedRoles)
     ) {
       setIsRedirecting(true)
-      if (effectiveProfile.role === 'cliente') {
-        router.replace('/dashboard')
+      if (effectiveProfile.role === 'cliente' && effectiveProfile.client_id) {
+        router.replace(`/dashboard/clientes/${effectiveProfile.client_id}`)
       } else {
         router.replace('/dashboard')
       }

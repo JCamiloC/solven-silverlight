@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { LoadingLink } from '@/components/ui/loading-link'
 import { useAuth } from '@/hooks/use-auth'
+import { resolveEffectiveProfile } from '@/lib/auth/fallback-profile'
 import { useActionLock } from '@/hooks/use-action-lock'
 import { useSidebar } from './sidebar-context'
 import { 
@@ -139,17 +140,22 @@ const allNavigationItems: NavigationItem[] = [
 
 export function Sidebar({ className, onNavigate }: SidebarProps) {
   const pathname = usePathname()
-  const { profile, signOut } = useAuth()
+  const { user, profile, signOut } = useAuth()
+  const effectiveProfile = resolveEffectiveProfile(user, profile)
+  const role = effectiveProfile?.role
   const { runWithLock, isLocked } = useActionLock()
   const { isCollapsed, isHovered, setIsHovered } = useSidebar()
 
   // Filter navigation items based on user role
   const navigation = allNavigationItems
-    .filter(item => profile?.role && item.roles.includes(profile.role))
-    .map(item => {
-      // Para clientes, ajustar el href de "Mi Empresa" con su client_id
-      if (item.roles.includes('cliente') && profile?.client_id) {
-        return { ...item, href: `/dashboard/clientes/${profile.client_id}` }
+    .filter((item) => role && item.roles.includes(role))
+    .map((item) => {
+      if (item.name === 'Mi Empresa' && role === 'cliente') {
+        const clientId = effectiveProfile?.client_id
+        return {
+          ...item,
+          href: clientId ? `/dashboard/clientes/${clientId}` : '/dashboard',
+        }
       }
       return item
     })
@@ -194,7 +200,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
         <div className="space-y-1">
           {navigation.map((item) => (
             <NavButton
-              key={item.name}
+              key={`${item.href}-${item.name}`}
               item={item}
               isActive={
                 pathname === item.href ||

@@ -2,6 +2,7 @@ import { useAuth } from './use-auth'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { toast } from 'sonner'
+import { resolveEffectiveProfile } from '@/lib/auth/fallback-profile'
 import {
   canCreateClientCompany,
   canDeleteClientCompany,
@@ -15,17 +16,19 @@ import { useSupportAgentClientIds } from '@/hooks/use-support-agent-clients'
  * y que el agente de soporte solo vea empresas asignadas.
  */
 export function useClientPermissions() {
-  const { profile } = useAuth()
+  const { user, profile, loading, initialized } = useAuth()
   const params = useParams()
   const router = useRouter()
 
-  const clientId = params.id as string
-  const isClientUser = profile?.role === 'cliente'
-  const isSupportAgent = profile?.role === 'agente_soporte'
-  const isOwnClient = profile?.client_id === clientId
+  const effectiveProfile = resolveEffectiveProfile(user, profile)
+  const clientId = params.id as string | undefined
+  const isClientUser = effectiveProfile?.role === 'cliente'
+  const isSupportAgent = effectiveProfile?.role === 'agente_soporte'
+  const profileClientId = effectiveProfile?.client_id
+  const isOwnClient = Boolean(clientId && profileClientId && profileClientId === clientId)
 
   const { data: assignedClientIds = [], isLoading: assignmentsLoading } = useSupportAgentClientIds(
-    profile?.id,
+    effectiveProfile?.id,
     isSupportAgent
   )
 
@@ -33,11 +36,14 @@ export function useClientPermissions() {
     !isSupportAgent || !clientId || assignedClientIds.includes(clientId)
 
   useEffect(() => {
-    if (isClientUser && clientId && !isOwnClient) {
+    if (!initialized || loading) return
+
+    if (isClientUser && clientId) {
+      if (!profileClientId) return
+      if (isOwnClient) return
+
       toast.error('No tienes permiso para ver esta información')
-      if (profile?.client_id) {
-        router.push(`/dashboard/clientes/${profile.client_id}`)
-      }
+      router.replace(`/dashboard/clientes/${profileClientId}`)
       return
     }
 
@@ -57,10 +63,12 @@ export function useClientPermissions() {
       router.push('/dashboard/clientes')
     }
   }, [
+    initialized,
+    loading,
     isClientUser,
     isOwnClient,
     clientId,
-    profile,
+    profileClientId,
     router,
     isSupportAgent,
     assignmentsLoading,
@@ -68,7 +76,7 @@ export function useClientPermissions() {
   ])
 
   const staffCanManage =
-    hasFullClientCatalogAccess(profile?.role) ||
+    hasFullClientCatalogAccess(effectiveProfile?.role) ||
     (isSupportAgent && isAssignedSupportClient && !assignmentsLoading)
 
   return {
@@ -78,8 +86,8 @@ export function useClientPermissions() {
     isAssignedSupportClient,
     assignedClientIds,
     canEdit: staffCanManage && !isClientUser,
-    canDelete: canDeleteClientCompany(profile?.role),
-    canCreate: canCreateClientCompany(profile?.role),
+    canDelete: canDeleteClientCompany(effectiveProfile?.role),
+    canCreate: canCreateClientCompany(effectiveProfile?.role),
     readOnly: isClientUser,
   }
 }

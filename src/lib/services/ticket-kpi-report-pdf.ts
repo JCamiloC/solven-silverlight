@@ -2,8 +2,10 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { TicketWithRelations } from '@/lib/services/tickets'
 import {
+  buildKpiNarrativeParagraphs,
   buildTicketKpiReportData,
   formatMinutesToReadable,
+  getKpiReportPeriodLabel,
 } from '@/lib/services/ticket-kpi-report-utils'
 import { getReportLogoForPdf } from '@/lib/services/report-logo'
 import type { VisitReportRow } from '@/lib/services/visit-report-pdf'
@@ -17,13 +19,6 @@ interface KpiReportOptions {
   endDate?: string
   assignedUserNames?: Record<string, string>
   visitHistory?: VisitReportRow[]
-}
-
-const getReportMonthLabel = (startDate?: string, endDate?: string) => {
-  if (startDate && endDate && startDate.slice(0, 7) === endDate.slice(0, 7)) {
-    return format(new Date(`${startDate}T00:00:00`), 'MMMM yyyy', { locale: es })
-  }
-  return 'el periodo seleccionado'
 }
 
 export class TicketKpiReportPDF {
@@ -78,7 +73,7 @@ export class TicketKpiReportPDF {
       drawHeaderLogo()
 
       const cityDate = `Bogota, ${format(new Date(), "d 'de' MMMM 'de' yyyy", { locale: es })}`
-      const monthLabel = getReportMonthLabel(options.startDate, options.endDate)
+      const monthLabel = options.reportPeriodLabel || getKpiReportPeriodLabel(options.startDate, options.endDate)
       const headerClientName = options.isGeneralReport ? 'Todos los clientes' : options.clientName
 
       doc.setFont('helvetica', 'bold')
@@ -206,7 +201,10 @@ export class TicketKpiReportPDF {
       writeWrappedText('Con base en la informacion contenida anteriormente y respondiendo a las metricas de exito propuestas en los SLAs, a continuacion, presentamos el comportamiento de la operacion durante el mes:', margin, maxWidth)
       yPos += 4
 
-      writeWrappedText('- Disponibilidad de servicios: No se registraron eventos nivel Critico P1; lo cual se traduce en que no hubo interrupciones del servicio, continuando con la disponibilidad del servicio en un nivel superior al 97.5% propuesto para los periodos operativos.', margin, maxWidth)
+      const visitHistory = options.visitHistory || []
+      const narratives = buildKpiNarrativeParagraphs(report, visitHistory, monthLabel)
+
+      writeWrappedText(narratives.availability, margin, maxWidth)
       yPos += 2
 
       const resolutionLine = `- Cumplimiento en Tiempos de resolucion: ${report.resolutionCompliance.percentage}% (${report.resolutionCompliance.within}/${report.resolutionCompliance.evaluated}) de los casos se resolvieron dentro de los tiempos propuestos en los SLA, dentro de los cuales se dividieron en:`
@@ -223,13 +221,11 @@ export class TicketKpiReportPDF {
       writeWrappedText(responseLine, margin, maxWidth)
       yPos += 2
 
-      writeWrappedText('- Seguridad: No se presento ningun incidente de seguridad mayor que afectara la operacion, se implementaron nuevas politicas con mayor restriccion sobre la navegacion en redes sociales y el bloqueo del uso de dispositivos de almacenamiento externo por USB.', margin, maxWidth)
+      writeWrappedText(narratives.security, margin, maxWidth)
       yPos += 2
 
-      writeWrappedText('- Productividad: Durante el mes de marzo se aprovisionaron 2 equipos nuevos, 2 docking station y 2 cargadores adicionales (para la direccion ejecutiva), ademas se han programado revisiones sobre equipos, infraestructura general y copias de seguridad en el servidor de aplicaciones, asi como ajustes en las politicas de dominio, para un total de 10 atenciones en sitio. Como ultimo anexo, se programaron 4 visitas al domicilio del director ejecutivo para la instalacion de 2 Access Point como solucion de red y la entrega de un equipo para uso personal junto con su respectivo docking.', margin, maxWidth)
+      writeWrappedText(narratives.productivity, margin, maxWidth)
       yPos += 8
-
-      const visitHistory = options.visitHistory || []
       ensureSpace(24)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(41, 128, 185)

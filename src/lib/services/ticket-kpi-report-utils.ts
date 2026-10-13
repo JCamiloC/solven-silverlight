@@ -1,4 +1,7 @@
+import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
 import type { TicketWithRelations } from '@/lib/services/tickets'
+import type { VisitReportRow } from '@/lib/services/visit-report-pdf'
 
 export interface TicketKpiRow {
   id: string
@@ -54,6 +57,7 @@ export interface TicketKpiReportData {
   }
   priorityBuckets: PriorityBucket[]
   criticalIncidents: number
+  securityIncidents: number
   mainMetrics: {
     open: number
     pendingConfirmation: number
@@ -324,6 +328,7 @@ export const buildTicketKpiReportData = (
     },
     priorityBuckets: priorityBucketsBase,
     criticalIncidents: priorityDistribution.P1,
+    securityIncidents: tickets.filter((ticket) => Boolean(ticket.security_incident)).length,
     mainMetrics: {
       open: tickets.filter((ticket) => isOpenStatus(ticket.status as string)).length,
       pendingConfirmation: tickets.filter((ticket) => ticket.status === 'pendiente_confirmacion').length,
@@ -331,6 +336,85 @@ export const buildTicketKpiReportData = (
       critical: tickets.filter((ticket) => ticket.priority === 'critical').length,
     },
   }
+}
+
+export const getKpiReportPeriodLabel = (startDate?: string, endDate?: string): string => {
+  if (startDate && endDate && startDate.slice(0, 7) === endDate.slice(0, 7)) {
+    return format(new Date(`${startDate}T00:00:00`), 'MMMM yyyy', { locale: es })
+  }
+  if (startDate && endDate) {
+    return `${startDate} a ${endDate}`
+  }
+  return 'el periodo seleccionado'
+}
+
+export interface KpiNarrativeParagraphs {
+  availability: string
+  security: string
+  productivity: string
+}
+
+const countVisitsByEstado = (visits: VisitReportRow[], estadoLabel: string) =>
+  visits.filter((visit) => visit.estado.toLowerCase() === estadoLabel.toLowerCase()).length
+
+const buildVisitTypeSummary = (visits: VisitReportRow[]): string => {
+  const counts = new Map<string, number>()
+  visits.forEach((visit) => {
+    counts.set(visit.tipo, (counts.get(visit.tipo) || 0) + 1)
+  })
+  if (counts.size === 0) return ''
+  return Array.from(counts.entries())
+    .map(([tipo, count]) => `${tipo} (${count})`)
+    .join(', ')
+}
+
+export const buildKpiNarrativeParagraphs = (
+  report: TicketKpiReportData,
+  visitHistory: VisitReportRow[] = [],
+  periodLabel: string
+): KpiNarrativeParagraphs => {
+  const p1 = report.priorityDistribution.P1
+  const availability =
+    p1 === 0
+      ? `- Disponibilidad de servicios: No se registraron eventos nivel Critico P1 durante ${periodLabel}; lo cual indica que no hubo interrupciones catalogadas con la maxima criticidad en el periodo, manteniendo la operacion dentro del objetivo de disponibilidad superior al 97.5% propuesto en los SLAs.`
+      : `- Disponibilidad de servicios: Se registraron ${p1} evento(s) nivel Critico P1 durante ${periodLabel}. Estos casos fueron gestionados conforme a los tiempos de respuesta y resolucion definidos para criticidad P1, con seguimiento hasta el restablecimiento del servicio.`
+
+  const securityCount = report.securityIncidents
+  const security =
+    securityCount === 0
+      ? `- Seguridad: No se registraron incidentes de seguridad marcados en tickets durante ${periodLabel}.`
+      : `- Seguridad: Se registraron ${securityCount} incidente(s) de seguridad en tickets durante ${periodLabel}, identificados con la marca "Incidente de seguridad" y gestionados por el equipo de soporte.`
+
+  const totalVisits = visitHistory.length
+  let productivity: string
+  if (totalVisits === 0) {
+    productivity = `- Productividad: Durante ${periodLabel} no se registraron visitas tecnicas en el sistema para el alcance del reporte.`
+  } else {
+    const completed = countVisitsByEstado(visitHistory, 'Completada')
+    const pending = countVisitsByEstado(visitHistory, 'Pendiente')
+    const cancelled = countVisitsByEstado(visitHistory, 'Cancelada')
+    const withEquipment = visitHistory.filter(
+      (visit) =>
+        visit.equipos.trim().length > 0 &&
+        !visit.equipos.toLowerCase().includes('sin equipo')
+    ).length
+    const tipoSummary = buildVisitTypeSummary(visitHistory)
+    const statusParts = [
+      `${completed} completada(s)`,
+      pending > 0 ? `${pending} pendiente(s)` : null,
+      cancelled > 0 ? `${cancelled} cancelada(s)` : null,
+    ].filter(Boolean)
+
+    productivity = `- Productividad: Durante ${periodLabel} se realizaron ${totalVisits} visita(s) tecnica(s) (${statusParts.join(', ')}).`
+    if (tipoSummary) {
+      productivity += ` Distribucion por tipo: ${tipoSummary}.`
+    }
+    if (withEquipment > 0) {
+      productivity += ` ${withEquipment} visita(s) incluyeron atencion a equipos en campo (detalle en el historico de visitas).`
+    }
+  }
+
+  return { availability, security, productivity }
 }
 
 export const formatMinutesToReadable = (minutes: number): string => {

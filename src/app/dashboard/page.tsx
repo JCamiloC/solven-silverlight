@@ -4,7 +4,7 @@ import {
   DashboardStats,
   RecentTickets,
   HardwareOverview,
-  UpcomingMaintenances,
+  ExpirationAlertsPanel,
   ClientDashboard,
 } from '@/components/dashboard'
 import { ProtectedRoute } from '@/components/auth/protected-route'
@@ -24,7 +24,7 @@ function StaffDashboard() {
 
       <DashboardStats />
 
-      <UpcomingMaintenances />
+      <ExpirationAlertsPanel limit={15} />
 
       <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
         <RecentTickets />
@@ -38,18 +38,15 @@ export default function DashboardPage() {
   const { user, profile, initialized, loading } = useAuth()
   const effectiveProfile = resolveEffectiveProfile(user, profile)
   const isClientUser = effectiveProfile?.role === 'cliente'
+  const waitingForSession = !initialized || (!user && loading)
 
   return (
     <ProtectedRoute
       allowedRoles={['administrador', 'lider_soporte', 'agente_soporte', 'cliente']}
     >
-      {!initialized ? (
+      {waitingForSession ? (
         <div className="flex min-h-[40vh] items-center justify-center">
           <Loading size="lg" text="Cargando panel..." />
-        </div>
-      ) : loading && !profile ? (
-        <div className="flex min-h-[40vh] items-center justify-center">
-          <Loading size="lg" text="Sincronizando perfil..." />
         </div>
       ) : isClientUser ? (
         <ClientDashboard />
